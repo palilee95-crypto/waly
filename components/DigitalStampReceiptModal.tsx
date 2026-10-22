@@ -16,6 +16,7 @@ import * as Sharing from 'expo-sharing';
 
 export interface ReceiptData {
   id: string;
+  receiptId?: string;
   storeName: string;
   branchName?: string;
   date: string;
@@ -28,6 +29,7 @@ export interface ReceiptData {
   customerName?: string;
   cashierName?: string;
   pointsEarned?: number;
+  currentPoints?: number;
   isPointsOnly?: boolean;
 }
 
@@ -57,8 +59,8 @@ export default function DigitalStampReceiptModal({
     : parseFloat(receiptData.billAmount) || 0;
 
   const isPointsOnly = !!receiptData.isPointsOnly;
-  const pointsEarned = receiptData.pointsEarned || Math.floor(numBill);
-  const stampsEarned = receiptData.stampsEarned || 1;
+  const pointsEarned = receiptData.pointsEarned ?? 0;
+  const stampsEarned = receiptData.stampsEarned ?? 0;
   const currentStamps = receiptData.currentStamps || 0;
   const goal = receiptData.stampGoal || 10;
   const remaining = Math.max(0, goal - currentStamps);

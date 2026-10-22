@@ -484,10 +484,16 @@ routerAdd("GET", "/api/risev/nfc/receipt", (e) => {
     }
     const receipts = $app.findRecordsByFilter("digital_receipts", "claim = '" + claimId + "'", "-created", 1, 0);
     const receipt = receipts.length ? receipts[0] : null;
-    if (!receipt || receipt.getString("payment_status") !== "paid" || Number(receipt.get("total_amount")) <= 0) {
+    if (!receipt || receipt.getString("payment_status") !== "paid") {
       return e.json(200, { receipt_id: "", paid_sale: Number(claim.get("bill_amount")) > 0 });
     }
-    return e.json(200, { receipt_id: receipt.id, paid_sale: true });
+    // A voucher can cover the whole bill; the receipt still exists as a paid
+    // record with a RM0.00 total and the voucher discount.
+    return e.json(200, {
+      receipt_id: receipt.id,
+      share_token: receipt.getString("share_token"),
+      paid_sale: true
+    });
   } catch (err) {
     return e.json(404, { message: "Receipt not found" });
   }
@@ -505,7 +511,17 @@ routerAdd("GET", "/api/risev/customer/transaction-receipt", (e) => {
     if (transaction.getString("customer") !== e.auth.id) return e.json(403, { message: "This transaction belongs to another customer" });
     const receipts = $app.findRecordsByFilter("digital_receipts", "transaction = '" + transactionId + "'", "-created", 1, 0);
     const receipt = receipts.length ? receipts[0] : null;
-    return e.json(200, { receipt_id: receipt && receipt.getString("payment_status") === "paid" ? receipt.id : "" });
+    if (!receipt) return e.json(200, { receipt_id: "", share_token: "" });
+
+    // Same rule as the public route: a paid receipt may be RM0.00 (voucher), a
+    // "recorded" one only counts when money actually changed hands.
+    const status = receipt.getString("payment_status");
+    const total = Number(receipt.get("total_amount")) || 0;
+    const usable = status === "paid" || (status === "recorded" && total > 0);
+    return e.json(200, {
+      receipt_id: usable ? receipt.id : "",
+      share_token: usable ? receipt.getString("share_token") : ""
+    });
   } catch (err) { return e.json(404, { message: "Transaction not found" }); }
 });
 

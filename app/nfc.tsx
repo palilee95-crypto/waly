@@ -33,6 +33,7 @@ import { getVoucherSpineTheme } from '@/theme';
 import * as Clipboard from 'expo-clipboard';
 import BranchFormModal, { StaffOption } from '@/components/BranchFormModal';
 import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
+import Svg, { Path } from 'react-native-svg';
 
 const stampIcons = [
   { id: 'ticket', family: 'Ionicons', name: 'ticket-sharp' },
@@ -1069,15 +1070,15 @@ export default function NfcLandingScreen() {
       Animated.sequence([
         Animated.delay(800), // Delay to let flip and stamp ink finish
         Animated.parallel([
-          Animated.spring(voucherSlideAnim, {
+          Animated.timing(voucherSlideAnim, {
             toValue: 1,
-            friction: 7,
-            tension: 50,
+            duration: 1500,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
           }),
           Animated.timing(voucherProgressAnim, {
             toValue: 1,
-            duration: 1000,
+            duration: 1400,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
           })
@@ -1146,13 +1147,25 @@ export default function NfcLandingScreen() {
     let attempts = 0;
     const load = async () => {
       try {
-        const match = await pb.send<{ receipt_id?: string; paid_sale?: boolean }>('/api/risev/nfc/receipt', {
+        const match = await pb.send<{ receipt_id?: string; share_token?: string; paid_sale?: boolean }>('/api/risev/nfc/receipt', {
           method: 'GET', params: { claim_id: activeClaimId, phone }, requestKey: null,
         });
         if (!cancelled && match.paid_sale) setReceiptExpected(true);
-        if (match.receipt_id) {
-          const saved = await pb.collection('digital_receipts').getOne(match.receipt_id, { expand: 'merchant', requestKey: null });
-          if (!cancelled && saved.payment_status === 'paid') { setReceiptData(saved); return; }
+        // Guests cannot read the collection any more: the token route returns the
+        // receipt's own fields, without the customer's phone or account ids.
+        if (match.share_token) {
+          const res = await pb.send<{ receipt?: any }>('/api/risev/receipt/public', {
+            method: 'GET', params: { token: match.share_token }, requestKey: null,
+          });
+          const saved = res?.receipt;
+          if (!cancelled && saved && saved.payment_status === 'paid') {
+            setReceiptData({
+              ...saved,
+              id: match.receipt_id || match.share_token,
+              expand: { merchant: { name: saved.merchant_name || '' } },
+            });
+            return;
+          }
         }
       } catch (error) { /* The purchase may not have produced a paid receipt. */ }
       if (!cancelled && ++attempts < 6) timer = setTimeout(load, 1500);
@@ -1610,6 +1623,11 @@ export default function NfcLandingScreen() {
     if (!merchant) return;
 
     let isSubscribed = true;
+    const unsubscribers: Array<() => Promise<void>> = [];
+    const keep = (remove: () => Promise<void>) => {
+      if (!isSubscribed) void remove().catch(() => {});
+      else unsubscribers.push(remove);
+    };
 
     // Subscribe to loyalty_cards updates for this user & merchant
     pb.collection('loyalty_cards').subscribe('*', (e) => {
@@ -1627,7 +1645,7 @@ export default function NfcLandingScreen() {
       }
     }, {
       filter: `merchant = "${merchant.id}"`
-    }).catch(() => {});
+    }).then(keep).catch(() => {});
 
     // Subscribe to transactions updates
     pb.collection('transactions').subscribe('*', (e) => {
@@ -1645,7 +1663,7 @@ export default function NfcLandingScreen() {
       }
     }, {
       filter: `merchant = "${merchant.id}"`
-    }).catch(() => {});
+    }).then(keep).catch(() => {});
 
     // Subscribe to nfc_claims updates for instant auto-reveal when WhatsApp is verified or merchant approves
     pb.collection('nfc_claims').subscribe('*', (e: any) => {
@@ -1712,13 +1730,11 @@ export default function NfcLandingScreen() {
       }
     }, {
       filter: `merchant = "${merchant.id}"`
-    }).catch(() => {});
+    }).then(keep).catch(() => {});
 
     return () => {
       isSubscribed = false;
-      pb.collection('loyalty_cards').unsubscribe('*').catch(() => {});
-      pb.collection('transactions').unsubscribe('*').catch(() => {});
-      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
+      for (const remove of unsubscribers) void remove().catch(() => {});
     };
   }, [merchant, user, claimId, step]);
 
@@ -2523,214 +2539,106 @@ export default function NfcLandingScreen() {
   // REWARD VOUCHER PREVIEW TICKET (What customer gets upon completion)
   // ══════════════════════════════════════════════════════════════════
   const renderRewardVoucherPreview = () => {
-    // Brand header color (Dynamic merchant primary color)
-    const headerBg = primaryColor || '#2563EB';
-    const headerTextColor = getContrastColor(headerBg);
-
-    const cardBg = '#FFFFFF'; // Crisp white paper background
-    const textColor = '#111827';
-    const subtextColor = '#4B5563';
-    const dividerColor = 'rgba(0, 0, 0, 0.15)';
-    const notchColor = '#100720'; // Seamless dark cutout blending with page backdrop
-
+    const collected = Math.min(stampGoal, Math.max(0, currentStamps));
+    const progressPercent = Math.min(100, Math.round((collected / Math.max(1, stampGoal)) * 100));
     const isComplete = currentStamps >= stampGoal;
-    const remainingStamps = Math.max(0, stampGoal - currentStamps);
-    const progressPercent = Math.min(100, Math.round((currentStamps / Math.max(1, stampGoal)) * 100));
+    const nextMilestone = subRewardsList
+      .filter((sr: any) => Number(sr.at_stamp) > currentStamps)
+      .sort((a: any, b: any) => Number(a.at_stamp) - Number(b.at_stamp))[0];
+    const milestoneTitle = nextMilestone?.reward_title || nextMilestone?.title || 'Reward';
 
-    const serialNo = `#WLY-${(merchant?.id || '88421').slice(-5).toUpperCase()}`;
-
-    const animatedMaxHeight = (step === 'form') ? 185 : voucherSlideAnim.interpolate({
+    const animatedMaxHeight = voucherSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 380] });
+    const animatedMarginBottom = voucherSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 10] });
+    const animatedTranslateY = voucherSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] });
+    const animatedOpacity = voucherSlideAnim.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0.4, 1] });
+    const animatedWidth: any = voucherProgressAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 185]
+      outputRange: ['0%', `${progressPercent}%`],
     });
 
-    const animatedMarginBottom = (step === 'form') ? 14 : voucherSlideAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, isApproved ? 6 : 10]
-    });
-
-    const animatedTranslateY = (step === 'form') ? 0 : voucherSlideAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-24, 0]
-    });
-    
-    const animatedOpacity = (step === 'form') ? 1 : voucherSlideAnim.interpolate({
-      inputRange: [0, 0.35, 1],
-      outputRange: [0, 0.4, 1]
-    });
-
-    const animatedWidth: any = (step === 'form') ? `${progressPercent}%` : voucherProgressAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0%', `${progressPercent}%`]
-    });
+    let edge = 'M0 0 H360 V10 H0 Z';
+    const notchRadius = 5;
+    for (let x = 10; x < 360; x += 20) {
+      edge += ` M${x - notchRadius} 10 a${notchRadius} ${notchRadius} 0 1 0 ${notchRadius * 2} 0 a${notchRadius} ${notchRadius} 0 1 0 ${-notchRadius * 2} 0`;
+    }
 
     return (
-      <Animated.View style={[
-        styles.voucherPreviewContainer,
-        {
-          maxHeight: animatedMaxHeight,
-          marginBottom: animatedMarginBottom,
-          opacity: animatedOpacity,
-          transform: [{ translateY: animatedTranslateY }],
-          overflow: 'hidden',
-        }
-      ]}>
-        {/* Boarding Pass Ticket Card Container */}
-        <View style={[styles.boardingPassCard, { backgroundColor: cardBg }]}>
-          
-          {/* Left Brand Band (The "Airline" Strip) */}
-          <View style={[styles.boardingPassBrandBand, { backgroundColor: headerBg }]}>
-            <View style={styles.boardingPassBandTextWrapper}>
-              <Text style={[styles.boardingPassBandText, { color: headerTextColor }]} numberOfLines={1}>
-                {merchantName.toUpperCase()}
-              </Text>
-              <Text style={[styles.boardingPassBandSubtext, { color: headerTextColor }]}>
-                REWARD PASS
-              </Text>
-            </View>
-          </View>
-
-          {/* Middle Main Body */}
-          <View style={styles.boardingPassMainBody}>
-            <View style={{ flex: 1, justifyContent: 'center', gap: 12 }}>
-              
-              {/* Top: Premium Progress Bar */}
-              <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#6B7280', letterSpacing: 0.5 }}>
-                    PROGRESS
-                  </Text>
-                  <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827' }}>
-                    {isComplete ? 'UNLOCKED' : `${progressPercent}%`}
-                  </Text>
+      <Animated.View
+        style={[
+          styles.voucherPreviewContainer,
+          {
+            maxHeight: animatedMaxHeight,
+            marginBottom: animatedMarginBottom,
+            opacity: animatedOpacity,
+            transform: [{ translateY: animatedTranslateY }],
+            overflow: 'hidden',
+          },
+        ]}
+      >
+        <View style={styles.receiptStub}>
+          <View style={styles.receiptPaper}>
+            <View style={styles.receiptTopline}>
+              <View style={[styles.receiptApprovedPill, !isApproved && { backgroundColor: '#FEF9C3' }]}>
+                <View style={[styles.receiptCheckDisc, !isApproved && { backgroundColor: '#D97706' }]}>
+                  <Ionicons name={isApproved ? 'checkmark' : 'time-outline'} size={12} color="#FFFFFF" />
                 </View>
-                <View style={{ height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' }}>
-                  <Animated.View style={{ height: '100%', width: animatedWidth, backgroundColor: headerBg, borderRadius: 4 }} />
-                </View>
-              </View>
-
-              {/* Middle: Reward Info */}
-              <View>
-                <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 2, textTransform: 'uppercase' }}>
-                  Your Reward
-                </Text>
-                <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: 0.1 }} numberOfLines={2}>
-                  {rewardTitle}
+                <Text style={[styles.receiptApprovedText, !isApproved && { color: '#B45309' }]}>
+                  {isApproved ? 'STAMP APPROVED' : 'STAMP PENDING'}
                 </Text>
               </View>
-
-              {/* Bottom: Stamp Status & Next Milestone */}
-              <View style={{ gap: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Ionicons name="gift-outline" size={13} color="#6B7280" />
-                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>
-                    {isComplete ? 'Ready to claim!' : `${currentStamps} out of ${stampGoal} stamps collected`}
-                  </Text>
-                </View>
-                {(() => {
-                  const nextMilestone = subRewardsList
-                    .filter((sr: any) => Number(sr.at_stamp) > currentStamps)
-                    .sort((a: any, b: any) => Number(a.at_stamp) - Number(b.at_stamp))[0];
-                  if (nextMilestone) {
-                    return (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
-                        <View style={{ 
-                          backgroundColor: '#FEF3C7', 
-                          paddingHorizontal: 7, 
-                          paddingVertical: 2.5, 
-                          borderRadius: 6, 
-                          borderWidth: 1, 
-                          borderColor: '#FDE68A',
-                          maxWidth: '96%',
-                          alignSelf: 'flex-start'
-                        }}>
-                          <Text 
-                            style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                          >
-                            🎁 Milestone at {nextMilestone.at_stamp} stamps: {nextMilestone.reward_title}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  }
-                  return null;
-                })()}
-              </View>
-
+              <Image source={require('../assets/risev logo.png')} style={styles.receiptRisevLogo} resizeMode="contain" />
             </View>
-          </View>
 
-          {/* Perforation Column */}
-          <View style={styles.boardingPassPerforationCol} pointerEvents="none">
-            {/* Background fill for the right half to connect the brand color to the dashed line */}
-            <View style={{ 
-              position: 'absolute', right: 0, top: 0, bottom: 0, width: 10, 
-              backgroundColor: headerBg,
-              shadowColor: '#000',
-              shadowOffset: { width: -4, height: 0 },
-              shadowOpacity: 0.12,
-              shadowRadius: 6,
-              elevation: 4
-            }} />
-            
-            <View style={[styles.voucherDashedLine, { borderColor: '#FFFFFF', zIndex: 1 }]} />
-            <View style={[styles.voucherNotchTop, { backgroundColor: notchColor, zIndex: 2 }]} />
-            <View style={[styles.voucherNotchBottom, { backgroundColor: notchColor, zIndex: 2 }]} />
-          </View>
+            <Text style={styles.receiptMerchant}>{merchantName.toUpperCase()}</Text>
+            <Text style={styles.receiptRewardTitle}>{rewardTitle}</Text>
+            <View style={styles.receiptRule} />
 
-          {/* Right Stub */}
-          <View style={[styles.boardingPassRightStub, { backgroundColor: headerBg }]}>
-            <View style={[styles.boardingPassStubBody, { justifyContent: 'center', alignItems: 'center', gap: 6, padding: 6 }]}>
-              {merchantLogoUrl && !merchantLogoUrl.includes('placeholder') ? (
-                <View style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: '#FFFFFF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1,
-                  borderColor: 'rgba(0,0,0,0.06)',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 3,
-                  elevation: 2,
-                  padding: 2,
-                }}>
-                  <Image source={{ uri: merchantLogoUrl }} style={{ width: '100%', height: '100%', borderRadius: 22 }} resizeMode="contain" />
-                </View>
-              ) : (
-                <View style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: '#FFFFFF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 3,
-                  elevation: 2,
-                }}>
-                  <Ionicons name="storefront" size={22} color={headerBg} />
-                </View>
-              )}
-              
-              <Text style={[styles.boardingPassStubValueText, { textAlign: 'center', fontSize: 10, color: headerTextColor, letterSpacing: 0.3 }]} numberOfLines={2}>
-                {merchantName.toUpperCase()}
+            <View style={styles.receiptProgressHeader}>
+              <Ionicons name="gift-outline" size={17} color="#6D7584" />
+              <Text style={styles.receiptProgressText}>
+                <Text style={styles.receiptProgressStrong}>{isComplete ? `${stampGoal} out of ${stampGoal}` : `${collected} out of ${stampGoal}`}</Text> stamps collected
               </Text>
             </View>
+            <View style={styles.receiptProgressTrack}>
+              <Animated.View style={[styles.receiptProgressFill, { width: animatedWidth }]} />
+            </View>
+
+            {nextMilestone ? (
+              <View style={styles.receiptMilestone}>
+                <Text style={styles.receiptMilestoneEmoji}>🎁</Text>
+                <Text style={styles.receiptMilestoneText}>
+                  Milestone at {nextMilestone.at_stamp} stamps: {milestoneTitle}
+                </Text>
+              </View>
+            ) : null}
+
+            {receiptData || receiptExpected ? (
+              <TouchableOpacity
+                style={styles.receiptAccess}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (receiptData) setShowReceiptModal(true);
+                  else setReceiptRetry((current) => current + 1);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={receiptData ? 'View or download receipt' : 'Check for your receipt again'}
+              >
+                <Ionicons name="receipt-outline" size={20} color="#141722" />
+                <Text style={styles.receiptAccessText}>
+                  {receiptData ? 'View / Download Receipt' : 'Receipt preparing · Tap to retry'}
+                </Text>
+                <Ionicons name={receiptData ? 'chevron-forward' : 'refresh'} size={17} color="#677080" />
+              </TouchableOpacity>
+            ) : null}
           </View>
+          <Svg width="100%" height={10} viewBox="0 0 360 10" preserveAspectRatio="none" style={styles.receiptTornEdge}>
+            <Path d={edge} fill="#FFFFFF" fillRule="evenodd" />
+          </Svg>
         </View>
       </Animated.View>
     );
   };
 
-  // ══════════════════════════════════════════════════════════════════
   // 9:16 CUSTOMIZABLE CARD CONTAINER
   // ══════════════════════════════════════════════════════════════════
   const renderCardContent = () => (
@@ -2832,7 +2740,7 @@ export default function NfcLandingScreen() {
             <TouchableOpacity
               activeOpacity={0.95}
               onPress={() => setShowBack(prev => !prev)}
-              style={{ marginBottom: 16, position: 'relative' }}
+              style={{ marginBottom: 16, position: 'relative', zIndex: 3 }}
             >
               {/* Front Card Panel */}
               <Animated.View
@@ -4081,18 +3989,16 @@ export default function NfcLandingScreen() {
                     </View>
                   </View>
                 </View>
-              ) : (
+              ) : isPointsOnly ? (
                 <View style={styles.radarStatusPill}>
                   <View style={[styles.radarStatusDot, { backgroundColor: '#34D399' }]} />
-                  <Text style={styles.radarStatusPillText}>
-                    {isPointsOnly ? '✨ POINTS APPROVED!' : '🎉 STAMP APPROVED!'}
-                  </Text>
+                  <Text style={styles.radarStatusPillText}>✨ POINTS APPROVED!</Text>
                 </View>
-              )}
+              ) : null}
 
               {isApproved && (
                 <View style={{ width: '100%', alignItems: 'center', marginTop: 0 }}>
-                  {receiptData && (
+                  {receiptData && isPointsOnly && (
                     <TouchableOpacity 
                       style={styles.receiptBanner}
                       onPress={() => setShowReceiptModal(true)}
@@ -4107,7 +4013,7 @@ export default function NfcLandingScreen() {
                       <Ionicons name="chevron-forward" size={16} color="#64748B" />
                     </TouchableOpacity>
                   )}
-                  {!receiptData && receiptExpected && (
+                  {!receiptData && receiptExpected && isPointsOnly && (
                     <TouchableOpacity
                       style={styles.receiptBanner}
                       onPress={() => setReceiptRetry((current) => current + 1)}
@@ -4124,7 +4030,7 @@ export default function NfcLandingScreen() {
                   )}
 
                   {canBookAppointment && bookingSlug ? (
-                    <View style={{ width: '100%', maxWidth: 360, marginTop: receiptData ? 8 : 0 }}>
+                    <View style={{ width: '100%', maxWidth: 360, marginTop: 18 }}>
                       <View style={styles.postApprovalBookingCard}>
                         {/* Green Pill Tag matching Image 2 */}
                         <View style={styles.postApprovalBookingTagPill}>
@@ -4949,6 +4855,7 @@ export default function NfcLandingScreen() {
         visible={showReceiptModal}
         receipt={receiptData}
         mode="customer"
+        animate
         onClose={() => setShowReceiptModal(false)}
       />
 
@@ -5827,7 +5734,142 @@ const styles = StyleSheet.create({
   // Voucher Ticket Preview (Between Card & Form)
   voucherPreviewContainer: {
     width: '100%',
+    marginTop: -24,
   },
+  receiptStub: {
+    width: '92%',
+    alignSelf: 'center',
+    marginTop: 0,
+    zIndex: 2,
+    shadowColor: '#5E4000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+  receiptPaper: {
+    backgroundColor: '#FFFFFF',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#F0F0F0',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  receiptTopline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 16,
+  },
+  receiptApprovedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#E5F9F0',
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  receiptCheckDisc: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#087C5A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptApprovedText: {
+    fontSize: 10.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#087C5A',
+    letterSpacing: 0.7,
+  },
+  receiptRisevLogo: { width: 46, height: 16 },
+  receiptMerchant: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#737989',
+    textTransform: 'uppercase',
+    letterSpacing: 2.2,
+    marginBottom: 6,
+  },
+  receiptRewardTitle: {
+    fontSize: 21,
+    lineHeight: 25,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#080A10',
+    letterSpacing: -0.7,
+    marginBottom: 14,
+  },
+  receiptRule: { height: 1, backgroundColor: '#E9EAEC', width: '100%' },
+  receiptProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  receiptProgressText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#6F7683',
+  },
+  receiptProgressStrong: {
+    color: '#080A10',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  receiptProgressTrack: {
+    height: 7,
+    width: '100%',
+    borderRadius: 99,
+    backgroundColor: '#E7E7EA',
+    overflow: 'hidden',
+  },
+  receiptProgressFill: {
+    height: '100%',
+    borderRadius: 99,
+    backgroundColor: '#FFCC00',
+  },
+  receiptMilestone: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8DF',
+    borderWidth: 1,
+    borderColor: '#FFE794',
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  receiptMilestoneEmoji: { fontSize: 16 },
+  receiptMilestoneText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#624315',
+  },
+  receiptAccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderTopWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#D9DCE2',
+    marginTop: 16,
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  receiptAccessText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#141722',
+  },
+  receiptTornEdge: { marginTop: -1 },
   voucherRibbonTag: {
     flexDirection: 'row',
     alignItems: 'center',

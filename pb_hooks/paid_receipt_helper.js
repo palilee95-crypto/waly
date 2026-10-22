@@ -78,7 +78,6 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   if (!txn) throw new Error("The paid transaction for this claim was not found.");
 
   const amount = Number(claim.get("bill_amount")) || Number(txn.get("bill_amount")) || 0;
-  if (amount <= 0) return "";
 
   let meta = {};
   try {
@@ -91,6 +90,12 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   const rawItems = Array.isArray(source.items)
     ? source.items
     : (Array.isArray(meta.items_summary) ? meta.items_summary : []);
+  const grossAmount = Number(source.subtotal) || rawItems.reduce(function (sum, item) {
+    return sum + Math.max(0, Number(item.price) || 0) * Math.max(1, Number(item.qty) || 1);
+  }, 0);
+  const voucherApplied = Boolean(meta.voucher_id || source.voucher_id) &&
+    !meta.voucher_error && !source.voucher_error;
+  if (amount <= 0 && !(voucherApplied && grossAmount > 0)) return "";
   const items = rawItems.slice(0, 100).map(function (item) {
     return {
       name: String(item.name || "Item").slice(0, 120),
@@ -130,6 +135,46 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   receipt.set("payment_reference", String(source.payment_reference || "").slice(0, 120));
   receipt.set("payment_status", "paid");
   receipt.set("stamps_earned", Number(txn.get("stamps")) || 0);
+  // Public receipt links carry this token instead of the record id.
+  receipt.set("share_token", $security.randomString(24));
+  try {
+    const cardId = txn.getString("loyalty_card");
+    if (cardId) {
+      const card = $app.findRecordById("loyalty_cards", cardId);
+      const earnedStamps = Number(txn.get("stamps")) || 0;
+      const balance = Math.max(0, Number(card.get("stamps_collected")) || 0);
+      let goal = 10;
+      let rewardName = "";
+      try {
+        const program = $app.findRecordById("loyalty_programs", card.getString("program"));
+        goal = Math.max(1, Number(program.get("stamp_goal")) || 10);
+        // Name the REWARD, not the card ("Free Reward", not "Standard Loyalty
+        // Card") — manual-give receipts read the same field.
+        rewardName = String(program.getString("reward_name") || "").slice(0, 120);
+        if (!rewardName) {
+          try {
+            const rewardId = program.getString("linked_reward");
+            if (rewardId) {
+              rewardName = String($app.findRecordById("rewards", rewardId).getString("name") || "").slice(0, 120);
+            }
+          } catch (rewardLookupErr) {}
+        }
+      } catch (programErr) {}
+      // A card that just completed its goal is reset before this snapshot runs.
+      // Read live, a 9/10 -> 10/10 visit looks like "0 before, 0 after"; the
+      // receipt must instead show the balance the visit reached.
+      const completedCard = earnedStamps > 0 && balance < earnedStamps;
+      const stampsBefore = completedCard
+        ? Math.max(0, goal - earnedStamps)
+        : Math.max(0, balance - earnedStamps);
+      receipt.set("stamps_before", stampsBefore);
+      receipt.set("stamps_balance", completedCard ? goal : balance);
+      receipt.set("stamp_goal", goal);
+      receipt.set("reward_name", rewardName);
+    }
+  } catch (rewardErr) {
+    console.log("[PAID RECEIPT] reward snapshot failed:", rewardErr.message || rewardErr);
+  }
   $app.save(receipt);
   return receipt.id;
 }
