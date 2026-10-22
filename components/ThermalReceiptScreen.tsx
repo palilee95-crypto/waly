@@ -73,7 +73,7 @@ export default function ThermalReceiptScreen({ visible, receipt, mode, animate =
   const [reward, setReward] = useState<{ balance: number; goal: number; name: string } | null>(null);
 
   useEffect(() => {
-    if (visible && receipt) preloadPaidReceiptLogo(receipt);
+    if (visible && receipt) void preloadPaidReceiptLogo(receipt);
   }, [visible, receipt?.id]);
 
   useEffect(() => {
