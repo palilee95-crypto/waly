@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
-import { PaidReceipt } from '@/lib/paidReceipt';
+import { PaidReceipt, receiptFromPublicPayload } from '@/lib/paidReceipt';
 import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
 
 // A receipt link carries a share token, not the record id: the id is not a
@@ -35,36 +35,15 @@ export default function DigitalReceiptScreen() {
           setError('A receipt is not available for this transaction.');
           return;
         }
-        const numberOrUndefined = (value: any) => (value === null || value === undefined || value === ''
-          ? undefined
-          : Number(value));
-        setReceipt({
-          id,
-          receipt_number: String(record.receipt_number || ''),
-          created: String(record.created || ''),
-          merchant: '',
-          customer_name: String(record.customer_name || ''),
-          staff_name: String(record.staff_name || ''),
-          branch_name: String(record.branch_name || ''),
-          line_items: Array.isArray(record.line_items) ? record.line_items : [],
-          subtotal: Number(record.subtotal) || 0,
-          discount_amount: Number(record.discount_amount) || 0,
-          total_amount: Number(record.total_amount) || 0,
-          payment_method: String(record.payment_method || ''),
-          payment_status: String(record.payment_status || ''),
-          stamps_earned: Number(record.stamps_earned) || 0,
-          stamps_before: numberOrUndefined(record.stamps_before),
-          stamps_balance: numberOrUndefined(record.stamps_balance),
-          stamp_goal: numberOrUndefined(record.stamp_goal),
-          reward_name: String(record.reward_name || ''),
-          expand: {
-            merchant: {
-              id: String(record.merchant_id || ''),
-              name: String(record.merchant_name || ''),
-              logo: String(record.merchant_logo || ''),
-            },
-          },
-        });
+        // Same mapper the customer's in-app slip uses, so this page and the
+        // merchant's receipt render the identical slip (logo, transaction row,
+        // payment reference and all).
+        const mapped = receiptFromPublicPayload(record, String(id));
+        if (!mapped) {
+          setError('A receipt is not available for this transaction.');
+          return;
+        }
+        setReceipt(mapped);
       })
       .catch(() => { if (mounted) setError('Could not load this receipt. Please try again later.'); })
       .finally(() => { if (mounted) setLoading(false); });

@@ -119,7 +119,11 @@ onRecordUpdate((e) => {
         r.set('stock', 1000000);
         r.set('is_active', true);
         r.set('type', type === 'free_item' ? 'free_item' : 'discount');
+        // A milestone worth money has to say so, or the checkout cannot price it.
+        r.set('discount_type', type === 'free_item' ? 'none' : 'fixed_amount');
         r.set('discount_value', parseFloat(value) || 0);
+        r.set('min_spend', 0);
+        r.set('max_discount', 0);
         $app.save(r);
         return r.id;
       } catch (err) {
@@ -155,7 +159,13 @@ onRecordUpdate((e) => {
           snapshot_title: subReward.reward_title || 'Sub-Reward',
           snapshot_description: `Sub-Reward for Stamp #${subReward.at_stamp}`,
           snapshot_type: subReward.reward_type || 'free_item',
+          // Without the type the checkout read the value as an untagged number
+          // and fell back to "free item", which zeroed the bill instead of
+          // taking the milestone's value off it.
+          discount_type: subReward.reward_type === 'discount' ? 'fixed_amount' : 'none',
           discount_value: parseFloat(subReward.reward_value) || 0,
+          min_spend: 0,
+          max_discount: 0,
           merchant_id: mId || '',
           is_sub_reward: true,
           at_stamp: subReward.at_stamp

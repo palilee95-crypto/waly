@@ -35,6 +35,47 @@ export const receiptMerchant = (receipt: PaidReceipt) => receipt.expand?.merchan
 export const receiptPaymentMethod = (receipt: PaidReceipt) => ({ qr: 'QR payment', card: 'Card payment', cash: 'Cash', transfer: 'Bank transfer' }[String(receipt.payment_method || '').toLowerCase()] || receipt.payment_method || 'Counter');
 export const receiptDate = (receipt: PaidReceipt) => new Date(String(receipt.created || '').replace(' ', 'T')).toLocaleString('en-MY', { dateStyle: 'medium', timeStyle: 'short' });
 export const receiptLines = (receipt: PaidReceipt) => Array.isArray(receipt.line_items) ? receipt.line_items : [];
+
+// One mapping for every token/public receipt read. The merchant slip is built
+// from the digital_receipts record; the customer's slip was being built field by
+// field with pieces missing (no logo, no transaction, no payment reference), so
+// the two PDFs drifted apart. Both now come through here.
+export function receiptFromPublicPayload(payload: Record<string, any> | null | undefined, token = ''): PaidReceipt | null {
+  if (!payload) return null;
+  const numberOrUndefined = (value: unknown) => (
+    value === null || value === undefined || value === '' ? undefined : Number(value)
+  );
+  const merchantId = String(payload.merchant_id || '');
+  return {
+    id: String(token || ''),
+    receipt_number: String(payload.receipt_number || ''),
+    transaction: String(payload.transaction || ''),
+    created: String(payload.created || ''),
+    merchant: merchantId,
+    customer_name: String(payload.customer_name || ''),
+    staff_name: String(payload.staff_name || ''),
+    branch_name: String(payload.branch_name || ''),
+    line_items: Array.isArray(payload.line_items) ? payload.line_items : [],
+    subtotal: Number(payload.subtotal) || 0,
+    discount_amount: Number(payload.discount_amount) || 0,
+    total_amount: Number(payload.total_amount) || 0,
+    payment_method: String(payload.payment_method || ''),
+    payment_reference: String(payload.payment_reference || ''),
+    payment_status: String(payload.payment_status || ''),
+    stamps_earned: Number(payload.stamps_earned) || 0,
+    stamps_before: numberOrUndefined(payload.stamps_before),
+    stamps_balance: numberOrUndefined(payload.stamps_balance),
+    stamp_goal: numberOrUndefined(payload.stamp_goal),
+    reward_name: String(payload.reward_name || ''),
+    expand: {
+      merchant: {
+        id: merchantId,
+        name: String(payload.merchant_name || ''),
+        logo: String(payload.merchant_logo || ''),
+      },
+    },
+  };
+}
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (match) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match));
 const browserLogos = new Map<string, HTMLImageElement>();
 const logoLoads = new Map<string, Promise<HTMLImageElement | null>>();

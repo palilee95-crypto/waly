@@ -64,6 +64,10 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
       receipt: {
         receipt_number: receipt.getString("receipt_number"),
         created: receipt.getString("created"),
+        // The merchant slip prints the ledger reference and the payment
+        // reference; the shared slip must carry the same rows or the two PDFs
+        // stop matching. Both belong to the sale the token already unlocks.
+        transaction: receipt.getString("transaction"),
         merchant_name: merchantName,
         // A logo is public branding (the Explore page shows it), and the receipt
         // PDF draws it, so the id and file name travel with the payload.
@@ -77,6 +81,7 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
         discount_amount: numberOrZero("discount_amount"),
         total_amount: total,
         payment_method: receipt.getString("payment_method"),
+        payment_reference: receipt.getString("payment_reference"),
         payment_status: status,
         stamps_earned: numberOrZero("stamps_earned"),
         stamps_before: goal ? numberOrZero("stamps_before") : null,
