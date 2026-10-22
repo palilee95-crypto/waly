@@ -55,7 +55,26 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
           }
         }
       } catch (posSubErr) {}
-      if (["starter", "pro", "business", "enterprise"].indexOf(posPlan) < 0) {
+
+      // A booking checkout is already covered by the booking add-on, so a manual
+      // POS sale that carries a valid booking id is allowed on any plan. Without
+      // a valid booking id the POS plan gate below still applies.
+      let bookingBypass = false;
+      const checkoutBookingId = String(body.booking_id || "").trim();
+      if (checkoutBookingId) {
+        try {
+          const digitsOf = (value) => String(value || "").replace(/[^\d]/g, "");
+          const booking = $app.findRecordById("service_bookings", checkoutBookingId);
+          const bookingStatus = booking.getString("status");
+          bookingBypass = booking.getString("merchant") === merchantId &&
+            ["booked", "arrived", "in_service"].indexOf(bookingStatus) >= 0 &&
+            digitsOf(booking.getString("customer_phone")) === digitsOf(rawPhone);
+        } catch (bookingErr) {
+          bookingBypass = false;
+        }
+      }
+
+      if (!bookingBypass && ["starter", "pro", "business", "enterprise"].indexOf(posPlan) < 0) {
         return e.json(403, {
           code: "POS_PLAN_REQUIRED",
           message: "The POS System is available on Starter and PRO plans."
