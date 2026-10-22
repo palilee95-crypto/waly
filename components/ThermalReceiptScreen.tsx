@@ -21,6 +21,7 @@ import { buildWhatsAppLink } from '@/lib/whatsapp';
 import { colors, iconSizes, shadows, spacing } from '@/theme';
 import {
   PaidReceipt,
+  mountPaidReceiptPrintSheet,
   preloadPaidReceiptLogo,
   receiptDate,
   receiptLines,
@@ -74,6 +75,11 @@ export default function ThermalReceiptScreen({ visible, receipt, mode, animate =
   useEffect(() => {
     if (visible && receipt) preloadPaidReceiptLogo(receipt);
   }, [visible, receipt?.id]);
+
+  useEffect(() => {
+    if (!visible || !receipt) return;
+    return mountPaidReceiptPrintSheet(receipt);
+  }, [visible, receipt]);
 
   useEffect(() => {
     setReward(null);

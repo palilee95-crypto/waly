@@ -70,7 +70,7 @@ function receiptHtml(receipt: PaidReceipt): string {
 
 // Browser PDF is drawn from receipt data, never captured from the animation.
 // A JPEG-backed single-page PDF is supported by iOS and Android browsers.
-function browserPdf(receipt: PaidReceipt): Blob {
+function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
   const isPaid = receipt.payment_status === 'paid';
   const rewardGoal = Math.max(1, Number(receipt.stamp_goal) || 10);
   const rewardBalance = Number(receipt.stamps_balance);
@@ -121,6 +121,13 @@ function browserPdf(receipt: PaidReceipt): Blob {
   label('Thank you for visiting!', Math.min(height - 70, y + 20), false, 20, 'center');
   label('Powered by risev', Math.min(height - 34, y + 55), true, 18, 'center', '#555');
 
+  return canvas;
+}
+
+function browserPdf(receipt: PaidReceipt): Blob {
+  const canvas = browserReceiptCanvas(receipt);
+  const width = canvas.width;
+  const height = canvas.height;
   const encoded = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
   const binary = atob(encoded);
   const jpg = Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -142,6 +149,32 @@ function browserPdf(receipt: PaidReceipt): Blob {
   for (let i = 1; i <= 5; i++) push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
   push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
   return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
+}
+
+const PRINT_STYLE_ID = 'risev-receipt-print-style';
+const PRINT_SHEET_ID = 'risev-receipt-print-sheet';
+
+// Browsers print the page, not the receipt — iOS Share → Print → Save to PDF
+// captured the animated screen (logo, barcode, action bar and all). Mounting
+// the same image the downloaded PDF carries, visible only under @media print,
+// makes every print path produce the designed receipt.
+export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return () => {};
+  const canvas = browserReceiptCanvas(receipt);
+  const slipWidthMm = 80;
+  const slipHeightMm = Math.round(slipWidthMm * (canvas.height / canvas.width) * 10) / 10;
+  const style = document.createElement('style');
+  style.id = PRINT_STYLE_ID;
+  style.textContent = `@media print{@page{size:${slipWidthMm}mm ${slipHeightMm}mm;margin:0}html,body{margin:0!important;padding:0!important;background:#fff!important}body>*:not(#${PRINT_SHEET_ID}){display:none!important}#${PRINT_SHEET_ID}{display:block!important;width:${slipWidthMm}mm;margin:0}#${PRINT_SHEET_ID} img{display:block;width:${slipWidthMm}mm;height:${slipHeightMm}mm}}#${PRINT_SHEET_ID}{display:none}`;
+  const sheet = document.createElement('div');
+  sheet.id = PRINT_SHEET_ID;
+  const image = document.createElement('img');
+  image.alt = `Receipt ${receipt.receipt_number || ''}`.trim();
+  image.src = canvas.toDataURL('image/jpeg', 0.92);
+  sheet.appendChild(image);
+  document.head.appendChild(style);
+  document.body.appendChild(sheet);
+  return () => { sheet.remove(); style.remove(); };
 }
 
 export async function savePaidReceiptPdf(receipt: PaidReceipt): Promise<void> {
