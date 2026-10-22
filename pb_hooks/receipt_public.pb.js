@@ -35,9 +35,13 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
     }
 
     let merchantName = "";
+    let merchantId = "";
+    let merchantLogo = "";
     try {
       const merchant = $app.findRecordById("merchants", receipt.getString("merchant"));
       merchantName = merchant.getString("name") || "";
+      merchantId = merchant.id;
+      merchantLogo = merchant.getString("logo") || "";
     } catch (merchantErr) {}
 
     let items = [];
@@ -61,6 +65,10 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
         receipt_number: receipt.getString("receipt_number"),
         created: receipt.getString("created"),
         merchant_name: merchantName,
+        // A logo is public branding (the Explore page shows it), and the receipt
+        // PDF draws it, so the id and file name travel with the payload.
+        merchant_id: merchantId,
+        merchant_logo: merchantLogo,
         branch_name: receipt.getString("branch_name"),
         customer_name: receipt.getString("customer_name"),
         staff_name: receipt.getString("staff_name"),

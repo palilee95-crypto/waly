@@ -68,6 +68,13 @@ export function preloadPaidReceiptLogo(receipt: PaidReceipt): Promise<HTMLImageE
   return load;
 }
 
+// The slip is drawn with the app's webfont and the merchant logo, so both must
+// be settled before the canvas is baked.
+async function prepareBrowserReceipt(receipt: PaidReceipt): Promise<void> {
+  const fonts = typeof document !== 'undefined' ? (document as Document & { fonts?: FontFaceSet }).fonts?.ready : undefined;
+  await Promise.all([preloadPaidReceiptLogo(receipt), fonts || Promise.resolve()]);
+}
+
 function receiptHtml(receipt: PaidReceipt): string {
   const lines = receiptLines(receipt).map((item) => `<div class="item"><div><b>${escapeHtml(item.name || 'Item')}</b><small>${Number(item.qty) || 1} × ${receiptMoney(item.price)}</small></div><b>${receiptMoney((Number(item.price) || 0) * (Number(item.qty) || 1))}</b></div>`).join('');
   const merchant = receiptMerchant(receipt);
@@ -81,60 +88,268 @@ function receiptHtml(receipt: PaidReceipt): string {
   </style></head><body><div class="paper"><div class="head"><div class="logo">${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="">` : 'R'}</div><h1>${escapeHtml(merchant)}</h1><div class="sub">${escapeHtml(receipt.branch_name || '')}</div></div><div class="rule"></div><div class="row"><span>Receipt no.</span><b>${escapeHtml(receipt.receipt_number)}</b></div>${receipt.transaction ? `<div class="row"><span>Transaction</span><b>${escapeHtml(receipt.transaction.toUpperCase())}</b></div>` : ''}<div class="row"><span>Date</span><b>${escapeHtml(receiptDate(receipt))}</b></div><div class="row"><span>Customer</span><b>${escapeHtml(receipt.customer_name || 'Customer')}</b></div>${receipt.staff_name ? `<div class="row"><span>Staff</span><b>${escapeHtml(receipt.staff_name)}</b></div>` : ''}<div class="rule"></div>${lines}<div class="rule"></div><div class="row"><span>Subtotal</span><b>${receiptMoney(receipt.subtotal || receipt.total_amount)}</b></div>${Number(receipt.discount_amount) > 0 ? `<div class="row"><span>Voucher discount</span><b>−${receiptMoney(receipt.discount_amount)}</b></div>` : ''}<div class="row total"><span>${isPaid ? 'Total paid' : 'Total recorded'}</span><b>${receiptMoney(receipt.total_amount)}</b></div><div class="rule"></div><div class="row"><span>${isPaid ? 'Payment method' : 'Entry method'}</span><b>${escapeHtml(receiptPaymentMethod(receipt))}</b></div>${receipt.payment_reference ? `<div class="row"><span>Payment ref.</span><b>${escapeHtml(receipt.payment_reference)}</b></div>` : ''}<div class="row"><span>${isPaid ? 'Payment status' : 'Transaction status'}</span><b class="paid">${isPaid ? 'PAID' : 'RECORDED'}</b></div>${Number(receipt.stamps_earned) > 0 ? `<div class="reward">★ +${Number(receipt.stamps_earned)} stamp${Number(receipt.stamps_earned) === 1 ? '' : 's'} earned${rewardProgress ? ` · ${rewardProgress} collected` : ''}</div>` : ''}<div class="foot">Thank you for visiting!<br>Powered by <b>risev</b></div></div></body></html>`;
 }
 
+const SLIP_WIDTH = 300; // the on-screen paper width; every size below mirrors ThermalReceiptScreen
+const SLIP_SCALE = 2;
+const INK = '#000000';
+const MUTED = '#64748B';
+const FAINT = '#94A3B8';
+const LINE = '#E2E8F0';
+const BRAND = '#FFC700';
+const PAID_INK = '#15803D';
+
 // Browser PDF is drawn from receipt data, never captured from the animation.
-// A JPEG-backed single-page PDF is supported by iOS and Android browsers.
+// It mirrors the on-screen receipt, so the file and the screen agree.
 function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
   const isPaid = receipt.payment_status === 'paid';
-  const rewardGoal = Math.max(1, Number(receipt.stamp_goal) || 10);
-  const rewardBalance = Number(receipt.stamps_balance);
-  const rewardProgress = Number.isFinite(rewardBalance) ? `${Math.max(0, Math.min(rewardGoal, rewardBalance))}/${rewardGoal}` : '';
+  const earned = Math.max(0, Number(receipt.stamps_earned) || 0);
+  const goal = Math.max(1, Math.min(50, Number(receipt.stamp_goal) || 10));
+  const balanceRaw = Number(receipt.stamps_balance);
+  const balance = Number.isFinite(balanceRaw) ? Math.max(0, balanceRaw) : earned;
+  const filled = Math.min(goal, balance);
+  const rewardName = String(receipt.reward_name || '').trim();
+
   const canvas = document.createElement('canvas');
-  const width = 640;
-  const lineHeight = 34;
-  const extraRows = Number(!!receipt.transaction) + Number(!!receipt.staff_name) + Number(!!receipt.payment_reference) + Number(Number(receipt.discount_amount) > 0);
-  const height = 690 + receiptLines(receipt).length * 76 + extraRows * 34 + (Number(receipt.stamps_earned) > 0 ? 94 : 0);
-  canvas.width = width; canvas.height = height;
+  canvas.width = SLIP_WIDTH * SLIP_SCALE;
+  canvas.height = 1200 * SLIP_SCALE;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('PDF rendering is not available on this device.');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
-  const left = 48, right = width - 48;
-  const label = (text: string, y: number, bold = false, size = 22, align: CanvasTextAlign = 'left', color = '#111') => {
-    ctx.fillStyle = color; ctx.font = `${bold ? 700 : 400} ${size}px Arial`; ctx.textAlign = align;
-    ctx.fillText(text, align === 'right' ? right : align === 'center' ? width / 2 : left, y, width - 96);
-  };
-  const rule = (y: number) => { ctx.strokeStyle = '#b6b6b6'; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke(); ctx.setLineDash([]); };
-  ctx.fillStyle = '#ffcc00'; ctx.fillRect(width / 2 - 25, 36, 50, 50);
-  const logo = browserLogos.get(receiptLogoUrl(receipt));
-  if (logo) ctx.drawImage(logo, width / 2 - 25, 36, 50, 50);
-  else label('R', 72, true, 29, 'center');
-  label(receiptMerchant(receipt), 126, true, 31, 'center');
-  label(receipt.branch_name || '', 153, false, 18, 'center', '#666');
-  rule(180);
-  let y = 220;
-  const row = (name: string, value: string, bold = false) => { label(name, y, bold, 20, 'left', bold ? '#111' : '#666'); label(value, y, true, 20, 'right'); y += lineHeight; };
-  row('Receipt no.', receipt.receipt_number); if (receipt.transaction) row('Transaction', receipt.transaction.toUpperCase()); row('Date', receiptDate(receipt)); row('Customer', receipt.customer_name || 'Customer');
-  if (receipt.staff_name) row('Staff', receipt.staff_name);
-  rule(y + 6); y += 48;
-  for (const item of receiptLines(receipt)) {
-    label(item.name || 'Item', y, true, 21);
-    label(receiptMoney((Number(item.price) || 0) * (Number(item.qty) || 1)), y, true, 21, 'right');
-    y += 28; label(`${Number(item.qty) || 1} × ${receiptMoney(item.price)}`, y, false, 18, 'left', '#666'); y += 48;
-  }
-  rule(y); y += 42;
-  row('Subtotal', receiptMoney(receipt.subtotal || receipt.total_amount));
-  if (Number(receipt.discount_amount) > 0) row('Voucher discount', `-${receiptMoney(receipt.discount_amount)}`);
-  y += 10; label(isPaid ? 'Total paid' : 'Total recorded', y, true, 29); label(receiptMoney(receipt.total_amount), y, true, 29, 'right'); y += 32;
-  rule(y); y += 42;
-  row(isPaid ? 'Payment method' : 'Entry method', receiptPaymentMethod(receipt)); if (receipt.payment_reference) row('Payment ref.', receipt.payment_reference); row(isPaid ? 'Payment status' : 'Transaction status', isPaid ? 'PAID' : 'RECORDED');
-  if (Number(receipt.stamps_earned) > 0) {
-    ctx.fillStyle = '#ffeb84'; ctx.fillRect(left, y + 7, right - left, 60);
-    label(`★  +${Number(receipt.stamps_earned)} stamp${Number(receipt.stamps_earned) === 1 ? '' : 's'} earned${rewardProgress ? ` · ${rewardProgress} collected` : ''}`, y + 45, true, 21);
-    y += 90;
-  }
-  label('Thank you for visiting!', Math.min(height - 70, y + 20), false, 20, 'center');
-  label('Powered by risev', Math.min(height - 34, y + 55), true, 18, 'center', '#555');
+  ctx.scale(SLIP_SCALE, SLIP_SCALE);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, SLIP_WIDTH, 1200);
 
-  return canvas;
+  const padX = 16;
+  const left = padX;
+  const right = SLIP_WIDTH - padX;
+  const cx = SLIP_WIDTH / 2;
+  const fontFor = (weight: number, size: number) =>
+    `${weight} ${size}px "PlusJakartaSans_${weight >= 800 ? '800ExtraBold' : weight >= 700 ? '700Bold' : '500Medium'}", -apple-system, Arial`;
+
+  const measure = (value: string, size: number, weight: number, spacing = 0) => {
+    ctx.font = fontFor(weight, size);
+    let total = 0;
+    for (const char of value) total += ctx.measureText(char).width + spacing;
+    return value ? total - spacing : 0;
+  };
+  const text = (value: unknown, x: number, y: number, options: { size?: number; weight?: number; color?: string; align?: 'left' | 'right' | 'center'; spacing?: number } = {}) => {
+    const { size = 10, weight = 500, color = INK, align = 'left', spacing = 0 } = options;
+    const string = String(value ?? '');
+    if (!string) return 0;
+    ctx.font = fontFor(weight, size);
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    const width = measure(string, size, weight, spacing);
+    let x0 = align === 'right' ? x - width : align === 'center' ? x - width / 2 : x;
+    if (spacing) {
+      for (const char of string) {
+        ctx.fillText(char, x0, y);
+        x0 += ctx.measureText(char).width + spacing;
+      }
+    } else {
+      ctx.fillText(string, x0, y);
+    }
+    return width;
+  };
+  const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, radius);
+    ctx.arcTo(x + w, y + h, x, y + h, radius);
+    ctx.arcTo(x, y + h, x, y, radius);
+    ctx.arcTo(x, y, x + w, y, radius);
+    ctx.closePath();
+  };
+  const rule = (y: number) => {
+    ctx.strokeStyle = LINE;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+
+  let y = 24;
+
+  // Merchant mark: the same yellow tile, with the logo when it has loaded.
+  const tile = 44;
+  ctx.fillStyle = BRAND;
+  roundRect(cx - tile / 2, y, tile, tile, 13);
+  ctx.fill();
+  const logo = browserLogos.get(receiptLogoUrl(receipt));
+  if (logo) {
+    ctx.save();
+    roundRect(cx - tile / 2, y, tile, tile, 13);
+    ctx.clip();
+    ctx.drawImage(logo, cx - tile / 2, y, tile, tile);
+    ctx.restore();
+  } else {
+    const merchantName = receiptMerchant(receipt);
+    const parts = merchantName.trim().split(/\s+/).filter(Boolean);
+    const initials = parts.length ? (parts[0].charAt(0) + (parts[1]?.charAt(0) || '')).toUpperCase() : 'R';
+    text(initials, cx, y + tile / 2 + 7, { size: 20, weight: 800, align: 'center', spacing: -1 });
+  }
+  y += tile + 8;
+
+  text(receiptMerchant(receipt), cx, y + 14, { size: 17, weight: 800, align: 'center', spacing: -0.6 });
+  y += 22;
+  text((receipt.branch_name || 'Digital receipt').toUpperCase(), cx, y + 8, { size: 9, weight: 700, color: FAINT, align: 'center', spacing: 1.2 });
+  y += 16;
+
+  rule(y);
+  y += 12;
+
+  const row = (label: string, value: string) => {
+    text(label, left, y + 9, { size: 9.5, color: MUTED });
+    text(value, right, y + 9, { size: 9.5, weight: 700, align: 'right' });
+    y += 17;
+  };
+  row('Receipt no.', receipt.receipt_number);
+  if (receipt.transaction) row('Transaction', String(receipt.transaction).toUpperCase());
+  row('Date & time', receiptDate(receipt));
+  row('Customer', receipt.customer_name || 'Customer');
+  if (receipt.staff_name) row('Staff', receipt.staff_name);
+
+  rule(y);
+  y += 12;
+
+  const items = receiptLines(receipt);
+  if (!items.length) {
+    text('Counter payment', left, y + 10, { size: 10, color: FAINT });
+    y += 20;
+  }
+  for (const item of items) {
+    const qty = Number(item.qty) || 1;
+    const price = Number(item.price) || 0;
+    text(item.name || 'Item', left, y + 10, { size: 10, weight: 700 });
+    text(receiptMoney(price * qty), right, y + 10, { size: 10, weight: 700, align: 'right' });
+    text(`${qty} × ${receiptMoney(price)}`, left, y + 22, { size: 8.8, color: FAINT });
+    y += 30;
+  }
+
+  rule(y);
+  y += 12;
+
+  row('Subtotal', receiptMoney(receipt.subtotal || receipt.total_amount));
+  if (Number(receipt.discount_amount) > 0) row('Voucher discount', `−${receiptMoney(receipt.discount_amount)}`);
+  y += 4;
+  text(isPaid ? 'Total paid' : 'Total recorded', left, y + 16, { size: 12, weight: 800 });
+  text(receiptMoney(receipt.total_amount), right, y + 16, { size: 22, weight: 800, align: 'right', spacing: -1 });
+  y += 24;
+
+  rule(y);
+  y += 12;
+
+  row(isPaid ? 'Payment method' : 'Entry method', receiptPaymentMethod(receipt));
+  if (receipt.payment_reference) row('Payment ref.', receipt.payment_reference);
+
+  const statusLabel = isPaid ? 'PAID' : 'RECORDED';
+  const statusWidth = measure(statusLabel, 10, 800);
+  const dotCx = right - statusWidth - 5 - 7;
+  ctx.fillStyle = isPaid ? BRAND : LINE;
+  ctx.beginPath();
+  ctx.arc(dotCx, y + 4, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = isPaid ? INK : MUTED;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if (isPaid) {
+    ctx.moveTo(dotCx - 3.4, y + 4);
+    ctx.lineTo(dotCx - 0.8, y + 6.6);
+    ctx.lineTo(dotCx + 4, y + 1.4);
+  } else {
+    ctx.arc(dotCx, y + 4, 3, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+  text(isPaid ? 'Payment status' : 'Transaction status', left, y + 9, { size: 9.5, color: MUTED });
+  text(statusLabel, right, y + 9, { size: 10, weight: 800, align: 'right', color: isPaid ? PAID_INK : MUTED });
+  y += 17;
+
+  if (earned > 0) {
+    y += 6;
+    const cardTop = y;
+    const cardHeight = 56;
+    ctx.fillStyle = BRAND;
+    roundRect(left, cardTop, right - left, cardHeight, 11);
+    ctx.fill();
+
+    // Small gift glyph, matching the card's icon.
+    const giftX = left + 10;
+    const giftY = cardTop + 9;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.1;
+    ctx.strokeRect(giftX + 1, giftY + 3, 9, 7);
+    ctx.beginPath();
+    ctx.moveTo(giftX, giftY + 3);
+    ctx.lineTo(giftX + 11, giftY + 3);
+    ctx.moveTo(giftX + 5.5, giftY + 3);
+    ctx.lineTo(giftX + 5.5, giftY + 10);
+    ctx.stroke();
+
+    text('Rewards earned', giftX + 15, cardTop + 18, { size: 10, weight: 800 });
+    text(`+${earned} Stamp${earned === 1 ? '' : 's'}`, right - 10, cardTop + 18, { size: 10, weight: 800, align: 'right' });
+    text(
+      `${earned} stamp${earned === 1 ? '' : 's'} added · ${filled}/${goal} collected${rewardName ? ` · ${rewardName}` : ''}`,
+      left + 10,
+      cardTop + 32,
+      { size: 9, weight: 500 },
+    );
+
+    for (let index = 0; index < goal; index += 1) {
+      const dotX = left + 10 + 6 + index * 18;
+      ctx.beginPath();
+      ctx.arc(dotX, cardTop + 44, 6, 0, Math.PI * 2);
+      if (index < filled) {
+        ctx.fillStyle = INK;
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+    y += cardHeight;
+  }
+
+  y += 16;
+  text('Thank you for visiting!', cx, y + 8, { size: 10.5, weight: 700, align: 'center' });
+  y += 16;
+
+  // The barcode mirrors the on-screen bar pattern so both renders look alike.
+  const bars = Array.from({ length: 34 }, (_, index) => ({
+    width: index % 3 === 0 ? 2.5 : 1.5,
+    height: index % 5 === 0 ? 27 : 21,
+    gap: index % 4 === 0 ? 3 : 1.5,
+  }));
+  const barcodeWidth = bars.reduce((total, bar) => total + bar.width + bar.gap, 0);
+  let barX = cx - barcodeWidth / 2;
+  ctx.fillStyle = INK;
+  for (const bar of bars) {
+    ctx.fillRect(barX, y + (27 - bar.height), bar.width, bar.height);
+    barX += bar.width + bar.gap;
+  }
+  y += 27;
+  text(receipt.receipt_number.replace(/-/g, ''), cx, y + 11, { size: 8, color: MUTED, align: 'center', spacing: 0.7 });
+  y += 16;
+
+  const poweredLabel = 'Powered by';
+  const wordmark = 'risev';
+  const poweredWidth = measure(poweredLabel, 9, 500) + 4 + measure(wordmark, 13, 800, -0.8);
+  let poweredX = cx - poweredWidth / 2;
+  poweredX += text(poweredLabel, poweredX, y + 10, { size: 9, color: FAINT }) + 4;
+  text(wordmark, poweredX, y + 11, { size: 13, weight: 800, spacing: -0.8 });
+  y += 20;
+
+  const finalHeight = Math.ceil(y + 12);
+  const cropped = document.createElement('canvas');
+  cropped.width = canvas.width;
+  cropped.height = Math.round(finalHeight * SLIP_SCALE);
+  const target = cropped.getContext('2d');
+  if (!target) throw new Error('PDF rendering is not available on this device.');
+  target.drawImage(canvas, 0, 0, canvas.width, cropped.height, 0, 0, canvas.width, cropped.height);
+  return cropped;
 }
 
 function browserPdf(receipt: PaidReceipt): Blob {
@@ -153,7 +368,9 @@ function browserPdf(receipt: PaidReceipt): Blob {
   push('%PDF-1.4\n');
   object(1, '<< /Type /Catalog /Pages 2 0 R >>');
   object(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  const pageWidth = 240, pageHeight = Math.round(height / width * pageWidth);
+  // Same 80 mm slip the print path uses, so both files share one shape.
+  const pageWidth = Math.round((80 / 25.4) * 72);
+  const pageHeight = Math.round((height / width) * pageWidth);
   object(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
   offsets[4] = bytes; push(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); push(jpg); push('\nendstream\nendobj\n');
   const stream = `q ${pageWidth} 0 0 ${pageHeight} 0 0 cm /Im0 Do Q`;
@@ -220,13 +437,15 @@ export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
   printSheets.push(entry);
   syncPrintSheets();
 
-  // The first draw carries the brand tile when the logo is still in flight;
-  // repaint once it lands so print never keeps the fallback. A disposed sheet
-  // must stay dead, so the callback checks before touching it.
+  // The first draw carries the brand tile when the logo is still in flight and
+  // the fallback font before the webfont settles; repaint once both land so
+  // print never keeps either. A disposed sheet must stay dead, so the callback
+  // checks before touching it.
   let disposed = false;
-  if (logoUrl && !browserLogos.get(logoUrl)) {
-    void preloadPaidReceiptLogo(receipt).then((logo) => {
-      if (!logo || disposed || !sheet.isConnected) return;
+  const fontsPending = typeof document !== 'undefined' && (document as Document & { fonts?: FontFaceSet }).fonts?.status !== 'loaded';
+  if ((logoUrl && !browserLogos.get(logoUrl)) || fontsPending) {
+    void prepareBrowserReceipt(receipt).then(() => {
+      if (disposed || !sheet.isConnected) return;
       image.src = paint(browserReceiptCanvas(receipt));
     });
   }
@@ -242,7 +461,7 @@ export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
 
 export async function savePaidReceiptPdf(receipt: PaidReceipt): Promise<void> {
   if (Platform.OS === 'web') {
-    await preloadPaidReceiptLogo(receipt);
+    await prepareBrowserReceipt(receipt);
     const blob = browserPdf(receipt);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url; link.download = `${receipt.receipt_number || 'risev-receipt'}.pdf`;
@@ -257,7 +476,7 @@ export async function sharePaidReceiptPdf(receipt: PaidReceipt): Promise<'shared
   if (Platform.OS === 'web') {
     const shareNav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
     if (typeof File !== 'undefined' && shareNav.share && shareNav.canShare) {
-      await preloadPaidReceiptLogo(receipt);
+      await prepareBrowserReceipt(receipt);
       const blob = browserPdf(receipt);
       const file = new File([blob], `${receipt.receipt_number || 'risev-receipt'}.pdf`, { type: 'application/pdf' });
       if (shareNav.canShare({ files: [file] })) {
