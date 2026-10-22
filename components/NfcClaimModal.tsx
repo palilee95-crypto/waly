@@ -229,6 +229,9 @@ export default function NfcClaimModal() {
   // Customer Vouchers & Smart Discount Engine states
   const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
   const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+  // Which claim the applied/placeholder voucher belongs to. A new claim must
+  // start with no voucher, even if the last one resolved to a real record.
+  const appliedVoucherClaimRef = React.useRef<string>('');
   const [isVouchersExpanded, setIsVouchersExpanded] = useState<boolean>(false);
   const [customBillInput, setCustomBillInput] = useState<string>('20');
   const [subtotalAmount, setSubtotalAmount] = useState<number>(20);
@@ -479,6 +482,17 @@ export default function NfcClaimModal() {
       setActiveBooking(null);
       return;
     }
+    const effectClaimId = String(claim.id || '');
+
+    // A new claim starts with no voucher. Without this, a real voucher resolved
+    // for the previous customer stays applied and blocks this claim's own
+    // placeholder and lookup (the guards below only defer to a non-synthetic
+    // *current* selection).
+    if (appliedVoucherClaimRef.current !== effectClaimId) {
+      appliedVoucherClaimRef.current = effectClaimId;
+      setAppliedVoucher(null);
+    }
+
     const claimVoucherId = String(claim.voucher || claim.voucher_id || '').trim();
     const claimVoucherTitle = String(claim.voucher_title || claim.voucher_name || '').trim();
 
@@ -500,11 +514,19 @@ export default function NfcClaimModal() {
     const claimVoucherPromise: Promise<any> = claimVoucherId
       ? pb.collection('vouchers').getOne(claimVoucherId, { expand: 'reward' }).catch(() => null)
       : Promise.resolve(null);
-    let voucherLookupActive = true;
+    let active = true;
+
+    // Every asynchronous write goes through here: a lookup that resolves after
+    // the active claim changed must not repaint the modal with the old voucher.
+    const applyVoucherForClaim = (next: any) => {
+      if (!active) return;
+      setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : next));
+    };
+
     void claimVoucherPromise.then((voucher) => {
-      if (!voucherLookupActive) return;
+      if (!active) return;
       if (voucher) {
-        setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : voucher));
+        applyVoucherForClaim(voucher);
         return;
       }
       // The record could not be read: settle the placeholder so the cashier is
@@ -671,25 +693,26 @@ export default function NfcClaimModal() {
           }
 
           if (matched) {
-            // Never replace a voucher the cashier picked while this was loading.
-            setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : matched));
+            // Never replace a voucher the cashier picked while this was loading,
+            // and never write it after the active claim changed.
+            applyVoucherForClaim(matched);
           } else {
             // Synthetic fallback so the cashier at least sees the customer's choice.
-            setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : {
+            applyVoucherForClaim({
               id: targetVoucherId || 'v_selected',
               title: voucherTitleHint || 'Selected Customer Voucher',
               code: '',
               status: 'active',
               metadata: { snapshot_title: voucherTitleHint || 'Selected Customer Voucher', discount_type: 'none' },
               _synthetic: true,
-            }));
+            });
           }
         }
       } catch (e) {
         setCustomerVouchers([]);
       }
     })();
-    return () => { voucherLookupActive = false; };
+    return () => { active = false; };
   }, [claim?.id, claim?.customer_phone, claim?.customer_name, claim?.voucher, claim?.voucher_id, merchantId, scannedBookingId]);
 
   const activeClaimRef = React.useRef<any>(null);
@@ -915,6 +938,21 @@ export default function NfcClaimModal() {
     }
   };
 
+  // A free-item voucher is only worth redeeming when the cart carries the item
+  // it covers. With a bare bill amount it cannot discount anything, so applying
+  // it would consume it for nothing.
+  const voucherNeedsItemLine = (v: any): boolean => {
+    let meta: any = {};
+    try {
+      meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
+    } catch (e) {}
+    const reward = v.expand?.reward || {};
+    const voucherType = meta.snapshot_type || reward.type || '';
+    const discType = meta.discount_type || reward.discount_type || 'none';
+    const discVal = parseFloat(meta.discount_value ?? reward.discount_value) || 0;
+    return voucherType === 'free_item' && discType === 'none' && discVal <= 0;
+  };
+
   // Why a voucher cannot be applied right now (empty string = usable).
   const getVoucherIssue = (v: any): string => {
     if (!v) return '';
@@ -933,6 +971,11 @@ export default function NfcClaimModal() {
     const voucherMerchant = v.expand?.reward?.merchant || v.expand?.campaign?.merchant || '';
     if (voucherMerchant && merchantId && voucherMerchant !== merchantId) {
       return locale === 'ms' ? 'Bukan untuk kedai ini' : 'Not valid for this store';
+    }
+    if (voucherNeedsItemLine(v) && selectedServices.length === 0) {
+      return locale === 'ms'
+        ? 'Tambah item yang dilindungi baucar ini'
+        : 'Add the item this voucher covers';
     }
     return '';
   };
@@ -963,6 +1006,13 @@ export default function NfcClaimModal() {
       // The claim's voucher is still being read; confirming now would charge the
       // full bill and then consume the voucher.
       setErrorMsg(locale === 'ms' ? 'Baucar masih dimuatkan. Cuba sebentar.' : 'The voucher is still loading. Try again in a moment.');
+      return;
+    }
+    // Never submit a voucher the modal already flags (used, expired, wrong store,
+    // or a free item with no line to cover) — the server would consume it.
+    const voucherIssue = appliedVoucher ? getVoucherIssue(appliedVoucher) : '';
+    if (voucherIssue) {
+      setErrorMsg(voucherIssue);
       return;
     }
     if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) {
