@@ -57,7 +57,13 @@ export default function DigitalReceiptScreen() {
           stamps_balance: numberOrUndefined(record.stamps_balance),
           stamp_goal: numberOrUndefined(record.stamp_goal),
           reward_name: String(record.reward_name || ''),
-          expand: { merchant: { name: String(record.merchant_name || '') } },
+          expand: {
+            merchant: {
+              id: String(record.merchant_id || ''),
+              name: String(record.merchant_name || ''),
+              logo: String(record.merchant_logo || ''),
+            },
+          },
         });
       })
       .catch(() => { if (mounted) setError('Could not load this receipt. Please try again later.'); })
