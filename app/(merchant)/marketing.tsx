@@ -912,29 +912,34 @@ export default function MarketingScreen() {
     fetchWhatsappStatus();
     fetchAudienceEstimate();
 
+    let disposed = false;
+    const unsubscribers: Array<() => Promise<void>> = [];
+    const keep = (remove: () => Promise<void>) => {
+      if (disposed) void remove().catch(() => {});
+      else unsubscribers.push(remove);
+    };
     if (user && user.merchant_id) {
       pb.collection('campaigns').subscribe('*', () => {
         fetchCampaigns();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      });
+      }).then(keep).catch(() => {});
 
       pb.collection('broadcasts').subscribe('*', () => {
         fetchBroadcasts();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      });
+      }).then(keep).catch(() => {});
 
       pb.collection('automation_rules').subscribe('*', () => {
         fetchAutomationRules();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      });
+      }).then(keep).catch(() => {});
     }
     return () => {
-      pb.collection('campaigns').unsubscribe('*');
-      pb.collection('broadcasts').unsubscribe('*');
-      pb.collection('automation_rules').unsubscribe('*');
+      disposed = true;
+      for (const remove of unsubscribers) void remove().catch(() => {});
     };
   }, [user]);
 

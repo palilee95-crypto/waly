@@ -27,8 +27,8 @@ export default function DigitalReceiptScreen() {
     pb.collection('digital_receipts').getOne<PaidReceipt>(id, { expand: 'merchant', requestKey: null })
       .then((record) => {
         if (!mounted) return;
-        if (record.payment_status !== 'paid' || Number(record.total_amount) <= 0) {
-          setError('A paid receipt is not available for this transaction.');
+        if (record.payment_status !== 'paid' && record.payment_status !== 'recorded') {
+          setError('A receipt is not available for this transaction.');
         } else setReceipt(record);
       })
       .catch(() => { if (mounted) setError('Could not load this receipt. Please try again later.'); })

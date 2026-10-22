@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,19 +14,29 @@ import {
   AppState,
   AppStateStatus,
   DeviceEventEmitter,
+  Modal,
+  Linking,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { pb } from '@/lib/pocketbase';
-import { cachedFetch } from '@/lib/data-cache';
+import { cachedFetch, invalidate } from '@/lib/data-cache';
 import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { formatMalaysianPhone } from '@/lib/emailValidator';
-import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
+import type { ReceiptData } from '@/components/DigitalStampReceiptModal';
+import RisevRewardBanner from '@/components/RisevRewardBanner';
+import StampIssueSuccessModal from '@/components/StampIssueSuccessModal';
+import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
+import { inkOn } from '@/components/LoyaltyCardBack';
+import type { PaidReceipt } from '@/lib/paidReceipt';
 import { parsePassScan } from '@/lib/bookingPass';
+import { colors, radii, spacing, iconSizes, shadows } from '@/theme';
 
 export default function GiveStampsScreen() {
   const { user } = useAuth();
@@ -69,6 +79,9 @@ export default function GiveStampsScreen() {
   const [voucherCode, setVoucherCode] = useState('');
   const [isRedeemingVoucher, setIsRedeemingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
+  const [manualCodeOpen, setManualCodeOpen] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [pendingVoucher, setPendingVoucher] = useState<{ code: string; voucher?: any; loading?: boolean } | null>(null);
   const [redeemedDetails, setRedeemedDetails] = useState<{
     id?: string;
     code: string;
@@ -84,8 +97,11 @@ export default function GiveStampsScreen() {
   // Manual Issuance States
   const [phoneInput, setPhoneInput] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [existingCustomer, setExistingCustomer] = useState<{ id: string; name: string } | null>(null);
-  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [focusedField, setFocusedField] = useState<'phone' | 'name' | 'bill' | null>(null);
+  const [existingCustomer, setExistingCustomer] = useState<{ id: string; name: string; stamps?: number; points?: number } | null>(null);
+  const [customerLookup, setCustomerLookup] = useState<'idle' | 'checking' | 'found' | 'new' | 'error'>('idle');
+  const [lookupNameRequired, setLookupNameRequired] = useState(false);
+  const [lookupRetry, setLookupRetry] = useState(0);
   const [billAmount, setBillAmount] = useState('');
   const [stampAmount, setStampAmount] = useState('1');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,17 +134,44 @@ export default function GiveStampsScreen() {
 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [issueSuccessVisible, setIssueSuccessVisible] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<ReceiptData | null>(null);
+  const [activePaidReceipt, setActivePaidReceipt] = useState<PaidReceipt | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState('');
+  const [merchantIdentity, setMerchantIdentity] = useState<{ name: string; logo: string }>({ name: '', logo: '' });
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTxns, setLoadingTxns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const merchantId = user?.merchant_id;
 
+  useEffect(() => {
+    if (!merchantId) return;
+    let active = true;
+    pb.collection('merchants').getOne(merchantId, { requestKey: null }).then((merchant) => {
+      if (!active) return;
+      setMerchantIdentity({
+        name: merchant.name || merchant.store_name || '',
+        logo: merchant.logo ? pb.files.getURL(merchant, merchant.logo) : '',
+      });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [merchantId]);
+
   // Mode helpers
   const isPointsOnly = program?.enable_stamps === false && program?.enable_points === true;
   const isStampsOnly = program?.enable_stamps !== false && program?.enable_points === false;
   const isBoth = !isPointsOnly && !isStampsOnly;
+  const cardMilestones = useMemo(() => {
+    let rewards = program?.sub_rewards;
+    if (typeof rewards === 'string') {
+      try { rewards = JSON.parse(rewards); } catch { rewards = []; }
+    }
+    return Array.isArray(rewards)
+      ? rewards.map((reward: any) => Number(reward?.at_stamp)).filter((value: number) => Number.isInteger(value) && value > 0)
+      : [];
+  }, [program?.sub_rewards]);
 
   // 1. Fetch recent transactions & active loyalty program for merchant
   const fetchTransactions = useCallback(async () => {
@@ -152,7 +195,7 @@ export default function GiveStampsScreen() {
         ).catch(() => [] as any[]),
         cachedFetch(
           cacheKeys.merchantProgram(merchantId),
-          () => pb.collection('loyalty_programs').getFirstListItem(`merchant = '${merchantId}' && is_active = true`),
+          () => pb.collection('loyalty_programs').getFirstListItem(`merchant = '${merchantId}' && is_active = true`, { sort: '-created', requestKey: null }),
           { ttl: TTL.catalog }
         ).catch(() => null),
       ]);
@@ -169,45 +212,48 @@ export default function GiveStampsScreen() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  // Real-time lookup for existing customer by phone number
+  // Merchant lookup is authoritative for name and loyalty status. Keep stale
+  // responses from a previous phone number out of the form.
   useEffect(() => {
     const rawDigits = phoneInput.replace(/\D/g, '');
-    if (rawDigits.length < 8) {
+    const complete = rawDigits.length >= 9 && (!rawDigits.startsWith('11') || rawDigits.length === 10);
+    if (!complete) {
       setExistingCustomer(null);
+      setCustomerLookup('idle');
+      setLookupNameRequired(false);
       return;
     }
 
     let isMounted = true;
+    setCustomerLookup('checking');
     const timeout = setTimeout(async () => {
       try {
-        setIsSearchingCustomer(true);
-        let digits = rawDigits;
-        if (digits.startsWith('0')) digits = '6' + digits;
-        if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
-        const clean = '+' + digits;
-        const local = digits.startsWith('60') ? '0' + digits.slice(2) : digits;
-
-        const res = await pb.collection('users').getList(1, 1, {
-          filter: `phone = '${clean}' || phone = '${digits}' || phone = '${local}'`,
-          requestKey: null,
-        });
+        const res = await pb.send<{
+          found: boolean;
+          requiresName: boolean;
+          customer?: { id: string; name: string; stamps: number; points: number };
+        }>(`/api/risev/merchant/give-customer?phone=${encodeURIComponent(phoneInput)}`, { method: 'GET', requestKey: null });
 
         if (isMounted) {
-          if (res.items && res.items.length > 0) {
-            const foundUser = res.items[0];
-            const foundName = foundUser.name || '';
-            setExistingCustomer({ id: foundUser.id, name: foundName });
-            if (foundName && (!customerName || customerName.startsWith('Customer '))) {
-              setCustomerName(foundName);
+          if (res.found && res.customer) {
+            setExistingCustomer(res.customer);
+            setLookupNameRequired(res.requiresName);
+            setCustomerLookup('found');
+            if (!res.requiresName) {
+              setCustomerName(res.customer.name);
             }
           } else {
             setExistingCustomer(null);
+            setLookupNameRequired(true);
+            setCustomerLookup('new');
           }
         }
       } catch (err) {
-        // ignore lookup errors
-      } finally {
-        if (isMounted) setIsSearchingCustomer(false);
+        if (isMounted) {
+          setExistingCustomer(null);
+          setCustomerLookup('error');
+          setLookupNameRequired(false);
+        }
       }
     }, 400);
 
@@ -215,7 +261,7 @@ export default function GiveStampsScreen() {
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [phoneInput]);
+  }, [phoneInput, lookupRetry]);
 
   // 2. Submit Voucher Code Redemption via Backend Endpoint
   const executeRedemption = async (targetCode: string) => {
@@ -254,8 +300,11 @@ export default function GiveStampsScreen() {
 
       if (res.success && res.voucher) {
         setRedeemedDetails(res.voucher);
+        setPendingVoucher(null);
         setSuccessMsg(res.message || `Voucher ${res.voucher.code} redeemed successfully!`);
         setVoucherCode('');
+        setManualCodeOpen(false);
+        if (merchantId) invalidate(cacheKeys.merchantTxns(merchantId));
         fetchTransactions();
       } else {
         setVoucherError(res.message || 'Failed to redeem voucher.');
@@ -271,8 +320,70 @@ export default function GiveStampsScreen() {
     }
   };
 
+  const prepareVoucherReview = async (targetCode: string) => {
+    const clean = String(targetCode || '').trim().toUpperCase();
+    if (!clean) {
+      setVoucherError('Please enter or scan a voucher code.');
+      return;
+    }
+    setVoucherError('');
+    setPendingVoucher({ code: clean, loading: true });
+    try {
+      const voucher = await pb.collection('vouchers').getFirstListItem(`code = '${clean}'`, {
+        expand: 'reward,customer',
+        requestKey: null,
+      });
+      setPendingVoucher({ code: clean, voucher });
+    } catch (lookupErr) {
+      // The server remains authoritative on redemption; still let the cashier
+      // review the code when the read-only lookup is restricted.
+      setPendingVoucher({ code: clean });
+    }
+  };
+
   const handleRedeemVoucher = () => {
-    executeRedemption(voucherCode);
+    prepareVoucherReview(voucherCode);
+  };
+
+  const openCamera = async () => {
+    setVoucherError('');
+    setIsCameraActive(true);
+    if (!permission?.granted) {
+      await requestPermission();
+    }
+  };
+
+  const closeCamera = () => {
+    setIsCameraActive(false);
+    setTorchOn(false);
+  };
+
+  const scanFromGallery = async () => {
+    closeCamera();
+    try {
+      // Native image pickers need the camera modal to finish dismissing first.
+      if (Platform.OS !== 'web') await new Promise((resolve) => setTimeout(resolve, 380));
+      const selected = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      if (selected.canceled || !selected.assets?.[0]?.uri) return;
+      const results = await Camera.scanFromURLAsync(selected.assets[0].uri, ['qr']);
+      if (results[0]?.data) handleBarCodeScanned({ data: results[0].data });
+      else setVoucherError('No voucher QR code was found in that image. Try another image or enter the code manually.');
+    } catch {
+      setVoucherError('Could not read that image. Try scanning with the camera or enter the code manually.');
+    }
+  };
+
+  const closeReview = () => {
+    setPendingVoucher(null);
+    setTimeout(() => {
+      isProcessingScan.current = false;
+    }, 300);
+  };
+
+  const openSupport = () => {
+    const url = 'https://wa.me/60104648598?text=Hi%20Risev%20Support,%20I%20need%20some%20help%20with%20my%20merchant%20account.';
+    if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(url, '_blank');
+    else Linking.openURL(url);
   };
 
   // A customer appointment pass QR opens that booking in the POS.
@@ -337,26 +448,42 @@ export default function GiveStampsScreen() {
     }
     code = code.trim().toUpperCase();
     setVoucherCode(code);
-    executeRedemption(code);
+    prepareVoucherReview(code);
+    setTimeout(() => {
+      isProcessingScan.current = false;
+    }, 900);
   };
 
   // 4. Submit Manual Stamp or Points Issuance
   const handleManualIssue = async () => {
-    if (!phoneInput.trim()) {
-      Alert.alert('Validation Error', 'Please enter customer phone number.');
+    const digits = phoneInput.replace(/\D/g, '');
+    if (digits.length < 9 || (digits.startsWith('11') && digits.length !== 10)) {
+      Alert.alert('Customer phone', 'Enter a complete Malaysian mobile number.');
+      return;
+    }
+    if (customerLookup === 'checking' || customerLookup === 'idle') {
+      Alert.alert('Checking customer', 'Wait for the phone number lookup to finish.');
+      return;
+    }
+    if (customerLookup === 'error') {
+      Alert.alert('Customer lookup failed', 'Retry the phone number lookup before issuing rewards.');
+      return;
+    }
+    if (lookupNameRequired && !customerName.trim()) {
+      Alert.alert('Customer name required', 'Enter a name for this phone number before issuing rewards.');
       return;
     }
 
     const bill = parseFloat(billAmount) || 0;
-    const stamps = isPointsOnly ? 0 : (parseInt(stampAmount, 10) || 1);
+    const stamps = isPointsOnly ? 0 : parseInt(stampAmount, 10);
 
     if (isPointsOnly && bill <= 0) {
       Alert.alert('Validation Error', 'Please enter a bill amount to calculate points.');
       return;
     }
 
-    if (!isPointsOnly && stamps < 1) {
-      Alert.alert('Validation Error', 'Stamps to issue must be at least 1.');
+    if (!isPointsOnly && (!Number.isInteger(stamps) || stamps < 1 || stamps > 99)) {
+      Alert.alert('Validation Error', 'Stamps to issue must be between 1 and 99.');
       return;
     }
 
@@ -374,7 +501,12 @@ export default function GiveStampsScreen() {
     setIsSubmitting(true);
     setSuccessMsg(null);
     try {
-      const res = await pb.send<{ success: boolean; message: string; customerName: string; pointsEarned?: number }>(
+      const res = await pb.send<{
+        success: boolean; message: string; customerName: string; phone?: string;
+        transactionId?: string; receiptId?: string; totalStamps?: number; goal?: number;
+        pointsEarned?: number; pointsBalance?: number; stampsEarned?: number; storeName?: string;
+        branchName?: string; nextRewardName?: string; created?: string;
+      }>(
         '/api/risev/merchant/give-manual',
         {
           method: 'POST',
@@ -388,66 +520,45 @@ export default function GiveStampsScreen() {
         }
       );
 
+      if (!res.success) throw new Error(res.message || 'Could not issue the reward.');
+
       const resolvedName = res.customerName || customerName.trim() || 'Customer';
-      if (isPointsOnly) {
-        setSuccessMsg(res.message || `Points awarded to ${resolvedName}`);
-      } else {
-        setSuccessMsg(res.message || `${stamps} stamp(s) issued to ${resolvedName}`);
-      }
-
-      // Fetch real transaction record and merchant details from PocketBase
-      let realTxnId = (res as any).transactionId || '';
-      let storeName = (res as any).storeName || '';
-      let branchName = (res as any).branchName || '';
-
-      if (merchantId) {
-        try {
-          const [mRec, latestTxns] = await Promise.all([
-            pb.collection('merchants').getOne(merchantId).catch(() => null),
-            pb.collection('transactions').getList(1, 1, {
-              filter: `merchant = "${merchantId}"`,
-              sort: '-created',
-            }).catch(() => ({ items: [] }))
-          ]);
-
-          if (mRec?.name) storeName = mRec.name;
-          if (latestTxns?.items?.length > 0) {
-            const latest = latestTxns.items[0];
-            if (!realTxnId) realTxnId = latest.id;
-          }
-        } catch (fetchErr) {}
-      }
-
-      // Trust the server: it applies spend_per_point, campaigns, streaks and the
-      // minimum-spend floor. `|| floor(bill)` printed wrong numbers, and turned a
-      // legitimate 0 into the bill amount.
-      const pointsEarnedCalc =
-        typeof (res as any).pointsEarned === 'number' ? (res as any).pointsEarned : 0;
+      // Use the transaction and card balance returned by this request. A latest-
+      // transaction lookup can belong to a different customer at a busy counter.
+      const pointsEarnedCalc = typeof res.pointsEarned === 'number' ? res.pointsEarned : 0;
 
       const receiptInfo: ReceiptData = {
-        id: realTxnId || ('TXN-' + Math.random().toString(36).substring(2, 9).toUpperCase()),
-        storeName: storeName || (user as any)?.merchant_name || 'Risev Partner Store',
-        branchName: branchName || branches.find((b: any) => b.id === selectedBranchId)?.name || storeName || 'Main Counter',
-        date: new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        id: res.transactionId || '',
+        receiptId: res.receiptId || '',
+        storeName: res.storeName || merchantIdentity.name || 'Risev Partner Store',
+        branchName: res.branchName || branches.find((b: any) => b.id === selectedBranchId)?.name || 'Main Counter',
+        date: new Date(String(res.created || new Date().toISOString()).replace(' ', 'T')).toLocaleString('en-MY', { dateStyle: 'medium', timeStyle: 'short' }),
         billAmount: bill,
-        stampsEarned: stamps,
-        currentStamps: (res as any).totalStamps || stamps,
-        stampGoal: (res as any).goal || 10,
-        nextRewardName: (res as any).nextRewardName || 'Next Reward',
-        customerPhone: phoneInput.trim(),
+        stampsEarned: Number(res.stampsEarned) || 0,
+        currentStamps: typeof res.totalStamps === 'number' ? res.totalStamps : 0,
+        stampGoal: Number(res.goal) || Number(program?.stamp_goal) || 10,
+        nextRewardName: res.nextRewardName || program?.reward_name || '',
+        customerPhone: res.phone || phoneInput.trim(),
         customerName: resolvedName,
         cashierName: user?.name,
         pointsEarned: pointsEarnedCalc,
+        currentPoints: Number(res.pointsBalance) || 0,
         isPointsOnly,
       };
       setActiveReceipt(receiptInfo);
-      setReceiptModalVisible(true);
+      setActivePaidReceipt(null);
+      setReceiptError('');
+      setIssueSuccessVisible(true);
+      setSuccessMsg(null);
 
       setPhoneInput('');
       setCustomerName('');
+      setCustomerLookup('idle');
+      setLookupNameRequired(false);
       setExistingCustomer(null);
       setBillAmount('');
       setStampAmount('1');
+      if (merchantId) invalidate(cacheKeys.merchantTxns(merchantId));
       fetchTransactions();
     } catch (err: any) {
       const msg = err?.message || (isPointsOnly ? 'Failed to award points manually.' : 'Failed to issue stamps manually.');
@@ -459,84 +570,115 @@ export default function GiveStampsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    if (merchantId) invalidate(cacheKeys.merchantTxns(merchantId));
     await fetchTransactions();
     setRefreshing(false);
   };
+
+  const billValue = parseFloat(billAmount) || 0;
+  const stampsValue = isPointsOnly ? 0 : (parseInt(stampAmount, 10) || 1);
+  const pointsRate = Number(program?.spend_per_point) > 0 ? Number(program.spend_per_point) : 1;
+  const previewPoints = isStampsOnly ? 0 : Math.floor(billValue / pointsRate);
+  const customerLabel = customerName.trim() || existingCustomer?.name || phoneInput.trim() || 'Customer';
+  const manualCtaLabel = isPointsOnly ? 'Award Points' : stampsValue === 1 ? 'Issue Stamp' : 'Issue Stamps';
+  const canIssue = (customerLookup === 'found' || customerLookup === 'new') && (!lookupNameRequired || !!customerName.trim());
+  const issueHint = customerLookup === 'checking' ? 'Checking number…'
+    : customerLookup === 'error' ? 'Retry number lookup'
+    : lookupNameRequired && !customerName.trim() ? 'Enter customer name'
+    : customerLookup === 'idle' ? 'Enter customer phone'
+    : isPointsOnly ? (previewPoints > 0 ? `+${previewPoints} points` : 'Points from sale')
+    : `${stampsValue} stamp${stampsValue === 1 ? '' : 's'}`;
+  const pendingVoucherRecord = pendingVoucher?.voucher;
+  const pendingRewardName = pendingVoucherRecord?.expand?.reward?.name || pendingVoucherRecord?.title || 'Reward voucher';
+  const pendingCustomerName = pendingVoucherRecord?.expand?.customer?.name || pendingVoucherRecord?.customer_name || 'Customer';
+  const pendingExpiry = pendingVoucherRecord?.expires_at
+    ? new Date(String(pendingVoucherRecord.expires_at).replace(' ', 'T')).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'No expiry';
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: 16 + insets.top, paddingBottom: 120 },
+          { paddingTop: activeTab === 'manual' ? 10 + insets.top : 16 + insets.top, paddingBottom: activeTab === 'manual' ? 108 : 120 },
           isDesktop && { maxWidth: 860, alignSelf: 'center', width: '100%' }
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFC700" />}
       >
-        {/* Dark Background - true black */}
-        <View style={{ position: 'absolute', top: -(16 + insets.top), left: -20, right: -20, height: 280 + insets.top, zIndex: 0, backgroundColor: '#050505' }} />
-
-        {/* Header Content */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, marginBottom: 24, paddingTop: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255, 199, 0, 0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 199, 0, 0.3)' }}>
-              <Ionicons name="qr-code" size={20} color="#FFC700" />
+        <View style={[styles.headerSheet, { paddingTop: 16 + insets.top, marginTop: -(16 + insets.top) }]}>
+          {activeTab === 'voucher' ? (
+            <View style={styles.merchantBrandRow}>
+              <View style={styles.merchantBrandLeft}>
+                <View style={styles.merchantBrandMark}>
+                  {merchantIdentity.logo ? (
+                    <Image source={{ uri: merchantIdentity.logo }} style={styles.merchantBrandImage} resizeMode="cover" />
+                  ) : (
+                    <Ionicons name="storefront" size={19} color="#111111" />
+                  )}
+                </View>
+                <Text style={styles.merchantBrandName} numberOfLines={1}>{merchantIdentity.name || 'Your store'}</Text>
+              </View>
+              <Image source={require('../../assets/risev logo.png')} style={styles.risevBrandImage} resizeMode="contain" accessibilityLabel="Risev" />
             </View>
-            <View>
-              <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 0.3 }}>
-                Issue & Redeem
-              </Text>
-              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                {isPointsOnly ? 'Scan vouchers or award points manually' : isStampsOnly ? 'Scan vouchers or issue stamps manually' : 'Scan vouchers or issue stamps & points'}
-              </Text>
+          ) : null}
+          <View style={[styles.headerRow, activeTab === 'manual' && styles.manualHeaderRow]}>
+            <View style={styles.headerTitleGroup}>
+              {activeTab === 'manual' ? (
+                <TouchableOpacity style={styles.headerIcon} onPress={() => setActiveTab('voucher')} accessibilityRole="button" accessibilityLabel="Back to Issue and Redeem">
+                  <Ionicons name="arrow-back" size={iconSizes.lg} color={colors.black} />
+                </TouchableOpacity>
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle}>{activeTab === 'manual' ? (isPointsOnly ? 'Award Points' : 'Give Stamps') : 'Issue & Redeem'}</Text>
+                {activeTab === 'voucher' && <Text style={styles.headerSubtitle} numberOfLines={1}>Customer rewards made simple.</Text>}
+              </View>
             </View>
+            {activeTab === 'voucher' && <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerAction} onPress={openSupport} accessibilityRole="button" accessibilityLabel="Help">
+                <Ionicons name="help-circle-outline" size={iconSizes.md} color={colors.accent[600]} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerAction} onPress={onRefresh} accessibilityRole="button" accessibilityLabel="Refresh">
+                <Ionicons name="refresh" size={iconSizes.md} color={colors.accent[600]} />
+              </TouchableOpacity>
+            </View>}
           </View>
-          <TouchableOpacity 
-            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' }} 
-            onPress={fetchTransactions} 
-            activeOpacity={0.7}
-          >
-            <Ionicons name="refresh" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
 
-        {/* High-Contrast Segment Tabs Embedded */}
-        <View style={{ flexDirection: 'row', backgroundColor: '#171717', borderRadius: 100, padding: 6, marginBottom: 24, zIndex: 10 }}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            testID="voucher-scan-tab"
-            style={[styles.tabBtn, activeTab === 'voucher' && { backgroundColor: '#FFC700' }]}
-            onPress={() => {
-              setActiveTab('voucher');
-              setSuccessMsg(null);
-              setVoucherError('');
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="qr-code-outline" size={18} color={activeTab === 'voucher' ? '#050505' : '#FFC700'} />
-            <Text style={[styles.tabBtnText, { color: activeTab === 'voucher' ? '#050505' : '#FFC700', fontFamily: activeTab === 'voucher' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold' }]}>
-              Scan Voucher QR
-            </Text>
-          </TouchableOpacity>
+          {activeTab === 'voucher' ? <View style={styles.tabBarWrap}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              testID="voucher-scan-tab"
+              style={[styles.tabBtn, activeTab === 'voucher' && styles.tabBtnActive]}
+              onPress={() => {
+                setActiveTab('voucher');
+                setSuccessMsg(null);
+                setVoucherError('');
+                setIsCameraActive(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="qr-code-outline" size={iconSizes.md} color={activeTab === 'voucher' ? colors.white : colors.accent[500]} />
+              <Text style={[styles.tabBtnText, activeTab === 'voucher' && styles.tabBtnTextActive]}>Redeem Voucher</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            accessibilityRole="button"
-            testID="manual-give-tab"
-            style={[styles.tabBtn, activeTab === 'manual' && { backgroundColor: '#FFC700' }]}
-            onPress={() => {
-              setActiveTab('manual');
-              setSuccessMsg(null);
-              setVoucherError('');
-              setIsCameraActive(false);
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name={isPointsOnly ? "sparkles-outline" : "ribbon-outline"} size={18} color={activeTab === 'manual' ? '#050505' : '#FFC700'} />
-            <Text style={[styles.tabBtnText, { color: activeTab === 'manual' ? '#050505' : '#FFC700', fontFamily: activeTab === 'manual' ? 'PlusJakartaSans_800ExtraBold' : 'PlusJakartaSans_700Bold' }]}>
-              {isPointsOnly ? 'Award Points' : isStampsOnly ? 'Issue Stamps' : 'Issue Stamps & Points'}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              testID="manual-give-tab"
+              style={styles.tabBtn}
+              onPress={() => {
+                setActiveTab('manual');
+                setSuccessMsg(null);
+                setVoucherError('');
+                setIsCameraActive(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={isPointsOnly ? 'sparkles-outline' : 'ribbon-outline'} size={iconSizes.md} color={colors.accent[500]} />
+              <Text style={styles.tabBtnText}>
+                {isPointsOnly ? 'Award Points' : 'Give Stamps'}
+              </Text>
+            </TouchableOpacity>
+          </View> : null}
         </View>
 
         {/* Rich Redemption Success Card */}
@@ -606,150 +748,120 @@ export default function GiveStampsScreen() {
         {/* TAB 1: VOUCHER QR SCANNER & REDEMPTION FORM */}
         {/* ───────────────────────────────────────────────────────────── */}
         {activeTab === 'voucher' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Voucher Redemption Scanner</Text>
-            <Text style={styles.cardSubtitle}>
-              Scan customer QR code or enter voucher code (e.g. WV-XXXX-XXXX) to redeem rewards.
-            </Text>
+          <View style={styles.voucherArea}>
+            <RisevRewardBanner mode="voucher" onPress={openCamera} />
 
-            {/* Viewfinder & Camera Scanner Card */}
-            <View style={styles.viewfinderCard}>
-              {isCameraActive && activeTab === 'voucher' ? (
-                permission?.granted ? (
-                  <View style={{ width: '100%', height: 260, position: 'relative' }}>
-                    <CameraView
-                      style={styles.cameraView}
-                      facing="back"
-                      barcodeScannerSettings={{
-                        barcodeTypes: ['qr'],
+            <TouchableOpacity style={styles.actionRow} onPress={openCamera} activeOpacity={0.85} accessibilityRole="button">
+              <View style={styles.actionIcon}><Ionicons name="camera-outline" size={20} color="#111111" /></View>
+              <Text style={styles.actionText}>Open Camera Scanner</Text>
+              <Ionicons name="chevron-forward" size={18} color="#6B788B" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionRow} onPress={() => setManualCodeOpen((value) => !value)} activeOpacity={0.85} accessibilityRole="button">
+              <View style={styles.actionIcon}><Ionicons name="keypad-outline" size={20} color="#111111" /></View>
+              <Text style={styles.actionText}>{manualCodeOpen ? 'Hide Voucher Code' : 'Enter Voucher Code Manually'}</Text>
+              <Ionicons name={manualCodeOpen ? 'chevron-up' : 'chevron-forward'} size={18} color="#6B788B" />
+            </TouchableOpacity>
+
+            {manualCodeOpen && (
+              <View style={{ marginTop: 12 }}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>VOUCHER CODE</Text>
+                  <View style={styles.inputWrap}>
+                    <Ionicons name="qr-code-outline" size={iconSizes.md} color={colors.accent[700]} style={{ marginLeft: 16, marginRight: 8 }} />
+                    <TextInput
+                      style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                      placeholder="e.g. WV-1234-5678"
+                      placeholderTextColor={colors.accent[400]}
+                      value={voucherCode}
+                      onChangeText={(text) => {
+                        setVoucherCode(text);
+                        setVoucherError('');
                       }}
-                      onBarcodeScanned={handleBarCodeScanned}
-                    >
-                      <View style={styles.scannerOverlay}>
-                        <View style={styles.scanTargetBox}>
-                          <View style={[styles.cornerBracket, styles.topLeft]} />
-                          <View style={[styles.cornerBracket, styles.topRight]} />
-                          <View style={[styles.cornerBracket, styles.bottomLeft]} />
-                          <View style={[styles.cornerBracket, styles.bottomRight]} />
-                        </View>
-                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', marginTop: 12 }}>
-                          Align customer QR code within frame
-                        </Text>
-                      </View>
-                    </CameraView>
-
-                    {/* Camera Close Control */}
-                    <TouchableOpacity
-                      style={styles.closeCameraOverlayBtn}
-                      onPress={() => setIsCameraActive(false)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#FFFFFF" />
-                      <Text style={styles.closeCameraOverlayText}>Cancel Scan</Text>
-                    </TouchableOpacity>
+                      autoCapitalize="characters"
+                    />
                   </View>
-                ) : (
-                  <View style={styles.cameraFallbackWrap}>
-                    <Text style={styles.cameraFallbackText}>Camera permission needed to scan QR codes</Text>
-                    <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
-                      <Text style={styles.permissionBtnText}>Grant Camera Permission</Text>
-                    </TouchableOpacity>
-                  </View>
-                )
-              ) : (
-                <View style={styles.viewfinderPlaceholder}>
-                  <View style={styles.scannerTargetGraphic}>
-                    <Ionicons name="qr-code" size={44} color="#FFC700" />
-                    <View style={[styles.cornerBracket, styles.topLeft]} />
-                    <View style={[styles.cornerBracket, styles.topRight]} />
-                    <View style={[styles.cornerBracket, styles.bottomLeft]} />
-                    <View style={[styles.cornerBracket, styles.bottomRight]} />
-                  </View>
-                  <Text style={styles.viewfinderHint}>Align QR code inside scanner frame</Text>
-                  <TouchableOpacity
-                    style={styles.activateCameraBtn}
-                    onPress={async () => {
-                      if (!permission?.granted) {
-                        const res = await requestPermission();
-                        if (res.granted) setIsCameraActive(true);
-                      } else {
-                        setIsCameraActive(true);
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="camera-outline" size={18} color="#B45309" />
-                    <Text style={styles.activateCameraBtnText}>Open Camera Scanner</Text>
-                  </TouchableOpacity>
                 </View>
-              )}
-            </View>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
+                  onPress={handleRedeemVoucher}
+                  disabled={isRedeemingVoucher}
+                  activeOpacity={0.85}
+                >
+                  {isRedeemingVoucher ? (
+                    <ActivityIndicator color={colors.primary[400]} />
+                  ) : (
+                    <>
+                      <Ionicons name="gift-outline" size={iconSizes.md} color={colors.primary[400]} style={{ marginRight: 8 }} />
+                      <Text style={styles.primaryBtnText}>Review & redeem</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
 
             {voucherError ? (
               <View style={styles.errorBanner}>
-                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Ionicons name="alert-circle" size={iconSizes.md} color={colors.error.DEFAULT} />
                 <Text style={styles.errorBannerText}>{voucherError}</Text>
               </View>
             ) : null}
-
-            {/* Voucher Code Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>VOUCHER CODE</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="qr-code-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
-                <TextInput
-                  style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                  placeholder="e.g. WV-1234-5678"
-                  placeholderTextColor="#94A3B8"
-                  value={voucherCode}
-                  onChangeText={(text) => {
-                    setVoucherCode(text);
-                    setVoucherError('');
-                  }}
-                  autoCapitalize="characters"
-                />
-              </View>
-            </View>
-
-            {/* Redeem Button (Sleek Black & White) */}
-            <TouchableOpacity
-              style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
-              onPress={handleRedeemVoucher}
-              disabled={isRedeemingVoucher}
-              activeOpacity={0.85}
-            >
-              {isRedeemingVoucher ? (
-                <ActivityIndicator color="#FFC700" />
-              ) : (
-                <>
-                  <Ionicons name="gift-outline" size={20} color="#FFC700" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>Redeem Voucher Now</Text>
-                </>
-              )}
-            </TouchableOpacity>
           </View>
         )}
 
-        {/* ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'voucher' && transactions.length > 0 ? (
+          <View style={styles.recentBlock}>
+            <Text style={styles.recentHeading}>Recent activity</Text>
+            {transactions.slice(0, 2).map((txn) => {
+              const redeemed = String(txn.type || '').toLowerCase().includes('redeem');
+              const stampCount = Number(txn.stamps) || 0;
+              const pointCount = Number(txn.points) || 0;
+              return (
+                <View key={txn.id} style={styles.recentRow}>
+                  <View style={[styles.recentIcon, redeemed ? styles.recentRedeemed : styles.recentEarned]}>
+                    <Ionicons name={redeemed ? 'checkmark' : 'ribbon'} size={17} color={redeemed ? '#087A53' : '#111111'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.recentName}>{redeemed ? 'Voucher redeemed' : stampCount > 0 ? `${stampCount} stamp${stampCount === 1 ? '' : 's'} issued` : pointCount > 0 ? `${pointCount} points awarded` : 'Customer visit recorded'}</Text>
+                    <Text style={styles.recentMeta} numberOfLines={1}>{txn.expand?.customer?.name || 'Customer'}</Text>
+                  </View>
+                  <Text style={styles.recentTime}>{new Date(String(txn.created).replace(' ', 'T')).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}</Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
         {/* TAB 2: MANUAL ISSUANCE FORM */}
         {/* ───────────────────────────────────────────────────────────── */}
         {activeTab === 'manual' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              {isPointsOnly ? 'Manual Points Issuance' : isStampsOnly ? 'Manual Stamp Issuance' : 'Manual Loyalty Issuance'}
-            </Text>
-            <Text style={styles.cardSubtitle}>
-              {isPointsOnly
-                ? 'Enter customer phone number and bill amount to credit loyalty points directly.'
-                : isStampsOnly
-                ? 'Enter customer phone number to credit loyalty stamps directly if NFC card is unavailable.'
-                : 'Enter customer phone and bill amount to credit stamps and loyalty points.'}
-            </Text>
+          <View style={[styles.card, styles.manualCard]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardEyebrow}>01 / CUSTOMER</Text>
+                <Text style={styles.cardTitle}>Who visited today?</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => Alert.alert(
+                  isPointsOnly ? 'Award points' : isStampsOnly ? 'Issue stamps' : 'Issue stamps & points',
+                  isPointsOnly
+                    ? 'Enter the customer phone and bill to award points directly.'
+                    : isStampsOnly
+                    ? 'Enter the customer phone to issue stamps when the NFC card is unavailable.'
+                    : 'Enter the customer phone and bill to issue stamps and points.'
+                )}
+                style={styles.cardHelpBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Manual issuance help"
+              >
+                <Ionicons name="help-circle-outline" size={iconSizes.md} color={colors.accent[400]} />
+              </TouchableOpacity>
+            </View>
 
             {/* Customer Phone Input */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>CUSTOMER PHONE NUMBER</Text>
-              <View style={styles.inputWrap}>
+              <View style={[styles.inputWrap, focusedField === 'phone' && styles.inputWrapFocused]}>
                 <View style={styles.prefixBox}>
                   <Text style={styles.flag}>🇲🇾</Text>
                   <Text style={styles.prefixCode}>+60</Text>
@@ -760,28 +872,46 @@ export default function GiveStampsScreen() {
                   placeholder="11 234 5678"
                   placeholderTextColor="#94A3B8"
                   value={phoneInput}
-                  onChangeText={(t) => setPhoneInput(formatMalaysianPhone(t))}
+                  onChangeText={(t) => {
+                    const nextPhone = formatMalaysianPhone(t);
+                    if (nextPhone !== phoneInput) {
+                      if (customerLookup !== 'idle') setCustomerName('');
+                      setExistingCustomer(null);
+                      setCustomerLookup('idle');
+                      setLookupNameRequired(false);
+                    }
+                    setPhoneInput(nextPhone);
+                  }}
+                  onFocus={() => setFocusedField('phone')}
+                  onBlur={() => setFocusedField(null)}
                   keyboardType="phone-pad"
+                  accessibilityLabel="Customer phone number"
                 />
               </View>
             </View>
 
-            {/* Customer Name Input (Optional / Auto-filled if registered) */}
-            <View style={styles.inputContainer}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={styles.label}>{t('customer_name_optional') || 'CUSTOMER NAME (OPTIONAL)'}</Text>
-                {isSearchingCustomer ? (
-                  <ActivityIndicator size="small" color="#FFC700" />
-                ) : existingCustomer?.name ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#10B981' }}>
-                      Registered Customer
-                    </Text>
-                  </View>
-                ) : null}
+            {customerLookup === 'checking' && (
+              <View style={styles.lookupNotice}>
+                <ActivityIndicator size="small" color="#A67A00" />
+                <Text style={styles.lookupNoticeText}>Checking customer number…</Text>
               </View>
-              <View style={styles.inputWrap}>
+            )}
+            {customerLookup === 'error' && (
+              <View style={[styles.lookupNotice, styles.lookupError]}>
+                <Ionicons name="alert-circle-outline" size={16} color="#B42318" />
+                <Text style={[styles.lookupNoticeText, { color: '#B42318' }]}>Could not check this number.</Text>
+                <TouchableOpacity onPress={() => setLookupRetry((value) => value + 1)} accessibilityRole="button" accessibilityLabel="Retry customer lookup">
+                  <Text style={styles.lookupRetry}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {lookupNameRequired && (customerLookup === 'new' || customerLookup === 'found') && (
+            <View style={styles.inputContainer}>
+              <View style={styles.nameLabelRow}>
+                <Text style={styles.label}>CUSTOMER NAME *</Text>
+                <Text style={styles.nameRequiredBadge}>{customerLookup === 'new' ? 'NEW CUSTOMER' : 'NAME REQUIRED'}</Text>
+              </View>
+              <View style={[styles.inputWrap, focusedField === 'name' && styles.inputWrapFocused]}>
                 <Ionicons name="person-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
                 <TextInput
                   style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
@@ -789,10 +919,77 @@ export default function GiveStampsScreen() {
                   placeholderTextColor="#94A3B8"
                   value={customerName}
                   onChangeText={setCustomerName}
+                  onFocus={() => setFocusedField('name')}
+                  onBlur={() => setFocusedField(null)}
                   autoCapitalize="words"
+                  accessibilityLabel="Customer name, required"
                 />
               </View>
             </View>
+            )}
+
+            {existingCustomer && !lookupNameRequired ? (
+              <View style={styles.customerPreview}>
+                <View style={styles.customerAvatar}>
+                  <Text style={styles.customerAvatarText}>
+                    {(existingCustomer.name || customerName || 'C').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'C'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.customerPreviewName}>{existingCustomer.name || customerName || 'Customer'}</Text>
+                  <Text style={styles.customerPreviewMeta}>
+                    {existingCustomer.stamps ?? 0}/{Number(program?.stamp_goal) || 10} stamps · {existingCustomer.points ?? 0} pts
+                  </Text>
+                  {!isPointsOnly && <View style={styles.customerProgressTrack}>
+                    <View style={[styles.customerProgressFill, { width: `${Math.min(100, ((existingCustomer.stamps || 0) / (Number(program?.stamp_goal) || 10)) * 100)}%` }]} />
+                  </View>}
+                </View>
+                <Ionicons name="checkmark-circle" size={iconSizes.md} color={colors.success.DEFAULT} />
+              </View>
+            ) : null}
+
+            <View style={styles.sectionDivider} />
+            <View style={styles.sectionHeadingRow}>
+              <View style={styles.sectionNumber}><Text style={styles.sectionNumberText}>02</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.manualSectionTitle}>Record this visit</Text>
+                <Text style={styles.sectionSubtitle}>Stamp count and sale</Text>
+              </View>
+            </View>
+
+            {/* Stamps to Issue Input (Hidden if Points-Only) */}
+            {!isPointsOnly && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>STAMPS TO ISSUE</Text>
+                <View style={styles.stampStepper}>
+                  <TouchableOpacity
+                    style={styles.stepperButton}
+                    onPress={() => setStampAmount(String(Math.max(1, stampsValue - 1)))}
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease stamps"
+                  >
+                    <Ionicons name="remove" size={21} color="#111111" />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.stepperInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
+                    placeholder="1"
+                    placeholderTextColor="#94A3B8"
+                    value={stampAmount}
+                    onChangeText={(value) => setStampAmount(value.replace(/\D/g, '').slice(0, 2))}
+                    keyboardType="number-pad"
+                    accessibilityLabel="Number of stamps to issue"
+                  />
+                  <TouchableOpacity
+                    style={[styles.stepperButton, styles.stepperButtonAdd]}
+                    onPress={() => setStampAmount(String(Math.min(99, stampsValue + 1)))}
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase stamps"
+                  >
+                    <Ionicons name="add" size={22} color="#111111" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* Bill Amount Input */}
             <View style={styles.inputContainer}>
@@ -809,7 +1006,7 @@ export default function GiveStampsScreen() {
                   </Text>
                 </View>
               ) : null}
-              <View style={styles.inputWrap}>
+              <View style={[styles.inputWrap, focusedField === 'bill' && styles.inputWrapFocused]}>
                 <Text style={styles.currencyPrefix}>RM</Text>
                 <TextInput
                   style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
@@ -817,6 +1014,8 @@ export default function GiveStampsScreen() {
                   placeholderTextColor="#94A3B8"
                   value={billAmount}
                   onChangeText={setBillAmount}
+                  onFocus={() => setFocusedField('bill')}
+                  onBlur={() => setFocusedField(null)}
                   keyboardType="decimal-pad"
                 />
               </View>
@@ -850,43 +1049,9 @@ export default function GiveStampsScreen() {
               </View>
             </View>
 
-            {/* Stamps to Issue Input (Hidden if Points-Only) */}
-            {!isPointsOnly && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>STAMPS TO ISSUE</Text>
-                <View style={styles.inputWrap}>
-                  <Ionicons name="ribbon-outline" size={20} color="#050505" style={{ marginLeft: 16, marginRight: 8 }} />
-                  <TextInput
-                    style={[styles.input, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                    placeholder="1"
-                    placeholderTextColor="#94A3B8"
-                    value={stampAmount}
-                    onChangeText={setStampAmount}
-                    keyboardType="number-pad"
-                  />
-                </View>
-
-                {/* Quick Stamp Presets */}
-                <View style={styles.presetRow}>
-                  {['1', '2', '3', '5'].map((s) => (
-                    <TouchableOpacity
-                      key={s}
-                      style={[styles.presetPill, stampAmount === s && styles.presetPillActive]}
-                      onPress={() => setStampAmount(s)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.presetText, stampAmount === s && styles.presetTextActive]}>
-                        {s} {parseInt(s, 10) === 1 ? 'Stamp' : 'Stamps'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
             {/* Outlet picker — brand-wide users (the owner) choose where this sale happened */}
             {isBrandWide && branches.length > 1 && (
-              <View style={{ marginBottom: 12 }}>
+              <View style={{ marginBottom: 5 }}>
                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 6, letterSpacing: 0.5 }}>
                   {locale === 'en' ? 'OUTLET' : 'CAWANGAN'}
                 </Text>
@@ -920,36 +1085,186 @@ export default function GiveStampsScreen() {
               </View>
             )}
 
-            {/* Submit Button */}
-            <TouchableOpacity
-              accessibilityRole="button"
-              testID="submit-manual-give"
-              style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
-              onPress={handleManualIssue}
-              disabled={isSubmitting}
-              activeOpacity={0.85}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFC700" />
-              ) : (
-                <>
-                  <Ionicons name={isPointsOnly ? "sparkles" : "checkmark-circle-outline"} size={20} color="#FFC700" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>
-                    {isPointsOnly ? 'Award Points Directly' : isBoth ? 'Issue Stamps & Points' : 'Issue Stamps Directly'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={styles.manualActionRow}>
+              <View style={styles.manualActionSummary}>
+                <Text style={styles.manualActionCustomer} numberOfLines={1}>{customerLabel}</Text>
+                <Text style={styles.manualActionDetail} numberOfLines={1}>{issueHint}</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                testID="submit-manual-give"
+                style={[styles.manualIssueButton, (!canIssue || isSubmitting) && styles.manualIssueDisabled]}
+                onPress={handleManualIssue}
+                disabled={!canIssue || isSubmitting}
+                activeOpacity={0.85}
+              >
+                {isSubmitting ? <ActivityIndicator color={colors.black} /> : <>
+                  <Text style={styles.manualIssueText}>{manualCtaLabel}</Text>
+                  <Ionicons name="arrow-forward" size={17} color="#111111" />
+                </>}
+              </TouchableOpacity>
+            </View>
+
           </View>
         )}
       </ScrollView>
 
-      {/* Digital Stamp Receipt & Print Modal */}
-      <DigitalStampReceiptModal
+      <Modal visible={isCameraActive} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeCamera}>
+        <View style={styles.cameraModal}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              enableTorch={torchOn}
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={handleBarCodeScanned}
+            >
+              <View style={styles.cameraOverlay}>
+                <View style={styles.cameraFrame}>
+                  <View style={[styles.cornerBracket, styles.topLeft]} />
+                  <View style={[styles.cornerBracket, styles.topRight]} />
+                  <View style={[styles.cornerBracket, styles.bottomLeft]} />
+                  <View style={[styles.cornerBracket, styles.bottomRight]} />
+                </View>
+                <Text style={styles.cameraHint}>Align the customer's QR inside the frame</Text>
+              </View>
+            </CameraView>
+
+            <View style={styles.cameraTopbar}>
+              <TouchableOpacity style={styles.cameraRoundBtn} onPress={closeCamera} accessibilityRole="button" accessibilityLabel="Close scanner">
+                <Ionicons name="close" size={iconSizes.lg} color={colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.cameraTitle}>Scan voucher</Text>
+              <TouchableOpacity style={styles.cameraRoundBtn} onPress={() => setTorchOn((value) => !value)} accessibilityRole="button" accessibilityLabel="Toggle torch">
+                <Ionicons name={torchOn ? 'flashlight' : 'flashlight-outline'} size={iconSizes.md} color={colors.white} />
+              </TouchableOpacity>
+            </View>
+
+            {!permission?.granted && (
+              <View style={styles.cameraPermission}>
+                <Ionicons name="camera-outline" size={iconSizes.display} color={colors.white} />
+                <Text style={styles.cameraPermissionText}>Camera access is needed to scan vouchers.</Text>
+                <TouchableOpacity style={styles.cameraPermissionBtn} onPress={requestPermission} activeOpacity={0.85}>
+                  <Text style={styles.cameraPermissionBtnText}>Allow camera</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.cameraBottomPanel}>
+              <View style={styles.cameraHandle} />
+              <View style={styles.cameraFallbackIcon}><Ionicons name="qr-code" size={23} color="#111111" /></View>
+              <Text style={styles.cameraFallbackTitle}>Having trouble scanning?</Text>
+              <Text style={styles.cameraFallbackCopy}>Enter the customer's voucher code manually.</Text>
+              <TouchableOpacity style={styles.cameraGalleryButton} onPress={scanFromGallery} accessibilityRole="button">
+                <Ionicons name="images-outline" size={17} color="#17202B" />
+                <Text style={styles.cameraGalleryText}>Choose QR Image</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cameraManualButton}
+                onPress={() => { closeCamera(); setActiveTab('voucher'); setManualCodeOpen(true); }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.cameraManualText}>Enter Voucher Code</Text>
+                <Ionicons name="chevron-forward" size={18} color="#111111" />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      <Modal visible={!!pendingVoucher} transparent animationType="slide" onRequestClose={closeReview}>
+        <View style={styles.reviewOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeReview} />
+          <View style={[styles.reviewSheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+            <View style={styles.reviewHandle} />
+            <Text style={styles.reviewTitle}>Redeem this voucher?</Text>
+            <View style={styles.reviewCodeBox}>
+              <Text style={styles.reviewCodeLabel}>VOUCHER</Text>
+              <Text style={styles.reviewCodeValue}>{pendingVoucher?.code}</Text>
+            </View>
+            {pendingVoucher?.loading ? (
+              <View style={styles.reviewLoading}>
+                <ActivityIndicator color={colors.primary[500]} />
+              </View>
+            ) : pendingVoucher?.voucher ? (
+              <View style={styles.reviewDetails}>
+                <View style={styles.reviewRow}>
+                  <Text style={styles.reviewRowLabel}>Reward</Text>
+                  <Text style={styles.reviewRowValue}>{pendingRewardName}</Text>
+                </View>
+                <View style={styles.reviewRow}>
+                  <Text style={styles.reviewRowLabel}>Customer</Text>
+                  <Text style={styles.reviewRowValue}>{pendingCustomerName}</Text>
+                </View>
+                <View style={styles.reviewRow}>
+                  <Text style={styles.reviewRowLabel}>Expires</Text>
+                  <Text style={styles.reviewRowValue}>{pendingExpiry}</Text>
+                </View>
+              </View>
+            ) : null}
+            {voucherError ? <Text style={styles.reviewError}>{voucherError}</Text> : null}
+            <TouchableOpacity
+              style={[styles.primaryBtn, isRedeemingVoucher && styles.primaryBtnDisabled]}
+              onPress={() => pendingVoucher && executeRedemption(pendingVoucher.code)}
+              disabled={isRedeemingVoucher}
+              activeOpacity={0.85}
+            >
+              {isRedeemingVoucher ? (
+                <ActivityIndicator color={colors.primary[400]} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={iconSizes.md} color={colors.primary[400]} style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>Redeem voucher</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reviewCancel} onPress={closeReview} activeOpacity={0.7}>
+              <Text style={styles.reviewCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* POS receipt presentation, backed by this manual transaction's recorded receipt. */}
+      <ThermalReceiptScreen
         visible={receiptModalVisible}
         onClose={() => setReceiptModalVisible(false)}
-        receiptData={activeReceipt}
+        receipt={activePaidReceipt}
         mode="merchant"
+        animate
+      />
+      <StampIssueSuccessModal
+        visible={issueSuccessVisible}
+        receipt={activeReceipt}
+        cardDesign={{
+          backgroundImage: program?.card_background_back ? pb.files.getURL(program, program.card_background_back) : undefined,
+          color: program?.card_color || '#FFCC00',
+          fontColor: program?.font_color || inkOn(program?.card_color || '#FFCC00'),
+          icon: program?.card_icon || 'coffee',
+          milestones: cardMilestones,
+          spendPerPoint: Number(program?.spend_per_point) || 1,
+        }}
+        receiptBusy={receiptLoading}
+        receiptError={receiptError}
+        onReceipt={async () => {
+          const id = activeReceipt?.receiptId;
+          if (!id || receiptLoading) return;
+          setReceiptLoading(true);
+          setReceiptError('');
+          try {
+            const saved = await pb.collection('digital_receipts').getOne<PaidReceipt>(id, { expand: 'merchant', requestKey: null });
+            if (saved.payment_status !== 'recorded' && saved.payment_status !== 'paid') throw new Error('Invalid receipt status');
+            setActivePaidReceipt(saved);
+            setIssueSuccessVisible(false);
+            // Let the confirmation modal dismiss before presenting the receipt on iOS.
+            setTimeout(() => setReceiptModalVisible(true), 380);
+          } catch {
+            setReceiptError('Could not load the receipt. Please try again.');
+          } finally {
+            setReceiptLoading(false);
+          }
+        }}
+        onAnother={() => { setIssueSuccessVisible(false); setActiveTab('manual'); }}
+        onDone={() => { setIssueSuccessVisible(false); setActiveTab('voucher'); setActiveReceipt(null); }}
       />
     </SafeAreaView>
   );
@@ -964,21 +1279,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    gap: 12,
+    marginBottom: 16,
   },
+  manualHeaderRow: { marginBottom: 9 },
   headerTitleGroup: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 21,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
+    color: colors.black,
+    letterSpacing: -0.3,
   },
   refreshIconBtn: {
     width: 36,
@@ -991,38 +1307,39 @@ const styles = StyleSheet.create({
     borderColor: '#FEF3C7',
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
   },
 
   // Segment Tab Selector (Capsule Style)
   tabBarWrap: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderRadius: 14,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 0,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.accent[100],
   },
   tabBtn: {
     flex: 1,
-    height: 46,
-    borderRadius: 100,
+    height: 44,
+    borderRadius: 11,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   tabBtnActive: {
-    backgroundColor: '#FFC700',
+    backgroundColor: colors.black,
   },
   tabBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#64748B',
+    color: colors.accent[500],
   },
   tabBtnTextActive: {
-    color: '#050505',
+    color: colors.white,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
   successBanner: {
@@ -1058,11 +1375,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: colors.accent[100],
     marginBottom: 20,
     shadowColor: '#050505',
     shadowOffset: { width: 0, height: 10 },
@@ -1070,11 +1387,18 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 4,
   },
+  manualCard: {
+    padding: 15,
+    borderRadius: 24,
+    borderColor: '#E8ECF1',
+    marginBottom: 8,
+  },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#050505',
-    marginBottom: 4,
+    color: colors.black,
+    letterSpacing: -0.4,
+    marginBottom: 0,
   },
   cardSubtitle: {
     fontSize: 13,
@@ -1213,24 +1537,28 @@ const styles = StyleSheet.create({
   },
 
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   label: {
     fontSize: 10,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    color: '#64748B',
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    color: colors.accent[500],
+    letterSpacing: 0.8,
+    marginBottom: 5,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
+    height: 44,
+    backgroundColor: colors.accent[50],
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: colors.accent[100],
     overflow: 'hidden',
+  },
+  inputWrapFocused: {
+    borderColor: '#E9B900',
+    backgroundColor: '#FFFDF5',
   },
   prefixBox: {
     flexDirection: 'row',
@@ -1262,20 +1590,20 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 52,
+    height: 44,
     paddingHorizontal: 12,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
+    color: colors.black,
   },
   presetRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 10,
+    marginTop: 7,
   },
   presetPill: {
     flex: 1,
-    height: 40,
+    height: 31,
     borderRadius: 100,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -1301,16 +1629,16 @@ const styles = StyleSheet.create({
     color: '#FFC700',
   },
   primaryBtn: {
-    height: 56,
-    backgroundColor: '#050505',
-    borderRadius: 16,
+    height: 52,
+    backgroundColor: colors.black,
+    borderRadius: 14,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#FFC700',
-    shadowColor: '#FFC700',
+    borderColor: colors.primary[400],
+    shadowColor: colors.primary[400],
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
@@ -1540,5 +1868,368 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  headerSheet: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent[100],
+  },
+  merchantBrandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 21 },
+  merchantBrandLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  merchantBrandMark: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFC700', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  merchantBrandImage: { width: 40, height: 40 },
+  merchantBrandName: { flex: 1, fontSize: 12.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#151515' },
+  risevBrandImage: { width: 66, height: 20, marginLeft: 12 },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: colors.accent[500],
+    marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerAction: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.accent[50],
+    borderWidth: 1,
+    borderColor: colors.accent[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  cardEyebrow: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.accent[500],
+    letterSpacing: 0.9,
+    marginBottom: 4,
+  },
+  cardHelpBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lookupNotice: { minHeight: 32, marginTop: -1, marginBottom: 9, paddingHorizontal: 10, borderRadius: 11, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#FFFBEC' },
+  lookupNoticeText: { flex: 1, color: '#756236', fontSize: 10.5, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  lookupError: { backgroundColor: '#FFF0EE' },
+  lookupRetry: { color: '#B42318', fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  nameLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  nameRequiredBadge: { color: '#9B6E00', fontSize: 9, letterSpacing: 0.3, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  sectionDivider: { height: 1, backgroundColor: '#EFF0F2', marginVertical: 7 },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 9 },
+  sectionNumber: { width: 29, height: 29, borderRadius: 10, backgroundColor: '#FFE998', alignItems: 'center', justifyContent: 'center' },
+  sectionNumberText: { color: '#493600', fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  manualSectionTitle: { color: '#151515', fontSize: 14, letterSpacing: -0.2, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  sectionSubtitle: { color: '#7A8798', fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 1 },
+  voucherArea: { paddingTop: 16 },
+  actionRow: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 11, borderRadius: 15, borderWidth: 1, borderColor: '#E4E8EF', backgroundColor: '#FFFFFF', paddingHorizontal: 13, marginBottom: 7 },
+  actionIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  actionText: { flex: 1, fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#18202B' },
+  recentBlock: { marginTop: 13, paddingHorizontal: 3 },
+  recentHeading: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#67758B', marginBottom: 8 },
+  recentRow: { minHeight: 55, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: '#E8ECF2', paddingVertical: 7 },
+  recentIcon: { width: 31, height: 31, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  recentRedeemed: { backgroundColor: '#DCFBE9' },
+  recentEarned: { backgroundColor: '#FFE68C' },
+  recentName: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#16202C' },
+  recentMeta: { fontSize: 10.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#7A8799' },
+  recentTime: { fontSize: 10, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#8C98A9' },
+  scanHero: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  scanIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  scanCaption: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: colors.accent[500],
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  textBtn: {
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  textBtnText: {
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.accent[600],
+  },
+  customerPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.accent[50],
+    borderWidth: 1,
+    borderColor: colors.accent[100],
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+  },
+  customerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary[400],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customerAvatarText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.black,
+  },
+  customerPreviewName: {
+    fontSize: 13.5,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.black,
+  },
+  customerPreviewMeta: {
+    fontSize: 11,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: colors.accent[500],
+    marginTop: 2,
+  },
+  customerProgressTrack: { width: '100%', height: 4, borderRadius: 2, backgroundColor: '#E2E7EF', overflow: 'hidden', marginTop: 6 },
+  customerProgressFill: { height: '100%', borderRadius: 2, backgroundColor: '#FFC700' },
+  stampStepper: { minHeight: 44, paddingHorizontal: 7, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF9DF', borderWidth: 1, borderColor: '#FFE48C', borderRadius: 13 },
+  stepperButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E0E5EC', alignItems: 'center', justifyContent: 'center' },
+  stepperButtonAdd: { backgroundColor: '#FFC700' },
+  stepperInput: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', minWidth: 45, paddingVertical: 0 },
+  manualActionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: '#ECEFF3', paddingTop: 10, marginTop: 2 },
+  manualActionSummary: { flex: 1, minWidth: 0 },
+  manualActionCustomer: { color: '#273344', fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold' },
+  manualActionDetail: { color: '#7A8797', fontSize: 10.5, marginTop: 2, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  manualIssueButton: { minWidth: 142, height: 43, borderRadius: 13, backgroundColor: '#FFC700', paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#B88A00', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 7, elevation: 3 },
+  manualIssueDisabled: { opacity: 0.5, shadowOpacity: 0, elevation: 0 },
+  manualIssueText: { color: '#111111', fontSize: 12.5, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  cameraModal: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+  cameraTopbar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  cameraRoundBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraTitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.white,
+  },
+  cameraOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 180,
+  },
+  cameraFrame: {
+    width: 230,
+    height: 230,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    borderRadius: 24,
+    position: 'relative',
+  },
+  cameraHint: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  cameraPermission: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+    backgroundColor: colors.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  cameraPermissionText: {
+    color: colors.white,
+    fontSize: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  cameraPermissionBtn: {
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraPermissionBtnText: {
+    color: colors.black,
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  cameraBottomPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 8, backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 18, alignItems: 'center' },
+  cameraHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#D8DEE7', marginBottom: 12 },
+  cameraFallbackIcon: { width: 39, height: 39, borderRadius: 20, backgroundColor: '#FFF4CD', alignItems: 'center', justifyContent: 'center' },
+  cameraFallbackTitle: { marginTop: 7, fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#17202B' },
+  cameraFallbackCopy: { marginTop: 3, fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#728096' },
+  cameraGalleryButton: { marginTop: 10, minHeight: 35, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  cameraGalleryText: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#17202B' },
+  cameraManualButton: { marginTop: 12, width: '100%', minHeight: 43, borderRadius: 13, backgroundColor: '#F4F6F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+  cameraManualText: { fontSize: 11.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111' },
+  reviewOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.48)',
+  },
+  reviewSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  reviewHandle: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.accent[200],
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  reviewTitle: {
+    fontSize: 20,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.black,
+    letterSpacing: -0.4,
+    marginBottom: 12,
+  },
+  reviewCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.accent[50],
+    borderWidth: 1,
+    borderColor: colors.accent[100],
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  reviewCodeLabel: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.accent[500],
+    letterSpacing: 0.8,
+  },
+  reviewCodeValue: {
+    fontSize: 15,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: colors.black,
+    letterSpacing: 1,
+  },
+  reviewLoading: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  reviewDetails: {
+    gap: 4,
+    marginBottom: 14,
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent[100],
+  },
+  reviewRowLabel: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: colors.accent[500],
+  },
+  reviewRowValue: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.black,
+    textAlign: 'right',
+  },
+  reviewError: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: colors.error.DEFAULT,
+    marginBottom: 10,
+  },
+  reviewCancel: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  reviewCancelText: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.accent[500],
   },
 });

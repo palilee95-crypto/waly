@@ -235,8 +235,11 @@ export default function VouchersScreen() {
   // 1. Global collection subscription for user's vouchers
   useEffect(() => {
     fetchVouchers();
+    let disposed = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
     if (user) {
       pb.collection('vouchers').subscribe('*', (e) => {
+        if (disposed) return;
         invalidate(CACHE_PREFIX.vouchersMe);
         fetchVouchers(true);
         if (e.record) {
@@ -253,12 +256,16 @@ export default function VouchersScreen() {
             return prev;
           });
         }
+      }).then((remove) => {
+        if (disposed) void remove().catch(() => {});
+        else unsubscribe = remove;
       }).catch((err) => {
         console.warn('Vouchers collection realtime subscription error:', err);
       });
     }
     return () => {
-      pb.collection('vouchers').unsubscribe('*');
+      disposed = true;
+      if (unsubscribe) void unsubscribe().catch(() => {});
     };
   }, [user]);
 
@@ -274,6 +281,7 @@ export default function VouchersScreen() {
 
     const voucherId = selectedVoucher.id;
     let isMounted = true;
+    let unsubscribe: (() => Promise<void>) | null = null;
 
     // Direct single-record SSE subscription (instant push notification from server)
     pb.collection('vouchers').subscribe(voucherId, (e) => {
@@ -287,6 +295,9 @@ export default function VouchersScreen() {
         } : prev);
         fetchVouchers();
       }
+    }).then((remove) => {
+      if (!isMounted) void remove().catch(() => {});
+      else unsubscribe = remove;
     }).catch((err) => {
       console.warn('Direct voucher SSE subscription error:', err);
     });
@@ -313,7 +324,7 @@ export default function VouchersScreen() {
     return () => {
       isMounted = false;
       clearInterval(interval);
-      pb.collection('vouchers').unsubscribe(voucherId).catch(() => {});
+      if (unsubscribe) void unsubscribe().catch(() => {});
     };
   }, [useModalVisible, selectedVoucher?.id, selectedVoucher?.status]);
 

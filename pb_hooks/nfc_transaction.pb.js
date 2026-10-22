@@ -47,7 +47,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       let priorReceiptId = "";
       let receiptError = "";
       try {
-        if (Number(claim.get("bill_amount")) > 0) priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+        // The helper also recognizes a fully discounted voucher sale, whose
+        // final bill is RM0.00. Stamp-only claims still return no receipt.
+        priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
       } catch (err) {
         receiptError = "Receipt recovery failed. Please contact support with this claim ID.";
         console.log("[NFC COMPLETE] Receipt recovery failed for", claim.id, err.message || err);
@@ -317,7 +319,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       try {
         const bookingReceipts = $app.findRecordsByFilter("digital_receipts", "booking = '" + activeBooking.id + "'", "-created", 1, 0);
         bookingReceiptId = bookingReceipts.length ? bookingReceipts[0].id : "";
-        if (!bookingReceiptId && billAmount > 0) bookingReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+        if (!bookingReceiptId && (billAmount > 0 || (voucherOutcome.id && !voucherOutcome.error))) {
+          bookingReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+        }
       } catch (receiptLookupErr) {
         bookingReceiptError = "Payment was recorded, but the receipt could not be saved. Retry the receipt from this sale.";
         console.log("[NFC COMPLETE] Booking receipt recovery failed:", receiptLookupErr.message || receiptLookupErr);
@@ -426,17 +430,22 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       }
 
       // The paid receipt is a server-owned snapshot of this exact POS claim.
-      // A stamp-only approval (zero bill) remains a loyalty event, not a sale.
+      // A stamp-only approval (zero bill, no voucher) remains a loyalty event,
+      // but a voucher can legitimately cover the whole bill and still needs a
+      // receipt showing the discount and RM0.00 total.
+      const voucherSale = Boolean(voucherOutcome.id) && !voucherOutcome.error;
+      const hasSaleValue = billAmount > 0 ||
+        (voucherSale && (Number(body.subtotal) > 0 || (Array.isArray(body.items) && body.items.length > 0)));
       let receiptId = "";
       let receiptError = "";
-      if (billAmount > 0 && transactionId) {
+      if (hasSaleValue && transactionId) {
         try {
           receiptId = receiptHelper.ensureNfcPaidReceipt(claim, $app.findRecordById("transactions", transactionId), body);
         } catch (receiptErr) {
           console.log("[NFC COMPLETE] Paid receipt error:", receiptErr.message || receiptErr);
           receiptError = "Payment was recorded, but the receipt could not be saved. Retry the receipt from this sale.";
         }
-      } else if (billAmount > 0) {
+      } else if (hasSaleValue) {
         receiptError = "Payment was recorded, but its transaction was not saved. Contact support with this claim ID.";
       }
 

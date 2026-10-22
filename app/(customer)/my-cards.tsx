@@ -366,16 +366,22 @@ export default function MyCardsScreen() {
     fetchLoyaltyCards();
     loadPinnedCards();
 
+    let disposed = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
     if (user) {
       pb.collection('loyalty_cards').subscribe('*', () => {
         fetchLoyaltyCards();
       }, {
         filter: `customer = '${user.id}'`
-      });
+      }).then((remove) => {
+        if (disposed) void remove().catch(() => {});
+        else unsubscribe = remove;
+      }).catch(() => {});
     }
 
     return () => {
-      pb.collection('loyalty_cards').unsubscribe('*');
+      disposed = true;
+      if (unsubscribe) void unsubscribe().catch(() => {});
     };
   }, [user]);
 

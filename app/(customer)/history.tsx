@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { pb } from '@/lib/pocketbase';
-import DigitalStampReceiptModal, { ReceiptData } from '@/components/DigitalStampReceiptModal';
+import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
+import { PaidReceipt } from '@/lib/paidReceipt';
 
 type TransactionItem = {
   id: string;
@@ -39,8 +40,9 @@ export default function StampHistoryScreen() {
   const router = useRouter();
   const [logs, setLogs] = useState<TransactionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptData | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<PaidReceipt | null>(null);
   const [receiptVisible, setReceiptVisible] = useState(false);
+  const [receiptError, setReceiptError] = useState('');
 
   useEffect(() => {
     fetchLogs();
@@ -70,7 +72,14 @@ export default function StampHistoryScreen() {
   };
 
   const handleOpenReceipt = async (item: TransactionItem) => {
-    if (Number(item.bill_amount) > 0) {
+    setReceiptError('');
+    let meta: any = {};
+    if (item.metadata) {
+      try { meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata; } catch (e) {}
+    }
+    const bill = Number(item.bill_amount) || 0;
+    const hasVoucher = Boolean(meta.voucher_id || meta.voucher_code || Number(meta.discount_amount) > 0);
+    if (bill > 0 || hasVoucher) {
       try {
         const match = await pb.send<{ receipt_id?: string }>('/api/risev/customer/transaction-receipt', {
           method: 'GET', params: { transaction_id: item.id }, requestKey: null,
@@ -79,31 +88,49 @@ export default function StampHistoryScreen() {
           router.push({ pathname: '/b/receipt/[id]', params: { id: match.receipt_id } });
           return;
         }
-      } catch (error) { /* Older transactions may have only a loyalty receipt. */ }
+      } catch (error) {
+        setReceiptError('Could not load this transaction’s receipt. Please try again.');
+        return;
+      }
+      setReceiptError('A recorded receipt is not available for this transaction yet.');
+      return;
     }
-    let branchName = 'Main Counter';
-    if (item.metadata) {
-      try {
-        const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-        if (meta.branch_name) branchName = meta.branch_name;
-      } catch (e) {}
-    }
-
     const card = item.expand?.loyalty_card;
     const program = card?.expand?.program;
+    const cardBalance = Number(card?.stamps_collected);
+    const items = Array.isArray(meta.items) && meta.items.length
+      ? meta.items.map((line: any) => ({
+          name: String(line.name || 'Item'),
+          qty: Math.max(1, parseInt(line.qty, 10) || 1),
+          price: Math.max(0, Number(line.price) || 0),
+        }))
+      : [{
+          name: hasVoucher ? 'Voucher redemption' : item.type === 'redeem' ? 'Reward redeemed' : item.type === 'adjust' ? 'Loyalty adjustment' : 'Stamps issued',
+          qty: 1,
+          price: bill > 0 ? bill : (Number(meta.subtotal) || 0),
+        }];
 
-    const receipt: ReceiptData = {
+    const receipt: PaidReceipt = {
       id: item.id,
-      storeName: item.expand?.merchant?.name || 'Partner Store',
-      branchName: branchName,
-      date: formatDate(item.created),
-      billAmount: item.bill_amount || 0,
-      stampsEarned: item.stamps || 0,
-      currentStamps: card?.stamps_collected || item.stamps || 1,
-      stampGoal: program?.stamp_goal || 10,
-      nextRewardName: program?.name || 'Loyalty Reward',
-      customerPhone: user?.phone,
-      customerName: user?.name,
+      receipt_number: `RV-${item.id.slice(0, 8).toUpperCase()}`,
+      transaction: item.id,
+      created: item.created,
+      merchant: item.expand?.merchant?.id || '',
+      customer_name: user?.name,
+      customer_phone: user?.phone,
+      staff_name: meta.staff_name || '',
+      branch_name: meta.branch_name || 'Main Counter',
+      line_items: items,
+      subtotal: Number(meta.subtotal) || (bill + (Number(meta.discount_amount) || 0)),
+      discount_amount: Number(meta.discount_amount) || 0,
+      total_amount: bill,
+      payment_method: bill > 0 ? String(meta.payment_method || 'cash') : hasVoucher ? 'Voucher' : 'Loyalty',
+      payment_status: bill > 0 || hasVoucher ? 'paid' : 'issued',
+      stamps_earned: item.stamps || 0,
+      stamps_balance: Number.isFinite(cardBalance) ? Math.max(0, cardBalance) : (item.stamps || 0),
+      stamp_goal: Math.max(1, Number(program?.stamp_goal) || 10),
+      reward_name: program?.name || '',
+      expand: { merchant: item.expand?.merchant },
     };
     setSelectedReceipt(receipt);
     setReceiptVisible(true);
@@ -168,6 +195,12 @@ export default function StampHistoryScreen() {
                 Track your stamp collections, rewards redemptions, and loyalty points earned at RISEV partner merchants.
               </Text>
             </View>
+            {receiptError ? (
+              <View style={styles.receiptError} accessibilityRole="alert">
+                <Ionicons name="information-circle-outline" size={18} color="#8A4B00" />
+                <Text style={styles.receiptErrorText}>{receiptError}</Text>
+              </View>
+            ) : null}
 
             {logs.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -230,12 +263,11 @@ export default function StampHistoryScreen() {
           </ScrollView>
         )}
 
-        {/* Digital Stamp Receipt & Print Modal */}
-        <DigitalStampReceiptModal
+        {/* Shared customer receipt */}
+        <ThermalReceiptScreen
           visible={receiptVisible}
           onClose={() => setReceiptVisible(false)}
-          onViewCard={() => router.push('/(customer)/my-cards' as any)}
-          receiptData={selectedReceipt}
+          receipt={selectedReceipt}
           mode="customer"
         />
       </SafeAreaView>
@@ -244,6 +276,8 @@ export default function StampHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
+  receiptError: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, marginBottom: 12, borderRadius: 12, backgroundColor: '#FFF4D6' },
+  receiptErrorText: { flex: 1, color: '#6B3F00', fontSize: 13 },
   root: {
     flex: 1,
     backgroundColor: '#FFFFFF',

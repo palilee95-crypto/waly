@@ -78,7 +78,6 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   if (!txn) throw new Error("The paid transaction for this claim was not found.");
 
   const amount = Number(claim.get("bill_amount")) || Number(txn.get("bill_amount")) || 0;
-  if (amount <= 0) return "";
 
   let meta = {};
   try {
@@ -91,6 +90,12 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   const rawItems = Array.isArray(source.items)
     ? source.items
     : (Array.isArray(meta.items_summary) ? meta.items_summary : []);
+  const grossAmount = Number(source.subtotal) || rawItems.reduce(function (sum, item) {
+    return sum + Math.max(0, Number(item.price) || 0) * Math.max(1, Number(item.qty) || 1);
+  }, 0);
+  const voucherApplied = Boolean(meta.voucher_id || source.voucher_id) &&
+    !meta.voucher_error && !source.voucher_error;
+  if (amount <= 0 && !(voucherApplied && grossAmount > 0)) return "";
   const items = rawItems.slice(0, 100).map(function (item) {
     return {
       name: String(item.name || "Item").slice(0, 120),
@@ -130,6 +135,27 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   receipt.set("payment_reference", String(source.payment_reference || "").slice(0, 120));
   receipt.set("payment_status", "paid");
   receipt.set("stamps_earned", Number(txn.get("stamps")) || 0);
+  try {
+    const cardId = txn.getString("loyalty_card");
+    if (cardId) {
+      const card = $app.findRecordById("loyalty_cards", cardId);
+      const earnedStamps = Number(txn.get("stamps")) || 0;
+      const balance = Math.max(0, Number(card.get("stamps_collected")) || 0);
+      let goal = 10;
+      let rewardName = "";
+      try {
+        const program = $app.findRecordById("loyalty_programs", card.getString("program"));
+        goal = Math.max(1, Number(program.get("stamp_goal")) || 10);
+        rewardName = String(program.getString("name") || "").slice(0, 120);
+      } catch (programErr) {}
+      receipt.set("stamps_before", Math.max(0, balance - earnedStamps));
+      receipt.set("stamps_balance", balance);
+      receipt.set("stamp_goal", goal);
+      receipt.set("reward_name", rewardName);
+    }
+  } catch (rewardErr) {
+    console.log("[PAID RECEIPT] reward snapshot failed:", rewardErr.message || rewardErr);
+  }
   $app.save(receipt);
   return receipt.id;
 }

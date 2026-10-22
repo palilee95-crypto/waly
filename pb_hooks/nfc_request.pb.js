@@ -484,9 +484,11 @@ routerAdd("GET", "/api/risev/nfc/receipt", (e) => {
     }
     const receipts = $app.findRecordsByFilter("digital_receipts", "claim = '" + claimId + "'", "-created", 1, 0);
     const receipt = receipts.length ? receipts[0] : null;
-    if (!receipt || receipt.getString("payment_status") !== "paid" || Number(receipt.get("total_amount")) <= 0) {
+    if (!receipt || receipt.getString("payment_status") !== "paid") {
       return e.json(200, { receipt_id: "", paid_sale: Number(claim.get("bill_amount")) > 0 });
     }
+    // A voucher can cover the whole bill; the receipt still exists as a paid
+    // record with a RM0.00 total and the voucher discount.
     return e.json(200, { receipt_id: receipt.id, paid_sale: true });
   } catch (err) {
     return e.json(404, { message: "Receipt not found" });

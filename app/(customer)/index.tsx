@@ -897,24 +897,33 @@ export default function CustomerDashboard() {
     fetchLoyaltyCards();
     fetchUpcomingAppointments();
 
-    // Listen to real-time updates on loyalty_cards and service_bookings
+    // Listen to real-time updates on loyalty_cards and service_bookings.
+    // Remove only this screen's listeners; other mounted screens share pb.
+    let disposed = false;
+    let unsubCards: (() => Promise<void>) | null = null;
+    let unsubBookings: (() => Promise<void>) | null = null;
     pb.collection('loyalty_cards').subscribe('*', () => {
       invalidate(CACHE_PREFIX.cardsMe);
       fetchLoyaltyCards(true);
     }, {
       filter: `customer = '${user.id}'`
-    });
+    }).then((remove) => {
+      if (disposed) void remove().catch(() => {});
+      else unsubCards = remove;
+    }).catch(() => {});
 
-    try {
-      pb.collection('service_bookings').subscribe('*', () => {
-        invalidate(CACHE_PREFIX.booking);
-        fetchUpcomingAppointments(true);
-      });
-    } catch (e) {}
+    pb.collection('service_bookings').subscribe('*', () => {
+      invalidate(CACHE_PREFIX.booking);
+      fetchUpcomingAppointments(true);
+    }).then((remove) => {
+      if (disposed) void remove().catch(() => {});
+      else unsubBookings = remove;
+    }).catch(() => {});
 
     return () => {
-      pb.collection('loyalty_cards').unsubscribe('*');
-      try { pb.collection('service_bookings').unsubscribe('*'); } catch (e) {}
+      disposed = true;
+      if (unsubCards) void unsubCards().catch(() => {});
+      if (unsubBookings) void unsubBookings().catch(() => {});
     };
   }, [user]);
 
