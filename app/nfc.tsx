@@ -33,6 +33,7 @@ import { getVoucherSpineTheme } from '@/theme';
 import * as Clipboard from 'expo-clipboard';
 import BranchFormModal, { StaffOption } from '@/components/BranchFormModal';
 import ThermalReceiptScreen from '@/components/ThermalReceiptScreen';
+import { receiptFromPublicPayload } from '@/lib/paidReceipt';
 import Svg, { Path } from 'react-native-svg';
 
 const stampIcons = [
@@ -1159,12 +1160,13 @@ export default function NfcLandingScreen() {
           });
           const saved = res?.receipt;
           if (!cancelled && saved && saved.payment_status === 'paid') {
-            setReceiptData({
-              ...saved,
-              id: match.receipt_id || match.share_token,
-              expand: { merchant: { name: saved.merchant_name || '' } },
-            });
-            return;
+            // Build the same PaidReceipt the merchant sees (logo, transaction,
+            // payment reference), so this slip and its PDF match theirs.
+            const mapped = receiptFromPublicPayload(saved, match.share_token || '');
+            if (mapped) {
+              setReceiptData(mapped);
+              return;
+            }
           }
         }
       } catch (error) { /* The purchase may not have produced a paid receipt. */ }

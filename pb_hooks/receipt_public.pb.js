@@ -60,10 +60,20 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
     // so the screen falls back to the card instead of rendering "0/10".
     const goal = numberOrZero("stamp_goal");
 
+    // The ledger relation is internal. The shared slip only needs a short,
+    // stable reference for its "Transaction" row, computed the same way the
+    // merchant slip derives it from the record.
+    const transactionRef = String(receipt.getString("transaction") || "")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .slice(-8)
+      .toUpperCase();
+
     return e.json(200, {
       receipt: {
         receipt_number: receipt.getString("receipt_number"),
         created: receipt.getString("created"),
+        // A display reference, never the raw transaction id.
+        transaction_reference: transactionRef,
         merchant_name: merchantName,
         // A logo is public branding (the Explore page shows it), and the receipt
         // PDF draws it, so the id and file name travel with the payload.
@@ -77,6 +87,7 @@ routerAdd("GET", "/api/risev/receipt/public", (e) => {
         discount_amount: numberOrZero("discount_amount"),
         total_amount: total,
         payment_method: receipt.getString("payment_method"),
+        payment_reference: receipt.getString("payment_reference"),
         payment_status: status,
         stamps_earned: numberOrZero("stamps_earned"),
         stamps_before: goal ? numberOrZero("stamps_before") : null,

@@ -35,6 +35,68 @@ export const receiptMerchant = (receipt: PaidReceipt) => receipt.expand?.merchan
 export const receiptPaymentMethod = (receipt: PaidReceipt) => ({ qr: 'QR payment', card: 'Card payment', cash: 'Cash', transfer: 'Bank transfer' }[String(receipt.payment_method || '').toLowerCase()] || receipt.payment_method || 'Counter');
 export const receiptDate = (receipt: PaidReceipt) => new Date(String(receipt.created || '').replace(' ', 'T')).toLocaleString('en-MY', { dateStyle: 'medium', timeStyle: 'short' });
 export const receiptLines = (receipt: PaidReceipt) => Array.isArray(receipt.line_items) ? receipt.line_items : [];
+
+// The ledger id is internal; the slip prints a short display reference. The
+// public route sends that reference instead of the relation, so both slips show
+// the same row without exposing the record id.
+export const receiptTransactionRef = (receipt: PaidReceipt) =>
+  String(receipt.transaction || '').replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
+
+// Older receipts have no reward snapshot stored on the record. The screen
+// resolves the card's current balance/goal and must hand those to the PDF and
+// print sheet, otherwise they fall back to a 10-dot default.
+export type ReceiptRewardSnapshot = { balance?: number; goal?: number; name?: string };
+
+function withResolvedReward(receipt: PaidReceipt, reward?: ReceiptRewardSnapshot | null): PaidReceipt {
+  if (!reward) return receipt;
+  return {
+    ...receipt,
+    stamps_balance: reward.balance ?? receipt.stamps_balance,
+    stamp_goal: reward.goal ?? receipt.stamp_goal,
+    reward_name: reward.name || receipt.reward_name,
+  };
+}
+
+// One mapping for every token/public receipt read. The merchant slip is built
+// from the digital_receipts record; the customer's slip was being built field by
+// field with pieces missing (no logo, no transaction, no payment reference), so
+// the two PDFs drifted apart. Both now come through here.
+export function receiptFromPublicPayload(payload: Record<string, any> | null | undefined, token = ''): PaidReceipt | null {
+  if (!payload) return null;
+  const numberOrUndefined = (value: unknown) => (
+    value === null || value === undefined || value === '' ? undefined : Number(value)
+  );
+  const merchantId = String(payload.merchant_id || '');
+  return {
+    id: String(token || ''),
+    receipt_number: String(payload.receipt_number || ''),
+    transaction: String(payload.transaction_reference || ''),
+    created: String(payload.created || ''),
+    merchant: merchantId,
+    customer_name: String(payload.customer_name || ''),
+    staff_name: String(payload.staff_name || ''),
+    branch_name: String(payload.branch_name || ''),
+    line_items: Array.isArray(payload.line_items) ? payload.line_items : [],
+    subtotal: Number(payload.subtotal) || 0,
+    discount_amount: Number(payload.discount_amount) || 0,
+    total_amount: Number(payload.total_amount) || 0,
+    payment_method: String(payload.payment_method || ''),
+    payment_reference: String(payload.payment_reference || ''),
+    payment_status: String(payload.payment_status || ''),
+    stamps_earned: Number(payload.stamps_earned) || 0,
+    stamps_before: numberOrUndefined(payload.stamps_before),
+    stamps_balance: numberOrUndefined(payload.stamps_balance),
+    stamp_goal: numberOrUndefined(payload.stamp_goal),
+    reward_name: String(payload.reward_name || ''),
+    expand: {
+      merchant: {
+        id: merchantId,
+        name: String(payload.merchant_name || ''),
+        logo: String(payload.merchant_logo || ''),
+      },
+    },
+  };
+}
 const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (match) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match));
 const browserLogos = new Map<string, HTMLImageElement>();
 const logoLoads = new Map<string, Promise<HTMLImageElement | null>>();
@@ -253,7 +315,7 @@ function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
       y += lines * 12 + 5;
     };
     row('Receipt no.', receipt.receipt_number);
-    if (receipt.transaction) row('Transaction', String(receipt.transaction).toUpperCase());
+    if (receipt.transaction) row('Transaction', receiptTransactionRef(receipt));
     row('Date & time', receiptDate(receipt));
     row('Customer', receipt.customer_name || 'Customer');
     if (receipt.staff_name) row('Staff', receipt.staff_name);
@@ -496,15 +558,16 @@ function syncPrintSheets(): void {
 // captured the animated screen (logo, barcode, action bar and all). Mounting
 // the same image the downloaded PDF carries, visible only under @media print,
 // makes every print path produce the designed receipt.
-export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
+export function mountPaidReceiptPrintSheet(receipt: PaidReceipt, reward?: ReceiptRewardSnapshot | null): () => void {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return () => {};
-  const logoUrl = receiptLogoUrl(receipt);
+  const rendered = withResolvedReward(receipt, reward);
+  const logoUrl = receiptLogoUrl(rendered);
   const paint = (canvas: HTMLCanvasElement) => canvas.toDataURL('image/jpeg', 0.92);
-  const first = browserReceiptCanvas(receipt);
+  const first = browserReceiptCanvas(rendered);
   const sheet = document.createElement('div');
   sheet.className = PRINT_SHEET_CLASS;
   const image = document.createElement('img');
-  image.alt = `Receipt ${receipt.receipt_number || ''}`.trim();
+  image.alt = `Receipt ${rendered.receipt_number || ''}`.trim();
   image.src = paint(first);
   sheet.appendChild(image);
   document.body.appendChild(sheet);
@@ -524,11 +587,11 @@ export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
   let disposed = false;
   const fontsPending = typeof document !== 'undefined' && (document as Document & { fonts?: FontFaceSet }).fonts?.status !== 'loaded';
   if ((logoUrl && !browserLogos.get(logoUrl)) || fontsPending) {
-    void prepareBrowserReceipt(receipt).then(() => {
+    void prepareBrowserReceipt(rendered).then(() => {
       if (disposed || !sheet.isConnected) return;
       // A taller slip is possible once the webfont wraps text differently, so
       // the page height has to follow the repaint or print would squash it.
-      const repainted = browserReceiptCanvas(receipt);
+      const repainted = browserReceiptCanvas(rendered);
       image.src = paint(repainted);
       entry.slipHeightMm = Math.round(PRINT_SLIP_MM * (repainted.height / repainted.width) * 10) / 10;
       syncPrintSheets();
@@ -544,34 +607,36 @@ export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
   };
 }
 
-export async function savePaidReceiptPdf(receipt: PaidReceipt): Promise<void> {
+export async function savePaidReceiptPdf(receipt: PaidReceipt, reward?: ReceiptRewardSnapshot | null): Promise<void> {
+  const rendered = withResolvedReward(receipt, reward);
   if (Platform.OS === 'web') {
-    await prepareBrowserReceipt(receipt);
-    const blob = browserPdf(receipt);
+    await prepareBrowserReceipt(rendered);
+    const blob = browserPdf(rendered);
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `${receipt.receipt_number || 'risev-receipt'}.pdf`;
+    const link = document.createElement('a'); link.href = url; link.download = `${rendered.receipt_number || 'risev-receipt'}.pdf`;
     document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
     return;
   }
-  const { uri } = await Print.printToFileAsync({ html: receiptHtml(receipt) });
+  const { uri } = await Print.printToFileAsync({ html: receiptHtml(rendered) });
   await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: 'Save receipt PDF' });
 }
 
-export async function sharePaidReceiptPdf(receipt: PaidReceipt): Promise<'shared' | 'downloaded'> {
+export async function sharePaidReceiptPdf(receipt: PaidReceipt, reward?: ReceiptRewardSnapshot | null): Promise<'shared' | 'downloaded'> {
+  const rendered = withResolvedReward(receipt, reward);
   if (Platform.OS === 'web') {
     const shareNav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
     if (typeof File !== 'undefined' && shareNav.share && shareNav.canShare) {
-      await prepareBrowserReceipt(receipt);
-      const blob = browserPdf(receipt);
-      const file = new File([blob], `${receipt.receipt_number || 'risev-receipt'}.pdf`, { type: 'application/pdf' });
+      await prepareBrowserReceipt(rendered);
+      const blob = browserPdf(rendered);
+      const file = new File([blob], `${rendered.receipt_number || 'risev-receipt'}.pdf`, { type: 'application/pdf' });
       if (shareNav.canShare({ files: [file] })) {
         await shareNav.share({ files: [file], title: 'Risev receipt' });
         return 'shared';
       }
     }
-    await savePaidReceiptPdf(receipt);
+    await savePaidReceiptPdf(rendered);
     return 'downloaded';
   }
-  await savePaidReceiptPdf(receipt);
+  await savePaidReceiptPdf(rendered);
   return 'shared';
 }

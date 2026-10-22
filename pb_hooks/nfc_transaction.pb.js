@@ -435,13 +435,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         console.log("[NFC COMPLETE] Transaction error:", txnErr.message || txnErr);
       }
 
-      // The paid receipt is a server-owned snapshot of this exact POS claim.
-      // A stamp-only approval (zero bill, no voucher) remains a loyalty event,
-      // but a voucher can legitimately cover the whole bill and still needs a
-      // receipt showing the discount and RM0.00 total.
+      // A consumed voucher is a sale even when it covers the whole bill, so the
+      // receipt is written at RM0.00 with the discount shown. A plain stamp-only
+      // approval still writes no receipt.
       const voucherSale = Boolean(voucherOutcome.id) && !voucherOutcome.error;
-      const hasSaleValue = billAmount > 0 ||
-        (voucherSale && (Number(body.subtotal) > 0 || (Array.isArray(body.items) && body.items.length > 0)));
+      const hasSaleValue = billAmount > 0 || voucherSale;
       let receiptId = "";
       let receiptError = "";
       if (hasSaleValue && transactionId) {

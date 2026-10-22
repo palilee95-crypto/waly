@@ -90,12 +90,50 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   const rawItems = Array.isArray(source.items)
     ? source.items
     : (Array.isArray(meta.items_summary) ? meta.items_summary : []);
-  const grossAmount = Number(source.subtotal) || rawItems.reduce(function (sum, item) {
-    return sum + Math.max(0, Number(item.price) || 0) * Math.max(1, Number(item.qty) || 1);
-  }, 0);
   const voucherApplied = Boolean(meta.voucher_id || source.voucher_id) &&
     !meta.voucher_error && !source.voucher_error;
-  if (amount <= 0 && !(voucherApplied && grossAmount > 0)) return "";
+  // A voucher can cover the whole bill: that is still a completed sale and needs
+  // a receipt at RM0.00. A stamp-only approval (no bill, no voucher) stays a
+  // loyalty event with no receipt.
+  if (amount <= 0 && !voucherApplied) return "";
+
+  // When the voucher paid for everything there are no line items, so the slip
+  // names the voucher and its face value instead of an empty "Counter payment".
+  const voucherId = String(meta.voucher_id || source.voucher_id || "");
+  let voucherTitle = "";
+  let voucherValue = 0;
+  if (voucherApplied && voucherId) {
+    try {
+      const voucher = $app.findRecordById("vouchers", voucherId);
+      let voucherMeta = {};
+      try {
+        const rawVoucherMeta = voucher.getString("metadata");
+        if (rawVoucherMeta && rawVoucherMeta !== "null") {
+          const parsedVoucherMeta = JSON.parse(rawVoucherMeta);
+          if (parsedVoucherMeta && typeof parsedVoucherMeta === "object" && !Array.isArray(parsedVoucherMeta)) {
+            voucherMeta = parsedVoucherMeta;
+          }
+        }
+      } catch (voucherMetaErr) {}
+      voucherTitle = String(voucherMeta.snapshot_title || "").trim();
+      if (String(voucherMeta.discount_type || "") === "fixed_amount") {
+        voucherValue = Math.max(0, Number(voucherMeta.discount_value) || 0);
+      }
+      if (!voucherTitle) {
+        const voucherRewardId = voucher.getString("reward");
+        if (voucherRewardId) {
+          voucherTitle = String($app.findRecordById("rewards", voucherRewardId).getString("name") || "").trim();
+        }
+      }
+    } catch (voucherErr) {}
+    if (!voucherTitle) voucherTitle = String(meta.voucher_code || source.voucher_code || "").trim();
+    if (!voucherTitle) voucherTitle = "Voucher redemption";
+  }
+
+  // The declared discount is what the client says the voucher took off. Only a
+  // voucher that actually applied may also derive it from subtotal − total.
+  const declaredDiscount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
+
   const items = rawItems.slice(0, 100).map(function (item) {
     return {
       name: String(item.name || "Item").slice(0, 120),
@@ -106,7 +144,14 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
     return item.name;
   });
   if (!items.length) {
-    items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount });
+    // A voucher that covers the whole bill stands in for the sale; a partial
+    // voucher still leaves a counter payment for the balance, with the voucher
+    // shown separately as the discount.
+    if (voucherApplied && amount <= 0) {
+      items.push({ name: voucherTitle, qty: 1, price: voucherValue });
+    } else {
+      items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount + declaredDiscount });
+    }
   }
   const subtotal = Math.max(
     0,
@@ -115,7 +160,12 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
         return sum + item.price * item.qty;
       }, 0)
   );
-  const discount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
+  // Deriving subtotal − total as a floor keeps a fully covered slip internally
+  // consistent (RM20 item − RM20 voucher = RM0.00), but only when a voucher was
+  // applied — otherwise it would print a "Voucher discount" with no voucher.
+  const discount = voucherApplied
+    ? Math.max(declaredDiscount, Math.min(subtotal, Math.max(0, subtotal - amount)))
+    : declaredDiscount;
 
   const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
   receipt.set("merchant", merchantId);

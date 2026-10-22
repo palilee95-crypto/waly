@@ -28,6 +28,7 @@ import {
   receiptMerchant,
   receiptMoney,
   receiptPaymentMethod,
+  receiptTransactionRef,
   savePaidReceiptPdf,
   sharePaidReceiptPdf,
 } from '@/lib/paidReceipt';
@@ -78,8 +79,10 @@ export default function ThermalReceiptScreen({ visible, receipt, mode, animate =
 
   useEffect(() => {
     if (!visible || !receipt) return;
-    return mountPaidReceiptPrintSheet(receipt);
-  }, [visible, receipt]);
+    // Passing the resolved card snapshot means the print sheet repaints with the
+    // same dots the screen shows; older receipts have no stored balance/goal.
+    return mountPaidReceiptPrintSheet(receipt, reward);
+  }, [visible, receipt, reward]);
 
   useEffect(() => {
     setReward(null);
@@ -168,7 +171,7 @@ export default function ThermalReceiptScreen({ visible, receipt, mode, animate =
     setNotice('');
     try {
       if (mode === 'merchant') {
-        const result = await sharePaidReceiptPdf(receipt);
+        const result = await sharePaidReceiptPdf(receipt, reward);
         if (result === 'downloaded') {
           setNotice('PDF downloaded. Attach it in WhatsApp, or share the receipt link below.');
           setShowLinkFallback(true);
@@ -176,7 +179,7 @@ export default function ThermalReceiptScreen({ visible, receipt, mode, animate =
           setNotice('Share sheet opened. Choose WhatsApp and send the PDF there.');
         }
       } else {
-        await savePaidReceiptPdf(receipt);
+        await savePaidReceiptPdf(receipt, reward);
         setNotice(Platform.OS === 'web' ? 'Receipt PDF downloaded.' : 'Choose where to save your receipt PDF.');
       }
     } catch (error: any) {
@@ -249,7 +252,7 @@ export default function ThermalReceiptScreen({ visible, receipt, mode, animate =
                 <View style={styles.rule} />
 
                 <Detail label="Receipt no." value={receipt.receipt_number} />
-                {receipt.transaction ? <Detail label="Transaction" value={receipt.transaction.toUpperCase()} /> : null}
+                {receipt.transaction ? <Detail label="Transaction" value={receiptTransactionRef(receipt)} /> : null}
                 <Detail label="Date & time" value={receiptDate(receipt)} />
                 <Detail label="Customer" value={receipt.customer_name || 'Customer'} />
                 {receipt.staff_name ? <Detail label="Staff" value={receipt.staff_name} /> : null}
