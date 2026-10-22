@@ -96,9 +96,17 @@ const FAINT = '#94A3B8';
 const LINE = '#E2E8F0';
 const BRAND = '#FFC700';
 const PAID_INK = '#15803D';
+const STAMP_DOT_STEP = 18; // 12px dot + 6px gap
+const STAMP_DOT_ROW_STEP = 14;
 
 // Browser PDF is drawn from receipt data, never captured from the animation.
 // It mirrors the on-screen receipt, so the file and the screen agree.
+//
+// The layout runs twice: once against a measuring context to learn how tall the
+// slip needs to be, then against a canvas allocated to exactly that height.
+// Variable text wraps (merchant name, rows, item names, reward line) and stamp
+// dots wrap into rows, so a long receipt or a large stamp goal is never clipped
+// and never loses its totals or payment block.
 function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
   const isPaid = receipt.payment_status === 'paid';
   const earned = Math.max(0, Number(receipt.stamps_earned) || 0);
@@ -108,248 +116,320 @@ function browserReceiptCanvas(receipt: PaidReceipt): HTMLCanvasElement {
   const filled = Math.min(goal, balance);
   const rewardName = String(receipt.reward_name || '').trim();
 
-  const canvas = document.createElement('canvas');
-  canvas.width = SLIP_WIDTH * SLIP_SCALE;
-  canvas.height = 1200 * SLIP_SCALE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('PDF rendering is not available on this device.');
-  ctx.scale(SLIP_SCALE, SLIP_SCALE);
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, SLIP_WIDTH, 1200);
+  const metrics = document.createElement('canvas').getContext('2d');
+  if (!metrics) throw new Error('PDF rendering is not available on this device.');
 
   const padX = 16;
   const left = padX;
   const right = SLIP_WIDTH - padX;
   const cx = SLIP_WIDTH / 2;
+  const contentWidth = right - left;
   const fontFor = (weight: number, size: number) =>
     `${weight} ${size}px "PlusJakartaSans_${weight >= 800 ? '800ExtraBold' : weight >= 700 ? '700Bold' : '500Medium'}", -apple-system, Arial`;
 
   const measure = (value: string, size: number, weight: number, spacing = 0) => {
-    ctx.font = fontFor(weight, size);
+    metrics.font = fontFor(weight, size);
     let total = 0;
-    for (const char of value) total += ctx.measureText(char).width + spacing;
+    for (const char of value) total += metrics.measureText(char).width + spacing;
     return value ? total - spacing : 0;
   };
-  const text = (value: unknown, x: number, y: number, options: { size?: number; weight?: number; color?: string; align?: 'left' | 'right' | 'center'; spacing?: number } = {}) => {
-    const { size = 10, weight = 500, color = INK, align = 'left', spacing = 0 } = options;
-    const string = String(value ?? '');
-    if (!string) return 0;
-    ctx.font = fontFor(weight, size);
-    ctx.fillStyle = color;
-    ctx.textAlign = 'left';
-    const width = measure(string, size, weight, spacing);
-    let x0 = align === 'right' ? x - width : align === 'center' ? x - width / 2 : x;
-    if (spacing) {
-      for (const char of string) {
-        ctx.fillText(char, x0, y);
-        x0 += ctx.measureText(char).width + spacing;
+
+  // Greedy word wrap. A single word wider than the line breaks by character, so
+  // a long name can never run under the price column or off the paper.
+  const wrapText = (value: unknown, maxWidth: number, size: number, weight: number, spacing = 0): string[] => {
+    const string = String(value ?? '').replace(/\s+/g, ' ').trim();
+    const limit = Math.max(12, maxWidth);
+    if (!string) return [];
+    const lines: string[] = [];
+    let line = '';
+    for (const word of string.split(' ')) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (measure(candidate, size, weight, spacing) <= limit) { line = candidate; continue; }
+      if (line) { lines.push(line); line = ''; }
+      if (measure(word, size, weight, spacing) <= limit) { line = word; continue; }
+      let chunk = '';
+      for (const char of word) {
+        if (chunk && measure(chunk + char, size, weight, spacing) > limit) { lines.push(chunk); chunk = char; }
+        else chunk += char;
       }
-    } else {
-      ctx.fillText(string, x0, y);
+      line = chunk;
     }
-    return width;
-  };
-  const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
-    const radius = Math.min(r, w / 2, h / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.arcTo(x + w, y, x + w, y + h, radius);
-    ctx.arcTo(x + w, y + h, x, y + h, radius);
-    ctx.arcTo(x, y + h, x, y, radius);
-    ctx.arcTo(x, y, x + w, y, radius);
-    ctx.closePath();
-  };
-  const rule = (y: number) => {
-    ctx.strokeStyle = LINE;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    if (line) lines.push(line);
+    return lines;
   };
 
-  let y = 24;
-
-  // Merchant mark: the same yellow tile, with the logo when it has loaded.
-  const tile = 44;
-  ctx.fillStyle = BRAND;
-  roundRect(cx - tile / 2, y, tile, tile, 13);
-  ctx.fill();
-  const logo = browserLogos.get(receiptLogoUrl(receipt));
-  if (logo) {
-    ctx.save();
-    roundRect(cx - tile / 2, y, tile, tile, 13);
-    ctx.clip();
-    ctx.drawImage(logo, cx - tile / 2, y, tile, tile);
-    ctx.restore();
-  } else {
-    const merchantName = receiptMerchant(receipt);
-    const parts = merchantName.trim().split(/\s+/).filter(Boolean);
-    const initials = parts.length ? (parts[0].charAt(0) + (parts[1]?.charAt(0) || '')).toUpperCase() : 'R';
-    text(initials, cx, y + tile / 2 + 7, { size: 20, weight: 800, align: 'center', spacing: -1 });
-  }
-  y += tile + 8;
-
-  text(receiptMerchant(receipt), cx, y + 14, { size: 17, weight: 800, align: 'center', spacing: -0.6 });
-  y += 22;
-  text((receipt.branch_name || 'Digital receipt').toUpperCase(), cx, y + 8, { size: 9, weight: 700, color: FAINT, align: 'center', spacing: 1.2 });
-  y += 16;
-
-  rule(y);
-  y += 12;
-
-  const row = (label: string, value: string) => {
-    text(label, left, y + 9, { size: 9.5, color: MUTED });
-    text(value, right, y + 9, { size: 9.5, weight: 700, align: 'right' });
-    y += 17;
-  };
-  row('Receipt no.', receipt.receipt_number);
-  if (receipt.transaction) row('Transaction', String(receipt.transaction).toUpperCase());
-  row('Date & time', receiptDate(receipt));
-  row('Customer', receipt.customer_name || 'Customer');
-  if (receipt.staff_name) row('Staff', receipt.staff_name);
-
-  rule(y);
-  y += 12;
-
-  const items = receiptLines(receipt);
-  if (!items.length) {
-    text('Counter payment', left, y + 10, { size: 10, color: FAINT });
-    y += 20;
-  }
-  for (const item of items) {
-    const qty = Number(item.qty) || 1;
-    const price = Number(item.price) || 0;
-    text(item.name || 'Item', left, y + 10, { size: 10, weight: 700 });
-    text(receiptMoney(price * qty), right, y + 10, { size: 10, weight: 700, align: 'right' });
-    text(`${qty} × ${receiptMoney(price)}`, left, y + 22, { size: 8.8, color: FAINT });
-    y += 30;
-  }
-
-  rule(y);
-  y += 12;
-
-  row('Subtotal', receiptMoney(receipt.subtotal || receipt.total_amount));
-  if (Number(receipt.discount_amount) > 0) row('Voucher discount', `−${receiptMoney(receipt.discount_amount)}`);
-  y += 4;
-  text(isPaid ? 'Total paid' : 'Total recorded', left, y + 16, { size: 12, weight: 800 });
-  text(receiptMoney(receipt.total_amount), right, y + 16, { size: 22, weight: 800, align: 'right', spacing: -1 });
-  y += 24;
-
-  rule(y);
-  y += 12;
-
-  row(isPaid ? 'Payment method' : 'Entry method', receiptPaymentMethod(receipt));
-  if (receipt.payment_reference) row('Payment ref.', receipt.payment_reference);
-
-  const statusLabel = isPaid ? 'PAID' : 'RECORDED';
-  const statusWidth = measure(statusLabel, 10, 800);
-  const dotCx = right - statusWidth - 5 - 7;
-  ctx.fillStyle = isPaid ? BRAND : LINE;
-  ctx.beginPath();
-  ctx.arc(dotCx, y + 4, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = isPaid ? INK : MUTED;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  if (isPaid) {
-    ctx.moveTo(dotCx - 3.4, y + 4);
-    ctx.lineTo(dotCx - 0.8, y + 6.6);
-    ctx.lineTo(dotCx + 4, y + 1.4);
-  } else {
-    ctx.arc(dotCx, y + 4, 3, 0, Math.PI * 2);
-  }
-  ctx.stroke();
-  text(isPaid ? 'Payment status' : 'Transaction status', left, y + 9, { size: 9.5, color: MUTED });
-  text(statusLabel, right, y + 9, { size: 10, weight: 800, align: 'right', color: isPaid ? PAID_INK : MUTED });
-  y += 17;
-
-  if (earned > 0) {
-    y += 6;
-    const cardTop = y;
-    const cardHeight = 56;
-    ctx.fillStyle = BRAND;
-    roundRect(left, cardTop, right - left, cardHeight, 11);
-    ctx.fill();
-
-    // Small gift glyph, matching the card's icon.
-    const giftX = left + 10;
-    const giftY = cardTop + 9;
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 1.1;
-    ctx.strokeRect(giftX + 1, giftY + 3, 9, 7);
-    ctx.beginPath();
-    ctx.moveTo(giftX, giftY + 3);
-    ctx.lineTo(giftX + 11, giftY + 3);
-    ctx.moveTo(giftX + 5.5, giftY + 3);
-    ctx.lineTo(giftX + 5.5, giftY + 10);
-    ctx.stroke();
-
-    text('Rewards earned', giftX + 15, cardTop + 18, { size: 10, weight: 800 });
-    text(`+${earned} Stamp${earned === 1 ? '' : 's'}`, right - 10, cardTop + 18, { size: 10, weight: 800, align: 'right' });
-    text(
-      `${earned} stamp${earned === 1 ? '' : 's'} added · ${filled}/${goal} collected${rewardName ? ` · ${rewardName}` : ''}`,
-      left + 10,
-      cardTop + 32,
-      { size: 9, weight: 500 },
-    );
-
-    for (let index = 0; index < goal; index += 1) {
-      const dotX = left + 10 + 6 + index * 18;
-      ctx.beginPath();
-      ctx.arc(dotX, cardTop + 44, 6, 0, Math.PI * 2);
-      if (index < filled) {
-        ctx.fillStyle = INK;
-        ctx.fill();
+  // Draws the slip and returns its height. With a null context it only
+  // measures, using the same code path so both passes agree exactly.
+  const layout = (ctx: CanvasRenderingContext2D | null): number => {
+    const text = (value: unknown, x: number, baseline: number, options: { size?: number; weight?: number; color?: string; align?: 'left' | 'right' | 'center'; spacing?: number } = {}): number => {
+      const { size = 10, weight = 500, color = INK, align = 'left', spacing = 0 } = options;
+      const string = String(value ?? '');
+      if (!string) return 0;
+      const width = measure(string, size, weight, spacing);
+      if (!ctx) return width;
+      ctx.font = fontFor(weight, size);
+      ctx.fillStyle = color;
+      ctx.textAlign = 'left';
+      let x0 = align === 'right' ? x - width : align === 'center' ? x - width / 2 : x;
+      if (spacing) {
+        for (const char of string) {
+          ctx.fillText(char, x0, baseline);
+          x0 += ctx.measureText(char).width + spacing;
+        }
       } else {
+        ctx.fillText(string, x0, baseline);
+      }
+      return width;
+    };
+    const paragraph = (value: unknown, x: number, firstBaseline: number, options: { maxWidth: number; lineHeight: number; size?: number; weight?: number; color?: string; align?: 'left' | 'right' | 'center'; spacing?: number }): number => {
+      const lines = wrapText(value, options.maxWidth, options.size ?? 10, options.weight ?? 500, options.spacing ?? 0);
+      lines.forEach((line, index) => text(line, x, firstBaseline + index * options.lineHeight, options));
+      return lines.length;
+    };
+    const roundRect = (x: number, top: number, w: number, h: number, r: number) => {
+      if (!ctx) return;
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, top);
+      ctx.arcTo(x + w, top, x + w, top + h, radius);
+      ctx.arcTo(x + w, top + h, x, top + h, radius);
+      ctx.arcTo(x, top + h, x, top, radius);
+      ctx.arcTo(x, top, x + w, top, radius);
+      ctx.closePath();
+    };
+    const rule = (top: number) => {
+      if (!ctx) return;
+      ctx.strokeStyle = LINE;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(left, top);
+      ctx.lineTo(right, top);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+
+    let y = 24;
+
+    // Merchant mark: the same yellow tile, with the logo when it has loaded.
+    const tile = 44;
+    const logo = browserLogos.get(receiptLogoUrl(receipt));
+    if (ctx) {
+      ctx.fillStyle = BRAND;
+      roundRect(cx - tile / 2, y, tile, tile, 13);
+      ctx.fill();
+      if (logo) {
+        ctx.save();
+        roundRect(cx - tile / 2, y, tile, tile, 13);
+        ctx.clip();
+        ctx.drawImage(logo, cx - tile / 2, y, tile, tile);
+        ctx.restore();
+      }
+    }
+    if (!logo) {
+      const merchantName = receiptMerchant(receipt);
+      const parts = merchantName.trim().split(/\s+/).filter(Boolean);
+      const initials = parts.length ? (parts[0].charAt(0) + (parts[1]?.charAt(0) || '')).toUpperCase() : 'R';
+      text(initials, cx, y + tile / 2 + 7, { size: 20, weight: 800, align: 'center', spacing: -1 });
+    }
+    y += tile + 8;
+
+    y += paragraph(receiptMerchant(receipt), cx, y + 14, { size: 17, weight: 800, align: 'center', spacing: -0.6, maxWidth: contentWidth, lineHeight: 20 }) * 20 + 2;
+    y += paragraph((receipt.branch_name || 'Digital receipt').toUpperCase(), cx, y + 8, { size: 9, weight: 700, color: FAINT, align: 'center', spacing: 1.2, maxWidth: contentWidth, lineHeight: 12 }) * 12 + 4;
+
+    rule(y);
+    y += 12;
+
+    // Label and value keep separate columns; either side may wrap.
+    const row = (label: string, value: string) => {
+      const labelMax = contentWidth * 0.42;
+      const labelLines = wrapText(label, labelMax, 9.5, 500);
+      const valueLines = wrapText(value, contentWidth - labelMax - 8, 9.5, 700);
+      const lines = Math.max(1, labelLines.length, valueLines.length);
+      for (let index = 0; index < lines; index += 1) {
+        if (labelLines[index]) text(labelLines[index], left, y + 9 + index * 12, { size: 9.5, color: MUTED });
+        if (valueLines[index]) text(valueLines[index], right, y + 9 + index * 12, { size: 9.5, weight: 700, align: 'right' });
+      }
+      y += lines * 12 + 5;
+    };
+    row('Receipt no.', receipt.receipt_number);
+    if (receipt.transaction) row('Transaction', String(receipt.transaction).toUpperCase());
+    row('Date & time', receiptDate(receipt));
+    row('Customer', receipt.customer_name || 'Customer');
+    if (receipt.staff_name) row('Staff', receipt.staff_name);
+
+    rule(y);
+    y += 12;
+
+    const items = receiptLines(receipt);
+    if (!items.length) {
+      text('Counter payment', left, y + 10, { size: 10, color: FAINT });
+      y += 20;
+    }
+    for (const item of items) {
+      const qty = Number(item.qty) || 1;
+      const price = Number(item.price) || 0;
+      const priceLabel = receiptMoney(price * qty);
+      // The price keeps its own column; the name wraps inside what is left.
+      const nameMax = Math.max(40, contentWidth - measure(priceLabel, 10, 700) - 10);
+      const nameLines = wrapText(item.name || 'Item', nameMax, 10, 700);
+      const qtyLines = wrapText(`${qty} × ${receiptMoney(price)}`, contentWidth, 8.8, 500);
+      nameLines.forEach((line, index) => text(line, left, y + 10 + index * 12, { size: 10, weight: 700 }));
+      text(priceLabel, right, y + 10, { size: 10, weight: 700, align: 'right' });
+      qtyLines.forEach((line, index) => text(line, left, y + 10 + nameLines.length * 12 + index * 11, { size: 8.8, color: FAINT }));
+      y += nameLines.length * 12 + 4 + qtyLines.length * 11 + 3;
+    }
+
+    rule(y);
+    y += 12;
+
+    row('Subtotal', receiptMoney(receipt.subtotal || receipt.total_amount));
+    if (Number(receipt.discount_amount) > 0) row('Voucher discount', `−${receiptMoney(receipt.discount_amount)}`);
+    y += 4;
+    const totalLabel = isPaid ? 'Total paid' : 'Total recorded';
+    const totalAmount = receiptMoney(receipt.total_amount);
+    const totalLabelLines = wrapText(totalLabel, Math.max(60, contentWidth - measure(totalAmount, 22, 800, -1) - 10), 12, 800);
+    totalLabelLines.forEach((line, index) => text(line, left, y + 16 + index * 14, { size: 12, weight: 800 }));
+    text(totalAmount, right, y + 16, { size: 22, weight: 800, align: 'right', spacing: -1 });
+    y += 24 + (Math.max(1, totalLabelLines.length) - 1) * 14;
+
+    rule(y);
+    y += 12;
+
+    row(isPaid ? 'Payment method' : 'Entry method', receiptPaymentMethod(receipt));
+    if (receipt.payment_reference) row('Payment ref.', receipt.payment_reference);
+
+    const statusLabel = isPaid ? 'PAID' : 'RECORDED';
+    const statusWidth = measure(statusLabel, 10, 800);
+    const dotCx = right - statusWidth - 5 - 7;
+    if (ctx) {
+      ctx.fillStyle = isPaid ? BRAND : LINE;
+      ctx.beginPath();
+      ctx.arc(dotCx, y + 4, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isPaid ? INK : MUTED;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      if (isPaid) {
+        ctx.moveTo(dotCx - 3.4, y + 4);
+        ctx.lineTo(dotCx - 0.8, y + 6.6);
+        ctx.lineTo(dotCx + 4, y + 1.4);
+      } else {
+        ctx.arc(dotCx, y + 4, 3, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    }
+    text(isPaid ? 'Payment status' : 'Transaction status', left, y + 9, { size: 9.5, color: MUTED });
+    text(statusLabel, right, y + 9, { size: 10, weight: 800, align: 'right', color: isPaid ? PAID_INK : MUTED });
+    y += 17;
+
+    if (earned > 0) {
+      y += 6;
+      const cardTop = y;
+      const innerLeft = left + 10;
+      const innerWidth = contentWidth - 20;
+      const titleRight = `+${earned} Stamp${earned === 1 ? '' : 's'}`;
+      const titleRightWidth = measure(titleRight, 10, 800);
+      const titleLines = wrapText('Rewards earned', innerWidth - 15 - 5 - titleRightWidth, 10, 800);
+      const subtitle = `${earned} stamp${earned === 1 ? '' : 's'} added · ${filled}/${goal} collected${rewardName ? ` · ${rewardName}` : ''}`;
+      const subtitleLines = wrapText(subtitle, innerWidth, 9, 500);
+      // Dots keep an 18px pitch and wrap into rows instead of leaving the card.
+      const dotsPerRow = Math.max(1, Math.floor(innerWidth / STAMP_DOT_STEP));
+      const dotRows = Math.ceil(goal / dotsPerRow);
+      const subtitleTop = cardTop + 18 + (Math.max(1, titleLines.length) - 1) * 12 + 14;
+      const dotsTop = subtitleTop + (Math.max(1, subtitleLines.length) - 1) * 11 + 12;
+      const cardHeight = dotsTop - cardTop + (dotRows - 1) * STAMP_DOT_ROW_STEP + 12;
+
+      if (ctx) {
+        ctx.fillStyle = BRAND;
+        roundRect(left, cardTop, contentWidth, cardHeight, 11);
+        ctx.fill();
+
+        // Small gift glyph, matching the card's icon.
+        const giftX = innerLeft;
+        const giftY = cardTop + 9;
         ctx.strokeStyle = INK;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.1;
+        ctx.strokeRect(giftX + 1, giftY + 3, 9, 7);
+        ctx.beginPath();
+        ctx.moveTo(giftX, giftY + 3);
+        ctx.lineTo(giftX + 11, giftY + 3);
+        ctx.moveTo(giftX + 5.5, giftY + 3);
+        ctx.lineTo(giftX + 5.5, giftY + 10);
         ctx.stroke();
       }
+
+      titleLines.forEach((line, index) => text(line, innerLeft + 15, cardTop + 18 + index * 12, { size: 10, weight: 800 }));
+      text(titleRight, right - 10, cardTop + 18, { size: 10, weight: 800, align: 'right' });
+      subtitleLines.forEach((line, index) => text(line, innerLeft, subtitleTop + index * 11, { size: 9, weight: 500 }));
+
+      for (let index = 0; index < goal; index += 1) {
+        if (!ctx) continue;
+        const dotRow = Math.floor(index / dotsPerRow);
+        const dotCol = index % dotsPerRow;
+        const dotX = innerLeft + 6 + dotCol * STAMP_DOT_STEP;
+        const dotY = dotsTop + dotRow * STAMP_DOT_ROW_STEP;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 6, 0, Math.PI * 2);
+        if (index < filled) {
+          ctx.fillStyle = INK;
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+      y += cardHeight;
     }
-    y += cardHeight;
-  }
 
-  y += 16;
-  text('Thank you for visiting!', cx, y + 8, { size: 10.5, weight: 700, align: 'center' });
-  y += 16;
+    y += 16;
+    text('Thank you for visiting!', cx, y + 8, { size: 10.5, weight: 700, align: 'center' });
+    y += 16;
 
-  // The barcode mirrors the on-screen bar pattern so both renders look alike.
-  const bars = Array.from({ length: 34 }, (_, index) => ({
-    width: index % 3 === 0 ? 2.5 : 1.5,
-    height: index % 5 === 0 ? 27 : 21,
-    gap: index % 4 === 0 ? 3 : 1.5,
-  }));
-  const barcodeWidth = bars.reduce((total, bar) => total + bar.width + bar.gap, 0);
-  let barX = cx - barcodeWidth / 2;
-  ctx.fillStyle = INK;
-  for (const bar of bars) {
-    ctx.fillRect(barX, y + (27 - bar.height), bar.width, bar.height);
-    barX += bar.width + bar.gap;
-  }
-  y += 27;
-  text(receipt.receipt_number.replace(/-/g, ''), cx, y + 11, { size: 8, color: MUTED, align: 'center', spacing: 0.7 });
-  y += 16;
+    // The barcode mirrors the on-screen bar pattern so both renders look alike.
+    const bars = Array.from({ length: 34 }, (_, index) => ({
+      width: index % 3 === 0 ? 2.5 : 1.5,
+      height: index % 5 === 0 ? 27 : 21,
+      gap: index % 4 === 0 ? 3 : 1.5,
+    }));
+    const barcodeWidth = bars.reduce((total, bar) => total + bar.width + bar.gap, 0);
+    if (ctx) {
+      let barX = cx - barcodeWidth / 2;
+      ctx.fillStyle = INK;
+      for (const bar of bars) {
+        ctx.fillRect(barX, y + (27 - bar.height), bar.width, bar.height);
+        barX += bar.width + bar.gap;
+      }
+    }
+    y += 27;
+    y += paragraph(receipt.receipt_number.replace(/-/g, ''), cx, y + 11, { size: 8, color: MUTED, align: 'center', spacing: 0.7, maxWidth: contentWidth, lineHeight: 11 }) * 11 + 5;
 
-  const poweredLabel = 'Powered by';
-  const wordmark = 'risev';
-  const poweredWidth = measure(poweredLabel, 9, 500) + 4 + measure(wordmark, 13, 800, -0.8);
-  let poweredX = cx - poweredWidth / 2;
-  poweredX += text(poweredLabel, poweredX, y + 10, { size: 9, color: FAINT }) + 4;
-  text(wordmark, poweredX, y + 11, { size: 13, weight: 800, spacing: -0.8 });
-  y += 20;
+    const poweredLabel = 'Powered by';
+    const wordmark = 'risev';
+    const poweredWidth = measure(poweredLabel, 9, 500) + 4 + measure(wordmark, 13, 800, -0.8);
+    let poweredX = cx - poweredWidth / 2;
+    poweredX += text(poweredLabel, poweredX, y + 10, { size: 9, color: FAINT }) + 4;
+    text(wordmark, poweredX, y + 11, { size: 13, weight: 800, spacing: -0.8 });
+    y += 20;
 
-  const finalHeight = Math.ceil(y + 12);
-  const cropped = document.createElement('canvas');
-  cropped.width = canvas.width;
-  cropped.height = Math.round(finalHeight * SLIP_SCALE);
-  const target = cropped.getContext('2d');
-  if (!target) throw new Error('PDF rendering is not available on this device.');
-  target.drawImage(canvas, 0, 0, canvas.width, cropped.height, 0, 0, canvas.width, cropped.height);
-  return cropped;
+    return y;
+  };
+
+  // Measure first, then allocate: the canvas is exactly as tall as the laid-out
+  // slip, so no fixed height can clip a long receipt and no final crop is needed.
+  const contentHeight = Math.max(1, Math.ceil(layout(null)));
+  const canvas = document.createElement('canvas');
+  canvas.width = SLIP_WIDTH * SLIP_SCALE;
+  canvas.height = contentHeight * SLIP_SCALE;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('PDF rendering is not available on this device.');
+  ctx.scale(SLIP_SCALE, SLIP_SCALE);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, SLIP_WIDTH, contentHeight);
+  layout(ctx);
+  return canvas;
 }
 
 function browserPdf(receipt: PaidReceipt): Blob {
@@ -446,7 +526,12 @@ export function mountPaidReceiptPrintSheet(receipt: PaidReceipt): () => void {
   if ((logoUrl && !browserLogos.get(logoUrl)) || fontsPending) {
     void prepareBrowserReceipt(receipt).then(() => {
       if (disposed || !sheet.isConnected) return;
-      image.src = paint(browserReceiptCanvas(receipt));
+      // A taller slip is possible once the webfont wraps text differently, so
+      // the page height has to follow the repaint or print would squash it.
+      const repainted = browserReceiptCanvas(receipt);
+      image.src = paint(repainted);
+      entry.slipHeightMm = Math.round(PRINT_SLIP_MM * (repainted.height / repainted.width) * 10) / 10;
+      syncPrintSheets();
     });
   }
 
