@@ -993,7 +993,7 @@ export default function MerchantLayout() {
       <ManualPosLauncher />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
-      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && !pathname.includes('manage-customers') && !pathname.includes('customer-detail') && (
+      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && !pathname.includes('manage-customers') && !pathname.includes('customer-detail') && !pathname.endsWith('/give') && (
         <TouchableOpacity
           activeOpacity={0.85}
           accessibilityRole="button"
