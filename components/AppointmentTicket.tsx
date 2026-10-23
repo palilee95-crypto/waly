@@ -2,14 +2,15 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppointmentPassData, PASS_CARD_RADIUS, passCopy, passStatusLabel, passStatusTone } from '@/lib/appointmentPass';
+import { AppointmentPassData, PASS_CARD_RADIUS, PASS_SHEET_SURFACE, passCopy, passStatusLabel, passStatusTone } from '@/lib/appointmentPass';
 
 type Props = {
   pass: AppointmentPassData;
   demo?: boolean;
   /**
    * Colour behind the card. The perforation cut-outs are punched with it, so it
-   * must match whatever the sheet sits on (defaults to the dark overlay).
+   * must match whatever the sheet sits on — the same light surface the PDF page
+   * uses by default.
    */
   surfaceColor?: string;
 };
@@ -24,7 +25,7 @@ const RADIUS = PASS_CARD_RADIUS;
 // The card splits around this band; the cut-outs are centred on it.
 const PERFORATION_HEIGHT = 18;
 
-export default function AppointmentTicket({ pass, demo = false, surfaceColor = '#0B0D10' }: Props) {
+export default function AppointmentTicket({ pass, demo = false, surfaceColor = PASS_SHEET_SURFACE }: Props) {
   const copy = passCopy(pass.locale);
   const status = passStatusLabel(pass.status, pass.locale);
   const tone = passStatusTone(pass.status);

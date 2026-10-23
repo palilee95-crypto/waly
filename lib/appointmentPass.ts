@@ -30,10 +30,10 @@ const PASS_WIDTH = 360;
 const PASS_HEIGHT = 710;
 const PASS_SCALE = 2;
 // Shared with the on-screen ticket so both renderings keep the same silhouette.
-// The surface itself differs by medium (dark sheet vs printed page), so each
-// renderer owns its own.
 export const PASS_CARD_RADIUS = 22;
-const PASS_SURFACE = '#F3F4F6';
+// One surface for both media: the printed page and the on-screen sheet share it
+// so the perforation cut-outs read identically (the card is white on both).
+export const PASS_SHEET_SURFACE = '#F3F4F6';
 const INK = '#111111';
 const MUTED = '#667085';
 const YELLOW = '#FFC700';
@@ -165,7 +165,7 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageEle
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, r);
   };
-  ctx.fillStyle = PASS_SURFACE;
+  ctx.fillStyle = PASS_SHEET_SURFACE;
   ctx.fillRect(0, 0, PASS_WIDTH, PASS_HEIGHT);
   ctx.fillStyle = '#FFFFFF';
   round(8, 8, 344, 702, PASS_CARD_RADIUS);
@@ -229,7 +229,7 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageEle
   // Perforation and QR retain a white quiet zone for reliable scanning.
   ctx.strokeStyle = '#CBD0D9'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
   ctx.beginPath(); ctx.moveTo(21, 427); ctx.lineTo(339, 427); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = PASS_SURFACE;
+  ctx.fillStyle = PASS_SHEET_SURFACE;
   ctx.beginPath(); ctx.arc(8, 427, 12, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(352, 427, 12, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(79, 439, 202, 202);
