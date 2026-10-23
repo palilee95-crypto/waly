@@ -75,10 +75,17 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
       }
     }) || null;
   }
-  // No ledger row means there is nothing to print: a stamp-only approval, or a
-  // sale whose transaction was blocked. Callers treat "" as "no receipt", so a
-  // recovery attempt on such a claim must not look like a failure.
-  if (!txn) return "";
+  // Nothing owed (a stamp-only approval) vs a sale whose ledger row went
+  // missing (blocked create) — the second must not look like success, or the
+  // merchant's retry hides an integrity failure behind an empty receipt.
+  if (!txn) {
+    const owed = Number(claim.get("bill_amount")) || 0;
+    if (owed > 0) {
+      console.log("[PAID RECEIPT] sale claim", claimId, "has no ledger transaction (bill " + owed + ")");
+      throw new Error("The paid transaction for this claim was not found.");
+    }
+    return "";
+  }
 
   const amount = Number(claim.get("bill_amount")) || Number(txn.get("bill_amount")) || 0;
 
