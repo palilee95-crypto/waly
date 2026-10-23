@@ -1962,9 +1962,12 @@ export default function UnifiedRewardsScreen() {
           const bdayCount = hasBirthday ? 1 : 0;
           // The stamp prize is rendered from the program, and milestone records are
           // internal shadows for sub-reward vouchers. Neither is merchant content.
-          const catalogueRewards = rewards.filter(
-            (r) => r.id !== linkedRewardId && r.reward_scope !== 'milestone'
-          );
+          // With the Points engine off the catalogue has nothing to spend against,
+          // so the whole list goes with the toggle (the birthday card is separate
+          // and still renders).
+          const catalogueRewards = enablePoints
+            ? rewards.filter((r) => r.id !== linkedRewardId && r.reward_scope !== 'milestone')
+            : [];
           const stampReward = linkedRewardId
             ? rewards.find((r) => r.id === linkedRewardId) || null
             : null;
