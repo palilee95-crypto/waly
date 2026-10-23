@@ -2229,11 +2229,11 @@ export default function CustomerDashboard() {
       <Modal visible={appointmentPassModalVisible} transparent animationType="fade" onRequestClose={() => setAppointmentPassModalVisible(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(10, 12, 16, 0.88)', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setAppointmentPassModalVisible(false)} />
-          <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', maxWidth: 390, maxHeight: '92%' }} contentContainerStyle={{ paddingBottom: 10 }}>
-            <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" style={{ alignSelf: 'flex-end', width: 38, height: 38, borderRadius: 19, backgroundColor: '#303238', alignItems: 'center', justifyContent: 'center', marginBottom: 9 }}>
-              <Ionicons name="close" size={22} color="#FFFFFF" />
+          <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', maxWidth: 390, maxHeight: '92%' }} contentContainerStyle={{ paddingBottom: 10, paddingHorizontal: 12 }}>
+            <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+              <Ionicons name="close" size={19} color="#FFFFFF" />
             </TouchableOpacity>
-            {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} /> : null}
+            {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} surfaceColor="#0A0C10" /> : null}
             {!isBookingMissed && !hasMarkedArrived && bookingCountdown ? <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', textAlign: 'center', fontSize: 12, marginTop: 10 }}>{bookingCountdown}</Text> : null}
             {isBookingMissed ? (
               <View style={{ marginTop: 12, gap: 8 }}>
@@ -2250,13 +2250,13 @@ export default function CustomerDashboard() {
               </TouchableOpacity>
             )}
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 9 }}>
-              <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.5 }}>
-                <Ionicons name="download-outline" size={17} color="#111111" />
-                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', fontSize: 11.5 }}>Save PDF</Text>
+              <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
+                <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', fontSize: 12 }}>Save PDF</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, backgroundColor: '#25D366', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.5 }}>
-                <Ionicons name="logo-whatsapp" size={17} color="#062D17" />
-                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#062D17', fontSize: 11.5 }}>WhatsApp</Text>
+              <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
+                <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', fontSize: 12 }}>WhatsApp</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

@@ -4304,34 +4304,66 @@ export default function CustomerBookingPwaScreen() {
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdropPress} onPress={() => setShowPassSheet(false)} />
           <View style={[styles.loyaltyCardModalContent, { backgroundColor: 'transparent', padding: 0, maxHeight: '92%' }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8, paddingHorizontal: 12 }}>
               <TouchableOpacity
                 onPress={() => setShowPassSheet(false)}
                 accessibilityLabel="Close appointment pass"
-                style={{ alignSelf: 'flex-end', width: 38, height: 38, borderRadius: 19, backgroundColor: '#303238', alignItems: 'center', justifyContent: 'center', marginBottom: 9 }}
+                style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
               >
-                <Ionicons name="close" size={22} color="#FFFFFF" />
+                <Ionicons name="close" size={19} color="#FFFFFF" />
               </TouchableOpacity>
-              <AppointmentTicket pass={passData} demo={passIsDemo} />
-              <TouchableOpacity
-                onPress={handleCheckIn}
-                disabled={hasArrived || checkingIn || passLoading || passInactive || passIsDemo}
-                activeOpacity={0.85}
-                style={{ marginTop: 12, backgroundColor: passInactive ? '#59606B' : hasArrived ? '#15803D' : '#FFC700', borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              >
-                {checkingIn ? <ActivityIndicator size="small" color="#111111" /> : <Ionicons name={hasArrived ? 'checkmark-circle' : 'location-outline'} size={18} color={hasArrived || passInactive ? '#FFFFFF' : '#111111'} />}
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: hasArrived || passInactive ? '#FFFFFF' : '#111111' }}>{passActionLabel}</Text>
-              </TouchableOpacity>
-              {passError ? <Text style={{ color: '#FCA5A5', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, marginTop: 8, textAlign: 'center' }}>{passError}</Text> : null}
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 9 }}>
-                <TouchableOpacity onPress={savePass} disabled={passLoading || passIsDemo} accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: passLoading || passIsDemo ? 0.45 : 1 }}>
-                  <Ionicons name="download-outline" size={17} color="#111111" />
-                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', fontSize: 11.5 }}>Save PDF</Text>
+              <AppointmentTicket pass={passData} demo={passIsDemo} surfaceColor="#0B0D10" />
+              <View style={styles.passActions}>
+                <TouchableOpacity
+                  onPress={handleCheckIn}
+                  disabled={hasArrived || checkingIn || passLoading || passInactive || passIsDemo}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={passActionLabel}
+                  style={[
+                    styles.passPrimary,
+                    { backgroundColor: passInactive ? '#2A2E35' : hasArrived ? '#15803D' : '#FFC700' },
+                    (passLoading || passIsDemo) && styles.passDisabled,
+                  ]}
+                >
+                  {checkingIn
+                    ? <ActivityIndicator size="small" color={hasArrived || passInactive ? '#FFFFFF' : '#111111'} />
+                    : <Ionicons name={hasArrived ? 'checkmark-circle' : 'location-outline'} size={17} color={hasArrived || passInactive ? '#FFFFFF' : '#111111'} />}
+                  <Text style={[styles.passPrimaryText, { color: hasArrived || passInactive ? '#FFFFFF' : '#111111' }]}>{passActionLabel}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSharePass} disabled={passLoading || passIsDemo} accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, backgroundColor: '#25D366', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: passLoading || passIsDemo ? 0.45 : 1 }}>
-                  <Ionicons name="logo-whatsapp" size={17} color="#062D17" />
-                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#062D17', fontSize: 11.5 }}>WhatsApp</Text>
-                </TouchableOpacity>
+
+                {passError ? <Text style={styles.passError}>{passError}</Text> : null}
+
+                <View style={styles.passSecondaryRow}>
+                  <TouchableOpacity
+                    onPress={savePass}
+                    disabled={passLoading || passIsDemo}
+                    accessibilityRole="button"
+                    accessibilityLabel="Save appointment pass PDF"
+                    style={[styles.passGhost, (passLoading || passIsDemo) && styles.passDisabled]}
+                  >
+                    <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.passGhostText}>Save PDF</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleSharePass}
+                    disabled={passLoading || passIsDemo}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share appointment pass to WhatsApp"
+                    style={[styles.passGhost, (passLoading || passIsDemo) && styles.passDisabled]}
+                  >
+                    <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                    <Text style={styles.passGhostText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.passHint}>
+                  {passInactive
+                    ? 'This pass is no longer active.'
+                    : hasArrived
+                      ? 'You are checked in. Keep this pass for your visit.'
+                      : 'Check in when you arrive at the store.'}
+                </Text>
               </View>
             </ScrollView>
           </View>
@@ -4522,6 +4554,15 @@ export default function CustomerBookingPwaScreen() {
 }
 
 const styles = StyleSheet.create({
+  passActions: { marginTop: 14, gap: 8 },
+  passPrimary: { height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  passPrimaryText: { fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  passSecondaryRow: { flexDirection: 'row', gap: 8 },
+  passGhost: { flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  passGhostText: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' },
+  passHint: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 2 },
+  passError: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FCA5A5', textAlign: 'center' },
+  passDisabled: { opacity: 0.4 },
   container: {
     flex: 1,
     backgroundColor: '#F5F0E8',
