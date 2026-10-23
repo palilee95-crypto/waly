@@ -976,9 +976,11 @@ export default function CustomerDashboard() {
   const loadMerchantRewards = async (merchantId: string, linkedRewardId?: string) => {
     try {
       setLoadingRewards(true);
-      // `is_archived` keeps the internal "Points Cash Voucher" reward (the backing
-      // record for converted points) out of the customer catalogue.
-      let filterQuery = `merchant = "${merchantId}" && is_active = true && is_archived != true`;
+      // Only `catalog` rewards are buyable with points. `system` covers the
+      // internal "Points Cash Voucher" backing record and `milestone` covers the
+      // shadow rewards behind stamp milestones — neither is a customer catalogue
+      // item (`is_archived` is kept for rows that predate `reward_scope`).
+      let filterQuery = `merchant = "${merchantId}" && is_active = true && is_archived != true && reward_scope = "catalog"`;
       if (linkedRewardId) {
         filterQuery += ` && id != "${linkedRewardId}"`;
       }

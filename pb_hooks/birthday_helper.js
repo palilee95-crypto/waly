@@ -224,6 +224,7 @@ function processBirthdayRewards(options) {
               r.set("points_cost", 1);
               r.set("stock", 1000000);
               r.set("is_active", true);
+              r.set("reward_scope", "system");
               r.set("type", rewardType === "discount_percent" ? "discount" : "free_item");
               r.set("discount_value", parseFloat(rewardValue) || 0);
               $app.save(r);

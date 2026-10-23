@@ -130,6 +130,7 @@ onRecordUpdate((e) => {
         r.set('points_cost', 1);
         r.set('stock', 1000000);
         r.set('is_active', true);
+        r.set('reward_scope', 'milestone');
         const shadowDiscountType = toDiscountType(type);
         r.set('type', shadowDiscountType === 'none' ? 'free_item' : 'discount');
         // A milestone worth money has to say so, or the checkout cannot price it.

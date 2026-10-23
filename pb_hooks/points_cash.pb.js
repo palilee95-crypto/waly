@@ -96,7 +96,15 @@ routerAdd("POST", "/api/risev/customer/points/convert", (e) => {
         "merchant = {:mid} && name = {:name}",
         { mid: merchantId, name: CASH_REWARD_NAME }
       );
-      if (found) return found;
+      if (found) {
+        // The merchant catalogue hides `system` rows; older records predate the
+        // column, so repair the scope on first use instead of leaving them listed.
+        if (found.getString("reward_scope") !== "system") {
+          found.set("reward_scope", "system");
+          try { $app.save(found); } catch (e) {}
+        }
+        return found;
+      }
     } catch (err) {}
     const col = $app.findCollectionByNameOrId("rewards");
     const rec = new Record(col);
@@ -108,6 +116,7 @@ routerAdd("POST", "/api/risev/customer/points/convert", (e) => {
     rec.set("discount_type", "fixed_amount");
     rec.set("is_active", true);
     rec.set("is_archived", true);
+    rec.set("reward_scope", "system");
     $app.save(rec);
     return rec;
   }
