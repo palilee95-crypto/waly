@@ -26,6 +26,24 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       return e.json(404, { message: "NFC claim record not found" });
     }
 
+    // A claim created through the booking-scoped plan bypass stays bound to
+    // that booking: it cannot be settled as an ordinary manual sale.
+    let claimBookingId = "";
+    try {
+      claimBookingId = claim.getString("booking") || "";
+    } catch (claimBookingErr) {
+      claimBookingId = "";
+    }
+    if (claimBookingId) {
+      const suppliedBookingId = String(body.booking_id || "").trim();
+      if (!suppliedBookingId || suppliedBookingId !== claimBookingId) {
+        return e.json(403, {
+          code: "POS_PLAN_REQUIRED",
+          message: "This sale is tied to a booking. Complete it through the booking checkout.",
+        });
+      }
+    }
+
     const merchantId = claim.getString("merchant");
     const authMerchantId = authRecord.getString ? authRecord.getString("merchant_id") : "";
     let isOwner = false;
@@ -47,7 +65,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       let priorReceiptId = "";
       let receiptError = "";
       try {
-        if (Number(claim.get("bill_amount")) > 0) priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+        // Always attempt recovery: the helper decides from the ledger whether a
+        // receipt is owed (a RM0 voucher sale is) and returns "" when the claim
+        // had no transaction. Gating on the claim's own voucher field missed
+        // vouchers that were only submitted with the checkout body.
+        priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
       } catch (err) {
         receiptError = "Receipt recovery failed. Please contact support with this claim ID.";
         console.log("[NFC COMPLETE] Receipt recovery failed for", claim.id, err.message || err);
@@ -232,7 +254,24 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       }
       const bookingStatus = activeBooking.getString("status");
       if (bookingStatus === "completed" || bookingStatus === "cancelled" || bookingStatus === "no_show") {
-        return e.json(400, { code: "BOOKING_NOT_ACTIVE", message: "This booking is already " + bookingStatus + "." });
+        // The booking was settled by another checkout. Return its receipt so the
+        // counter can show it instead of starting a second sale.
+        let settledReceiptId = "";
+        try {
+          const settledReceipts = $app.findRecordsByFilter(
+            "digital_receipts",
+            "booking = '" + activeBooking.id + "'",
+            "-created",
+            1,
+            0
+          );
+          if (settledReceipts.length > 0) settledReceiptId = settledReceipts[0].id;
+        } catch (settledErr) {}
+        return e.json(400, {
+          code: "BOOKING_NOT_ACTIVE",
+          message: "This booking is already " + bookingStatus + ".",
+          receipt_id: settledReceiptId,
+        });
       }
     }
 
@@ -317,7 +356,9 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       try {
         const bookingReceipts = $app.findRecordsByFilter("digital_receipts", "booking = '" + activeBooking.id + "'", "-created", 1, 0);
         bookingReceiptId = bookingReceipts.length ? bookingReceipts[0].id : "";
-        if (!bookingReceiptId && billAmount > 0) bookingReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+        if (!bookingReceiptId && (billAmount > 0 || (voucherOutcome.id && !voucherOutcome.error))) {
+          bookingReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
+        }
       } catch (receiptLookupErr) {
         bookingReceiptError = "Payment was recorded, but the receipt could not be saved. Retry the receipt from this sale.";
         console.log("[NFC COMPLETE] Booking receipt recovery failed:", receiptLookupErr.message || receiptLookupErr);
@@ -425,18 +466,21 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
         console.log("[NFC COMPLETE] Transaction error:", txnErr.message || txnErr);
       }
 
-      // The paid receipt is a server-owned snapshot of this exact POS claim.
-      // A stamp-only approval (zero bill) remains a loyalty event, not a sale.
+      // A consumed voucher is a sale even when it covers the whole bill, so the
+      // receipt is written at RM0.00 with the discount shown. A plain stamp-only
+      // approval still writes no receipt.
+      const voucherSale = Boolean(voucherOutcome.id) && !voucherOutcome.error;
+      const hasSaleValue = billAmount > 0 || voucherSale;
       let receiptId = "";
       let receiptError = "";
-      if (billAmount > 0 && transactionId) {
+      if (hasSaleValue && transactionId) {
         try {
           receiptId = receiptHelper.ensureNfcPaidReceipt(claim, $app.findRecordById("transactions", transactionId), body);
         } catch (receiptErr) {
           console.log("[NFC COMPLETE] Paid receipt error:", receiptErr.message || receiptErr);
           receiptError = "Payment was recorded, but the receipt could not be saved. Retry the receipt from this sale.";
         }
-      } else if (billAmount > 0) {
+      } else if (hasSaleValue) {
         receiptError = "Payment was recorded, but its transaction was not saved. Contact support with this claim ID.";
       }
 

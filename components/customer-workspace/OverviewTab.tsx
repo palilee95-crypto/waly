@@ -17,6 +17,7 @@ import {
   formatCount,
   formatDayLabel,
   formatLedgerImpact,
+  formatLocalTimeFromIso,
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 import CustomerSnapshotCard from './CustomerSnapshotCard';
@@ -198,7 +199,7 @@ export default function OverviewTab({
                       </Text>
                     </View>
                     <Text style={styles.txnMeta} numberOfLines={1}>
-                      {formatShortDateFromIso(row.created)} · {row.created.slice(11, 16)}
+                      {formatShortDateFromIso(row.created)} · {formatLocalTimeFromIso(row.created)}
                     </Text>
                   </View>
                 </View>

@@ -14,7 +14,6 @@ import {
   Modal,
   Linking,
   Animated,
-  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,8 +22,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Clipboard from 'expo-clipboard';
 import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
+import { ALL_TIME_SLOTS, getPeriodForSlot, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
+import { AppointmentPassData, PASS_SHEET_SURFACE, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import AppointmentTicket from '@/components/AppointmentTicket';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -142,40 +143,6 @@ function isValidImageUri(uri?: string | null) {
     trimmed.startsWith('blob:') ||
     trimmed.startsWith('file://')
   );
-}
-
-const ALL_TIME_SLOTS = [
-  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-  '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
-  '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM', '08:30 PM'
-];
-
-function parseSlotToMinutes(slot: string): number {
-  if (!slot || typeof slot !== 'string') return 0;
-  const [timePart, modifier] = slot.split(' ');
-  if (!timePart) return 0;
-  let [hours, minutes] = timePart.split(':').map(Number);
-  if (modifier === 'PM' && hours < 12) hours += 12;
-  if (modifier === 'AM' && hours === 12) hours = 0;
-  return (hours || 0) * 60 + (minutes || 0);
-}
-
-function isSlotInPast(slot: string, selectedIsoDate: string): boolean {
-  if (!slot) return false;
-  const now = new Date();
-  const todayIso = now.toISOString().split('T')[0];
-  if (selectedIsoDate < todayIso) return true;
-  if (selectedIsoDate > todayIso) return false;
-  // If today: check against current time
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return parseSlotToMinutes(slot) <= currentMinutes;
-}
-
-function getPeriodForSlot(slot: string): 'Morning' | 'Afternoon' | 'Evening' {
-  const mins = parseSlotToMinutes(slot);
-  if (mins < 12 * 60) return 'Morning';
-  if (mins < 17 * 60) return 'Afternoon';
-  return 'Evening';
 }
 
 interface OperatingHoursInfo {
@@ -354,6 +321,9 @@ export default function CustomerBookingPwaScreen() {
   const [liveBgColor, setLiveBgColor] = useState<string | null>(null);
   const [livePodColor, setLivePodColor] = useState<string | null>(null);
   const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(null);
+  // The page hero may use a demo/stock photo, but a pass must carry only this
+  // merchant's own banner — otherwise someone else's storefront is printed.
+  const [passCoverUrl, setPassCoverUrl] = useState<string | null>(null);
   const [liveTagline, setLiveTagline] = useState<string | null>(null);
   const [liveAllowStaffSelection, setLiveAllowStaffSelection] = useState<boolean | null>(null);
 
@@ -423,6 +393,15 @@ export default function CustomerBookingPwaScreen() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [eventVenue, setEventVenue] = useState('');
+  // Phone-first identity on the final step: a known number resolves the name,
+  // an unknown one reveals a required name field.
+  const [lookupStatus, setLookupStatus] = useState<'idle' | 'checking' | 'known' | 'unknown'>('idle');
+  const [resolvedName, setResolvedName] = useState('');
+  const [nameOverride, setNameOverride] = useState(false);
+  // Digits of the phone the current name belongs to — whether it came from a
+  // session, a URL, the cache, a lookup or was typed. A name is dropped as soon
+  // as the phone changes to a different number.
+  const nameOwnerPhoneRef = useRef('');
   const [profileTab, setProfileTab] = useState<'Services' | 'Reviews' | 'About'>('Services');
 
   // Post-booking state
@@ -838,6 +817,44 @@ export default function CustomerBookingPwaScreen() {
     return passBooking?.service_name || selectedServices.map((s: any) => s.name).join(', ') || 'Appointment';
   })();
 
+  // Everything the sheet, the PDF and the print sheet render, in one shape.
+  const passUrlForBooking = passBookingId ? buildPassUrl(String(slug), passBookingId) : '';
+  const bookingStatus = String(passBooking?.status || 'booked');
+  const passData: AppointmentPassData = {
+    bookingId: passBookingId,
+    shortRef: passBookingId ? shortPassRef(passBookingId) : '',
+    status: bookingStatus === 'booked' && hasArrived ? 'arrived' : bookingStatus,
+    merchantName: merchant?.store_name || merchant?.name || passBooking?.merchant_name || 'Risev merchant',
+    merchantLogoUrl: merchant?.logo_url || null,
+    merchantCoverUrl: liveCoverUrl || passCoverUrl || null,
+    passUrl: passUrlForBooking,
+    qrUrl: passUrlForBooking
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(passUrlForBooking)}`
+      : '',
+    bookingDate: formatUpcomingDate(passBooking?.booking_date),
+    startTime: String(passBooking?.start_time || '—'),
+    serviceText: passServiceText,
+    branchName: String(passBooking?.branch_name || selectedBranch?.name || merchant?.store_name || '—'),
+    staffName: String(passBooking?.staff_name || 'Any Available'),
+    total: Number(passBooking?.total_price || 0),
+    customerName: String(passBooking?.customer_name || customerName || ''),
+    customerPhone: String(passBooking?.customer_phone || customerPhone || ''),
+    locale,
+  };
+  const passStatus = passData.status;
+  const passInactive = ['completed', 'cancelled', 'no_show'].includes(passStatus);
+  const passActionLabel = passStatus === 'completed'
+    ? 'Appointment completed'
+    : passStatus === 'cancelled'
+      ? 'Appointment cancelled'
+      : passStatus === 'no_show'
+        ? 'Marked as no show'
+        : hasArrived
+          ? 'Arrival confirmed'
+          : checkingIn
+            ? 'Checking in…'
+            : "I'm here — Check in";
+
   const goToLoginForPass = () => {
     if (!passBookingId) return;
     const redirect = `/b/${slug}?pass=${passBookingId}`;
@@ -865,23 +882,31 @@ export default function CustomerBookingPwaScreen() {
     setShowPassSheet(true);
   };
 
-  const sharePass = async () => {
-    if (passIsDemo) return;
-    const url = buildPassUrl(String(slug), passBookingId);
-    try {
-      await Clipboard.setStringAsync(url);
-    } catch (e) {}
-    if (Platform.OS === 'web') {
-      showToast('Pass link copied');
+  const savePass = async () => {
+    if (passIsDemo) {
+      showToast('Demo booking — there is no PDF pass to save.');
       return;
     }
     try {
-      await Share.share({ message: `Your ${merchant?.store_name || 'Risev'} appointment pass:\n${url}` });
-    } catch (e) {}
+      await saveAppointmentPass(passData);
+      showToast(Platform.OS === 'web' ? 'Pass PDF downloaded.' : 'Choose where to save your pass.');
+    } catch (e) {
+      showToast('Could not prepare the pass PDF. Please try again.');
+    }
+  };
+
+  const handleSharePass = async () => {
+    if (passIsDemo) return;
+    try {
+      const result = await shareAppointmentPass(passData);
+      if (result === 'copied') showToast('Pass link copied');
+    } catch (e) {
+      showToast('Could not share the pass. Please try again.');
+    }
   };
 
   const handleCheckIn = async () => {
-    if (passIsDemo || checkingIn) return;
+    if (passIsDemo || checkingIn || passInactive) return;
     if (!isCustomerSession()) {
       goToLoginForPass();
       return;
@@ -955,11 +980,14 @@ export default function CustomerBookingPwaScreen() {
     const qName = (typeof queryName === 'string' ? queryName : '').trim();
     const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
     const session = customerSessionIdentity();
+    const namePhone = (qPhone || session.phone).replace(/[^\d]/g, '');
 
     if (qName) {
       setCustomerName(qName);
+      nameOwnerPhoneRef.current = namePhone;
     } else if (session.name) {
       setCustomerName(session.name);
+      nameOwnerPhoneRef.current = namePhone;
     }
 
     if (qPhone) {
@@ -971,12 +999,18 @@ export default function CustomerBookingPwaScreen() {
 
   // Returning customers: resolve the name from the phone so nobody retypes it.
   // The lookup is scoped to this store — it only answers for customers that
-  // already have a card or a booking here.
+  // already have a card or a booking here. It re-runs whenever the number
+  // changes; the input handler drops a name that belonged to the old number.
   useEffect(() => {
     const digits = customerPhone.replace(/[^\d]/g, '');
     const merchantId = merchant?.id;
-    if (!merchantId || digits.length < 9 || customerName.trim()) return;
+
+    if (!merchantId || digits.length < 9) {
+      setLookupStatus('idle');
+      return;
+    }
     let cancelled = false;
+    setLookupStatus('checking');
     const timer = setTimeout(async () => {
       try {
         const res = await pb.send<{ exists: boolean; name?: string }>('/api/risev/booking/customer-lookup', {
@@ -984,18 +1018,28 @@ export default function CustomerBookingPwaScreen() {
           query: { merchant: merchantId, phone: digits },
           requestKey: null,
         });
+        if (cancelled) return;
         const resolved = res && res.exists ? String(res.name || '').trim() : '';
-        if (!cancelled && resolved) {
-          setCustomerName(resolved);
-          AsyncStorage.setItem('risev_cust_name', resolved).catch(() => {});
+        if (resolved) {
+          nameOwnerPhoneRef.current = digits;
+          setResolvedName(resolved);
+          setLookupStatus('known');
+          setCustomerName((prev) => (prev.trim() ? prev : resolved));
+          AsyncStorage.setItem('risev_cust_identity', JSON.stringify({ name: resolved, phone: digits })).catch(() => {});
+        } else {
+          setLookupStatus('unknown');
         }
-      } catch (err) {}
+      } catch (err) {
+        // Never leave the form stuck on "checking": an unreachable lookup is
+        // treated like a new customer.
+        if (!cancelled) setLookupStatus('unknown');
+      }
     }, 600);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [customerPhone, customerName, merchant?.id]);
+  }, [customerPhone, merchant?.id]);
 
   useEffect(() => {
     if (queryRef === 'nfc_walkin') {
@@ -1064,28 +1108,63 @@ export default function CustomerBookingPwaScreen() {
       const qName = (typeof queryName === 'string' ? queryName : '').trim();
       const qPhone = (typeof queryPhone === 'string' ? queryPhone : '').trim();
       const session = customerSessionIdentity();
-      const activeName = session.name;
-      const activePhone = session.phone;
+
+      // Phone first: the cached name is only trusted for the same number, so a
+      // previous visitor's name never sticks to a different phone.
+      let phone = qPhone || session.phone;
+      if (!phone) {
+        try {
+          phone = (await AsyncStorage.getItem('risev_cust_phone')) || '';
+        } catch (e) {
+          phone = '';
+        }
+      }
+      if (phone) {
+        setCustomerPhone(phone);
+        AsyncStorage.setItem('risev_cust_phone', phone).catch(() => {});
+      }
 
       if (qName) {
         setCustomerName(qName);
-        AsyncStorage.setItem('risev_cust_name', qName).catch(() => {});
-      } else if (activeName) {
-        setCustomerName(activeName);
-      } else {
-        const savedName = await AsyncStorage.getItem('risev_cust_name');
-        if (savedName) setCustomerName(savedName);
+        setNameOverride(true);
+        nameOwnerPhoneRef.current = phone.replace(/[^\d]/g, '');
+        return;
+      }
+      if (session.name) {
+        setCustomerName(session.name);
+        nameOwnerPhoneRef.current = phone.replace(/[^\d]/g, '');
+        return;
       }
 
-      if (qPhone) {
-        setCustomerPhone(qPhone);
-        AsyncStorage.setItem('risev_cust_phone', qPhone).catch(() => {});
-      } else if (activePhone) {
-        setCustomerPhone(activePhone);
-      } else {
-        const savedPhone = await AsyncStorage.getItem('risev_cust_phone');
-        if (savedPhone) setCustomerPhone(savedPhone);
-      }
+      try {
+        const raw = await AsyncStorage.getItem('risev_cust_identity');
+        if (!raw) {
+          // Migrate the pre-identity cache: trust the remembered name only when
+          // it was stored for this same number, then keep the pair under the
+          // new key so later phone edits can still invalidate it.
+          const legacyName = await AsyncStorage.getItem('risev_cust_name');
+          const legacyPhone = (await AsyncStorage.getItem('risev_cust_phone')) || phone;
+          const digits = phone.replace(/[^\d]/g, '');
+          const legacyDigits = String(legacyPhone || '').replace(/[^\d]/g, '');
+          if (legacyName && digits && legacyDigits === digits) {
+            setCustomerName(legacyName);
+            nameOwnerPhoneRef.current = digits;
+            setResolvedName(legacyName);
+            setLookupStatus('known');
+            await AsyncStorage.setItem('risev_cust_identity', JSON.stringify({ name: legacyName, phone: digits }));
+            await AsyncStorage.removeItem('risev_cust_name');
+          }
+          return;
+        }
+        const cached = JSON.parse(raw);
+        const digits = phone.replace(/[^\d]/g, '');
+        if (cached?.name && digits && String(cached.phone || '') === digits) {
+          setCustomerName(String(cached.name));
+          nameOwnerPhoneRef.current = digits;
+          setResolvedName(String(cached.name));
+          setLookupStatus('known');
+        }
+      } catch (e) {}
     } catch (e) {}
   };
 
@@ -1154,6 +1233,7 @@ export default function CustomerBookingPwaScreen() {
       const bannerUrl = mRecord.banner 
         ? `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`
         : null;
+      setPassCoverUrl(bannerUrl || (mRecord.cover_url && isValidImageUri(mRecord.cover_url) ? mRecord.cover_url : null));
 
       let fallbackCover = 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80';
       if (slug === 'scoop-creamy') {
@@ -1615,6 +1695,42 @@ export default function CustomerBookingPwaScreen() {
     return selectedServices.reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
   };
 
+  // What the chosen provider already has that day. The create endpoint rejects an
+  // overlap, but the grid must not offer it in the first place.
+  const [busyWindows, setBusyWindows] = useState<Array<{ start: number; end: number }>>([]);
+  useEffect(() => {
+    let active = true;
+    const slug = merchant?.pwa_slug;
+    const staffId = selectedStaff?.id;
+    if (!slug || !selectedIsoDate || !staffId) {
+      setBusyWindows([]);
+      return;
+    }
+    pb.send<any>(
+      `/api/risev/booking/availability?slug=${encodeURIComponent(String(slug))}&date=${encodeURIComponent(selectedIsoDate)}&staff=${encodeURIComponent(staffId)}`,
+      { method: 'GET', requestKey: null }
+    )
+      .then((res) => {
+        if (!active) return;
+        const list = Array.isArray(res?.busy) ? res.busy : [];
+        setBusyWindows(
+          list
+            .map((b: any) => ({ start: Number(b.start_minutes) || 0, end: Number(b.end_minutes) || 0 }))
+            .filter((w: any) => w.start > 0 && w.end > w.start)
+        );
+      })
+      .catch(() => { if (active) setBusyWindows([]); });
+    return () => { active = false; };
+  }, [merchant?.pwa_slug, selectedIsoDate, selectedStaff?.id]);
+
+  const slotIsTaken = (slot: string) => {
+    if (!busyWindows.length) return false;
+    const start = parseSlotToMinutes(slot);
+    if (!start) return false;
+    const end = start + (calculateTotalDuration() || 30) + 10;
+    return busyWindows.some(w => start < w.end && w.start < end);
+  };
+
   const handleNextStep = async () => {
     if (currentStep === 0) {
       setCurrentStep(1);
@@ -1629,16 +1745,29 @@ export default function CustomerBookingPwaScreen() {
         Alert.alert('Slot Unavailable', 'The selected time slot has already passed. Please choose an upcoming time or another date.');
         return;
       }
+      if (slotIsTaken(selectedTime)) {
+        Alert.alert('Slot Unavailable', 'Your provider is already booked for that time. Please choose another slot.');
+        return;
+      }
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      if (!customerName.trim() || !customerPhone.trim()) {
-        Alert.alert('Required Details', 'Please enter your name and phone number to confirm your booking.');
+      const digits = customerPhone.replace(/[^\d]/g, '');
+      if (digits.length < 9 || digits.length > 12) {
+        Alert.alert('Phone Number', 'Please enter a valid WhatsApp number to confirm your booking.');
+        return;
+      }
+      if (lookupStatus === 'checking') {
+        Alert.alert('Checking Number', 'Please wait a moment while we check this number.');
+        return;
+      }
+      if (!customerName.trim()) {
+        Alert.alert('Your Name', 'We do not have this number yet. Please enter your name to confirm your booking.');
         return;
       }
 
       setIsSubmitting(true);
       try {
-        await AsyncStorage.setItem('risev_cust_name', customerName);
+        await AsyncStorage.setItem('risev_cust_identity', JSON.stringify({ name: customerName.trim(), phone: digits }));
         await AsyncStorage.setItem('risev_cust_phone', customerPhone);
 
         const totalPrice = calculateTotal();
@@ -1666,8 +1795,8 @@ export default function CustomerBookingPwaScreen() {
           merchant: merchant?.id,
           branch: (selectedBranch?.id && selectedBranch.id !== 'main') ? selectedBranch.id : null,
           staff: (!showStaffSelection || !selectedStaff?.id) ? null : selectedStaff.id,
-          customer_name: customerName,
-          customer_phone: customerPhone,
+          customer_name: customerName.trim(),
+          customer_phone: customerPhone.trim(),
           booking_date: selectedIsoDate || new Date().toISOString().split('T')[0],
           start_time: selectedTime,
           total_price: totalPrice,
@@ -1779,6 +1908,11 @@ export default function CustomerBookingPwaScreen() {
   const filteredServices = activeCategory === 'All'
     ? services
     : services.filter(s => s.category?.toLowerCase() === activeCategory.toLowerCase());
+
+  // Step 3 gate: a valid phone, a finished lookup, and a name (resolved or typed).
+  const phoneDigits = customerPhone.replace(/[^\d]/g, '');
+  const step3Ready = phoneDigits.length >= 9 && phoneDigits.length <= 12 &&
+    lookupStatus !== 'checking' && Boolean(customerName.trim());
 
 
   return (
@@ -3011,7 +3145,7 @@ export default function CustomerBookingPwaScreen() {
             <View style={[styles.periodSegmentTrack, themeStyles.neumorphicInset]}>
               {(['Morning', 'Afternoon', 'Evening'] as const).map(p => {
                 const pSlots = timeSlotsByPeriod[p] || [];
-                const isAllPast = pSlots.every(s => isSlotInPast(s, selectedIsoDate));
+                const isAllPast = pSlots.every(s => isSlotInPast(s, selectedIsoDate) || slotIsTaken(s));
                 const isSelectedPeriod = selectedTimePeriod === p;
                 return (
                   <TouchableOpacity
@@ -3023,7 +3157,7 @@ export default function CustomerBookingPwaScreen() {
                     ]}
                     onPress={() => {
                       setSelectedTimePeriod(p);
-                      const validInPeriod = pSlots.filter(s => !isSlotInPast(s, selectedIsoDate));
+                      const validInPeriod = pSlots.filter(s => !isSlotInPast(s, selectedIsoDate) && !slotIsTaken(s));
                       if (validInPeriod.length > 0 && !validInPeriod.includes(selectedTime)) {
                         setSelectedTime(validInPeriod[0]);
                       }
@@ -3048,21 +3182,23 @@ export default function CustomerBookingPwaScreen() {
             <View style={styles.timeSlotsGrid}>
               {(timeSlotsByPeriod[selectedTimePeriod] || []).map(tm => {
                 const isPast = isSlotInPast(tm, selectedIsoDate);
-                const isSelected = selectedTime === tm && !isPast;
+                const isTaken = slotIsTaken(tm);
+                const isBlocked = isPast || isTaken;
+                const isSelected = selectedTime === tm && !isBlocked;
                 return (
                   <TouchableOpacity
                     key={tm}
-                    disabled={isPast}
+                    disabled={isBlocked}
                     style={[
                       styles.timeSlotGridPill,
                       isSelected
                         ? themeStyles.neumorphicActiveBtn
-                        : isPast
+                        : isBlocked
                         ? [themeStyles.neumorphicInset, { opacity: 0.35 }]
                         : themeStyles.neumorphicInset
                     ]}
                     onPress={() => setSelectedTime(tm)}
-                    activeOpacity={isPast ? 1 : 0.85}
+                    activeOpacity={isBlocked ? 1 : 0.85}
                   >
                     <Text
                       style={[
@@ -3070,10 +3206,10 @@ export default function CustomerBookingPwaScreen() {
                         {
                           color: isSelected
                             ? themeStyles.contrastColor
-                            : isPast
+                            : isBlocked
                             ? themeStyles.textMutedColor
                             : themeStyles.textPrimaryColor,
-                          textDecorationLine: isPast ? 'line-through' : 'none'
+                          textDecorationLine: isBlocked ? 'line-through' : 'none'
                         }
                       ]}
                     >
@@ -3110,27 +3246,11 @@ export default function CustomerBookingPwaScreen() {
         {currentStep === 3 && (
           <View style={styles.stepContainer}>
             
+            {/* Phone first: the number is the identity. */}
             <View style={styles.inputFieldGroup}>
-              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Full Name</Text>
-              <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
-                <Ionicons name="person-outline" size={18} color={themeStyles.textSecondaryColor} />
-                <TextInput
-                  style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
-                  placeholder="Enter your full name"
-                  placeholderTextColor={themeStyles.textMutedColor}
-                  value={customerName}
-                  onChangeText={setCustomerName}
-                />
-              </View>
-              {customerName.trim() ? (
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.45)', marginTop: 6 }}>
-                  Saved from your last visit — edit it if anything changed.
-                </Text>
-              ) : null}
-            </View>
-
-            <View style={styles.inputFieldGroup}>
-              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>WhatsApp Number</Text>
+              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>
+                {locale === 'ms' ? 'Nombor WhatsApp' : 'WhatsApp Number'}
+              </Text>
               <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
                 <Ionicons name="logo-whatsapp" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
@@ -3139,10 +3259,85 @@ export default function CustomerBookingPwaScreen() {
                   placeholderTextColor={themeStyles.textMutedColor}
                   keyboardType="phone-pad"
                   value={customerPhone}
-                  onChangeText={setCustomerPhone}
+                  onChangeText={(text) => {
+                    setCustomerPhone(text);
+                    const nextDigits = text.replace(/[^\d]/g, '');
+                    // Drop a name that belongs to the previous number (session,
+                    // URL, cached, lookup or typed). A different number is a
+                    // different person until the lookup says otherwise.
+                    if (nameOwnerPhoneRef.current && nameOwnerPhoneRef.current !== nextDigits) {
+                      setCustomerName('');
+                      setNameOverride(false);
+                      nameOwnerPhoneRef.current = '';
+                      setResolvedName('');
+                    }
+                  }}
+                  autoFocus
                 />
               </View>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.45)', marginTop: 6 }}>
+                {locale === 'ms'
+                  ? 'Kami guna nombor ini untuk mencari kad loyaliti dan menghantar resit anda.'
+                  : 'We use this number to find your loyalty card and send your receipt.'}
+              </Text>
             </View>
+
+            {lookupStatus === 'checking' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
+                <ActivityIndicator size="small" color="#111111" />
+                <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: themeStyles.textSecondaryColor }}>
+                  {locale === 'ms' ? 'Menyemak nombor ini…' : 'Checking this number…'}
+                </Text>
+              </View>
+            ) : null}
+
+            {lookupStatus === 'known' && !nameOverride ? (
+              <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset, { paddingVertical: 14, justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <Ionicons name="person-circle-outline" size={26} color="#111111" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: themeStyles.textMutedColor, letterSpacing: 0.6 }}>
+                      {locale === 'ms' ? 'SELAMAT KEMBALI' : 'WELCOME BACK'}
+                    </Text>
+                    <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: themeStyles.textPrimaryColor, marginTop: 1 }} numberOfLines={1}>
+                      {customerName || resolvedName}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setNameOverride(true)} accessibilityRole="button">
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', textDecorationLine: 'underline' }}>
+                    {locale === 'ms' ? 'Bukan anda? Edit' : 'Not you? Edit'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {(lookupStatus === 'unknown' || nameOverride) ? (
+              <View style={styles.inputFieldGroup}>
+                <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>
+                  {locale === 'ms' ? 'Nama Anda' : 'Your Name'}
+                </Text>
+                <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
+                  <Ionicons name="person-outline" size={18} color={themeStyles.textSecondaryColor} />
+                  <TextInput
+                    style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
+                    placeholder={locale === 'ms' ? 'Masukkan nama penuh anda' : 'Enter your full name'}
+                    placeholderTextColor={themeStyles.textMutedColor}
+                    value={customerName}
+                    onChangeText={(text) => {
+                      setCustomerName(text);
+                      // A typed name belongs to the number on screen now.
+                      nameOwnerPhoneRef.current = customerPhone.replace(/[^\d]/g, '');
+                    }}
+                  />
+                </View>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(0, 0, 0, 0.45)', marginTop: 6 }}>
+                  {lookupStatus === 'unknown'
+                    ? (locale === 'ms' ? 'Nombor ini belum dikenali — masukkan nama untuk teruskan.' : "We don't have this number yet — add your name to continue.")
+                    : (locale === 'ms' ? 'Edit nama yang disimpan untuk nombor ini.' : 'Edit the name saved for this number.')}
+                </Text>
+              </View>
+            ) : null}
 
             {selectedServices.some(s => s.item_type === 'catering') && (
               <View style={styles.inputFieldGroup}>
@@ -3249,10 +3444,10 @@ export default function CustomerBookingPwaScreen() {
                   shadowOpacity: 0.04,
                   shadowRadius: 6,
                 }}
-                onPress={sharePass}
+                onPress={handleSharePass}
                 activeOpacity={0.8}
               >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#000000" />
+                <Ionicons name="logo-whatsapp" size={20} color="#000000" />
               </TouchableOpacity>
             </View>
 
@@ -3763,10 +3958,10 @@ export default function CustomerBookingPwaScreen() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              opacity: (currentStep === 1 && selectedServices.length === 0) ? 0.35 : 1,
+              opacity: (isSubmitting || (currentStep === 1 && selectedServices.length === 0) || (currentStep === 3 && !step3Ready)) ? 0.35 : 1,
             }}
             onPress={handleNextStep}
-            disabled={isSubmitting || (currentStep === 1 && selectedServices.length === 0)}
+            disabled={isSubmitting || (currentStep === 1 && selectedServices.length === 0) || (currentStep === 3 && !step3Ready)}
             activeOpacity={0.85}
           >
             {isSubmitting ? (
@@ -4146,189 +4341,78 @@ export default function CustomerBookingPwaScreen() {
         </View>
       </Modal>
 
-      {/* 🎫 Appointment Pass Sheet (QR + same-day check-in) */}
-      <Modal
-        visible={showPassSheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPassSheet(false)}
-      >
-        <View style={styles.modalOverlay}>
+      {/* Shared appointment ticket: the same booking details are used for PDF export. */}
+      <Modal visible={showPassSheet} transparent animationType="fade" onRequestClose={() => setShowPassSheet(false)}>
+        <View style={styles.passSheetBackdrop}>
           <TouchableOpacity style={styles.modalBackdropPress} onPress={() => setShowPassSheet(false)} />
-          <View style={[styles.loyaltyCardModalContent, {
-            backgroundColor: '#FFFFFF',
-            maxHeight: '92%',
-            boxShadow: 'none',
-            shadowColor: 'transparent',
-            shadowOpacity: 0,
-            shadowRadius: 0,
-            elevation: 0,
-          }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <View style={[styles.modalHeaderIconBadge, { backgroundColor: '#FFCC00' }]}>
-                  <Ionicons name="qr-code-outline" size={18} color="#111111" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.loyaltyModalTitle, { color: '#111111' }]}>Appointment Pass</Text>
-                  <Text style={[styles.loyaltyModalSub, { color: '#64748B' }]} numberOfLines={1}>
-                    {merchant?.store_name || passBooking?.merchant_name || 'Your appointment'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.modalCloseBtn, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9' }]}
-                  onPress={() => setShowPassSheet(false)}
-                >
-                  <Ionicons name="close" size={18} color="#111111" />
-                </TouchableOpacity>
-              </View>
-
-              {/* QR */}
-              <View style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 22,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-                paddingVertical: 18,
-                alignItems: 'center',
-              }}>
-                {passIsDemo ? (
-                  <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="qr-code-outline" size={64} color="#CBD5E1" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', marginTop: 8 }}>
-                      Demo booking — no live pass
-                    </Text>
-                  </View>
-                ) : (
-                  <Image
-                    source={{
-                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(buildPassUrl(String(slug), passBookingId))}`,
-                    }}
-                    style={{ width: 200, height: 200 }}
-                    resizeMode="contain"
-                  />
-                )}
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginTop: 10,
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: 999,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                }}>
-                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 1 }}>
-                    PASS
-                  </Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 1.2 }}>
-                    #{shortPassRef(passBookingId)}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 8 }}>
-                  Show this at the counter
-                </Text>
-              </View>
-
-              {/* Details */}
-              <View style={{ marginTop: 14, gap: 10 }}>
-                {[
-                  { icon: 'cut-outline', label: 'SERVICE', value: passServiceText },
-                  {
-                    icon: 'calendar-outline',
-                    label: 'SLOT',
-                    value: `${formatUpcomingDate(passBooking?.booking_date)} @ ${passBooking?.start_time || '—'}`,
-                  },
-                  {
-                    icon: 'location-outline',
-                    label: 'LOCATION',
-                    value: passBooking?.branch_name || selectedBranch?.name || merchant?.store_name || '—',
-                  },
-                  { icon: 'person-outline', label: 'PROVIDER', value: passBooking?.staff_name || 'Any Available' },
-                  { icon: 'cash-outline', label: 'TOTAL', value: `RM${Number(passBooking?.total_price || 0).toFixed(2)}` },
-                ].map((row) => (
-                  <View key={row.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={row.icon as any} size={15} color="#111111" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.6 }}>
-                        {row.label}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', marginTop: 1 }}>
-                        {row.value}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              {/* Status */}
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                marginTop: 16,
-                backgroundColor: hasArrived ? '#DCFCE7' : '#FEF9C3',
-                borderRadius: 999,
-                paddingVertical: 8,
-              }}>
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: hasArrived ? '#16A34A' : '#EAB308' }} />
-                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 0.6 }}>
-                  {hasArrived ? 'CHECKED IN' : 'CONFIRMED'}
-                </Text>
-              </View>
-
-              {/* Primary action */}
+          <View style={styles.passSheetPanel}>
+            <View style={styles.passSheetHeader}>
               <TouchableOpacity
-                onPress={handleCheckIn}
-                disabled={hasArrived || checkingIn || passLoading}
-                activeOpacity={0.85}
-                style={{
-                  marginTop: 12,
-                  backgroundColor: hasArrived ? '#16A34A' : '#000000',
-                  borderRadius: 16,
-                  paddingVertical: 15,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  opacity: checkingIn ? 0.7 : 1,
-                }}
+                onPress={() => setShowPassSheet(false)}
+                accessibilityLabel="Close appointment pass"
+                hitSlop={8}
+                style={styles.passSheetClose}
               >
-                {checkingIn ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name={hasArrived ? 'checkmark-circle' : 'navigate'} size={18} color="#FFFFFF" />
-                )}
-                <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>
-                  {hasArrived ? 'Arrival confirmed' : checkingIn ? 'Checking in…' : "I'm here — Check in"}
-                </Text>
+                <Ionicons name="close" size={19} color="#0F172A" />
               </TouchableOpacity>
-
-              {passError ? (
-                <Text style={{
-                  marginTop: 10,
-                  fontSize: 12,
-                  fontFamily: 'PlusJakartaSans_600SemiBold',
-                  color: '#B91C1C',
-                  textAlign: 'center',
-                }}>
-                  {passError}
-                </Text>
-              ) : null}
-
-              <TouchableOpacity
-                onPress={sharePass}
-                activeOpacity={0.8}
-                style={{ marginTop: 10, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                <Ionicons name="share-outline" size={16} color="#111111" />
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111' }}>Save / Share pass</Text>
-              </TouchableOpacity>
+            </View>
+            {/* Only the ticket scrolls; the actions stay pinned so the CTA is
+                always reachable on short screens. */}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 4 }}>
+              <AppointmentTicket pass={passData} demo={passIsDemo} surfaceColor={PASS_SHEET_SURFACE} />
             </ScrollView>
+            <View style={styles.passActions}>
+                <TouchableOpacity
+                  onPress={handleCheckIn}
+                  disabled={hasArrived || checkingIn || passLoading || passInactive || passIsDemo}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={passActionLabel}
+                  style={[
+                    styles.passPrimary,
+                    { backgroundColor: passInactive ? '#2A2E35' : hasArrived ? '#15803D' : '#FFC700' },
+                    (passLoading || passIsDemo) && styles.passDisabled,
+                  ]}
+                >
+                  {checkingIn
+                    ? <ActivityIndicator size="small" color={hasArrived || passInactive ? '#FFFFFF' : '#111111'} />
+                    : <Ionicons name={hasArrived ? 'checkmark-circle' : 'location-outline'} size={17} color={hasArrived || passInactive ? '#FFFFFF' : '#111111'} />}
+                  <Text style={[styles.passPrimaryText, { color: hasArrived || passInactive ? '#FFFFFF' : '#111111' }]}>{passActionLabel}</Text>
+                </TouchableOpacity>
+
+                {passError ? <Text style={styles.passError}>{passError}</Text> : null}
+
+                <View style={styles.passSecondaryRow}>
+                  <TouchableOpacity
+                    onPress={savePass}
+                    disabled={passLoading || passIsDemo}
+                    accessibilityRole="button"
+                    accessibilityLabel="Save appointment pass PDF"
+                    style={[styles.passGhost, (passLoading || passIsDemo) && styles.passDisabled]}
+                  >
+                    <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.passGhostText}>Save PDF</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleSharePass}
+                    disabled={passLoading || passIsDemo}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share appointment pass to WhatsApp"
+                    style={[styles.passGhost, (passLoading || passIsDemo) && styles.passDisabled]}
+                  >
+                    <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                    <Text style={styles.passGhostText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.passHint}>
+                  {passInactive
+                    ? (locale === 'ms' ? 'Pas ini tidak lagi aktif.' : 'This pass is no longer active.')
+                    : hasArrived
+                      ? (locale === 'ms' ? 'Anda telah check-in. Simpan pas ini untuk lawatan anda.' : 'You are checked in. Keep this pass for your visit.')
+                      : (locale === 'ms' ? 'Check-in apabila anda tiba di kedai.' : 'Check in when you arrive at the store.')}
+                </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -4517,6 +4601,19 @@ export default function CustomerBookingPwaScreen() {
 }
 
 const styles = StyleSheet.create({
+  passSheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 18 },
+  passSheetPanel: { width: '100%', maxWidth: 400, maxHeight: '92%', backgroundColor: PASS_SHEET_SURFACE, borderRadius: 28, paddingTop: 8, paddingBottom: 14, overflow: 'hidden' },
+  passSheetHeader: { paddingHorizontal: 12, alignItems: 'flex-end' },
+  passSheetClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  passActions: { marginTop: 10, gap: 8, paddingHorizontal: 12 },
+  passPrimary: { height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  passPrimaryText: { fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  passSecondaryRow: { flexDirection: 'row', gap: 8 },
+  passGhost: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  passGhostText: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+  passHint: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 2 },
+  passError: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626', textAlign: 'center' },
+  passDisabled: { opacity: 0.4 },
   container: {
     flex: 1,
     backgroundColor: '#F5F0E8',

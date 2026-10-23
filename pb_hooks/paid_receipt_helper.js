@@ -75,10 +75,19 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
       }
     }) || null;
   }
-  if (!txn) throw new Error("The paid transaction for this claim was not found.");
+  // Nothing owed (a stamp-only approval) vs a sale whose ledger row went
+  // missing (blocked create) — the second must not look like success, or the
+  // merchant's retry hides an integrity failure behind an empty receipt.
+  if (!txn) {
+    const owed = Number(claim.get("bill_amount")) || 0;
+    if (owed > 0) {
+      console.log("[PAID RECEIPT] sale claim", claimId, "has no ledger transaction (bill " + owed + ")");
+      throw new Error("The paid transaction for this claim was not found.");
+    }
+    return "";
+  }
 
   const amount = Number(claim.get("bill_amount")) || Number(txn.get("bill_amount")) || 0;
-  if (amount <= 0) return "";
 
   let meta = {};
   try {
@@ -91,6 +100,50 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   const rawItems = Array.isArray(source.items)
     ? source.items
     : (Array.isArray(meta.items_summary) ? meta.items_summary : []);
+  const voucherApplied = Boolean(meta.voucher_id || source.voucher_id) &&
+    !meta.voucher_error && !source.voucher_error;
+  // A voucher can cover the whole bill: that is still a completed sale and needs
+  // a receipt at RM0.00. A stamp-only approval (no bill, no voucher) stays a
+  // loyalty event with no receipt.
+  if (amount <= 0 && !voucherApplied) return "";
+
+  // When the voucher paid for everything there are no line items, so the slip
+  // names the voucher and its face value instead of an empty "Counter payment".
+  const voucherId = String(meta.voucher_id || source.voucher_id || "");
+  let voucherTitle = "";
+  let voucherValue = 0;
+  if (voucherApplied && voucherId) {
+    try {
+      const voucher = $app.findRecordById("vouchers", voucherId);
+      let voucherMeta = {};
+      try {
+        const rawVoucherMeta = voucher.getString("metadata");
+        if (rawVoucherMeta && rawVoucherMeta !== "null") {
+          const parsedVoucherMeta = JSON.parse(rawVoucherMeta);
+          if (parsedVoucherMeta && typeof parsedVoucherMeta === "object" && !Array.isArray(parsedVoucherMeta)) {
+            voucherMeta = parsedVoucherMeta;
+          }
+        }
+      } catch (voucherMetaErr) {}
+      voucherTitle = String(voucherMeta.snapshot_title || "").trim();
+      if (String(voucherMeta.discount_type || "") === "fixed_amount") {
+        voucherValue = Math.max(0, Number(voucherMeta.discount_value) || 0);
+      }
+      if (!voucherTitle) {
+        const voucherRewardId = voucher.getString("reward");
+        if (voucherRewardId) {
+          voucherTitle = String($app.findRecordById("rewards", voucherRewardId).getString("name") || "").trim();
+        }
+      }
+    } catch (voucherErr) {}
+    if (!voucherTitle) voucherTitle = String(meta.voucher_code || source.voucher_code || "").trim();
+    if (!voucherTitle) voucherTitle = "Voucher redemption";
+  }
+
+  // The declared discount is what the client says the voucher took off. Only a
+  // voucher that actually applied may also derive it from subtotal − total.
+  const declaredDiscount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
+
   const items = rawItems.slice(0, 100).map(function (item) {
     return {
       name: String(item.name || "Item").slice(0, 120),
@@ -101,7 +154,14 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
     return item.name;
   });
   if (!items.length) {
-    items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount });
+    // A voucher that covers the whole bill stands in for the sale; a partial
+    // voucher still leaves a counter payment for the balance, with the voucher
+    // shown separately as the discount.
+    if (voucherApplied && amount <= 0) {
+      items.push({ name: voucherTitle, qty: 1, price: voucherValue });
+    } else {
+      items.push({ name: "Counter payment", qty: 1, price: Number(source.subtotal) || amount + declaredDiscount });
+    }
   }
   const subtotal = Math.max(
     0,
@@ -110,7 +170,12 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
         return sum + item.price * item.qty;
       }, 0)
   );
-  const discount = meta.voucher_error ? 0 : Math.max(0, Number(source.discount_amount) || 0);
+  // Deriving subtotal − total as a floor keeps a fully covered slip internally
+  // consistent (RM20 item − RM20 voucher = RM0.00), but only when a voucher was
+  // applied — otherwise it would print a "Voucher discount" with no voucher.
+  const discount = voucherApplied
+    ? Math.max(declaredDiscount, Math.min(subtotal, Math.max(0, subtotal - amount)))
+    : declaredDiscount;
 
   const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
   receipt.set("merchant", merchantId);
@@ -130,6 +195,46 @@ function ensureNfcPaidReceipt(claim, transaction, checkout) {
   receipt.set("payment_reference", String(source.payment_reference || "").slice(0, 120));
   receipt.set("payment_status", "paid");
   receipt.set("stamps_earned", Number(txn.get("stamps")) || 0);
+  // Public receipt links carry this token instead of the record id.
+  receipt.set("share_token", $security.randomString(24));
+  try {
+    const cardId = txn.getString("loyalty_card");
+    if (cardId) {
+      const card = $app.findRecordById("loyalty_cards", cardId);
+      const earnedStamps = Number(txn.get("stamps")) || 0;
+      const balance = Math.max(0, Number(card.get("stamps_collected")) || 0);
+      let goal = 10;
+      let rewardName = "";
+      try {
+        const program = $app.findRecordById("loyalty_programs", card.getString("program"));
+        goal = Math.max(1, Number(program.get("stamp_goal")) || 10);
+        // Name the REWARD, not the card ("Free Reward", not "Standard Loyalty
+        // Card") — manual-give receipts read the same field.
+        rewardName = String(program.getString("reward_name") || "").slice(0, 120);
+        if (!rewardName) {
+          try {
+            const rewardId = program.getString("linked_reward");
+            if (rewardId) {
+              rewardName = String($app.findRecordById("rewards", rewardId).getString("name") || "").slice(0, 120);
+            }
+          } catch (rewardLookupErr) {}
+        }
+      } catch (programErr) {}
+      // A card that just completed its goal is reset before this snapshot runs.
+      // Read live, a 9/10 -> 10/10 visit looks like "0 before, 0 after"; the
+      // receipt must instead show the balance the visit reached.
+      const completedCard = earnedStamps > 0 && balance < earnedStamps;
+      const stampsBefore = completedCard
+        ? Math.max(0, goal - earnedStamps)
+        : Math.max(0, balance - earnedStamps);
+      receipt.set("stamps_before", stampsBefore);
+      receipt.set("stamps_balance", completedCard ? goal : balance);
+      receipt.set("stamp_goal", goal);
+      receipt.set("reward_name", rewardName);
+    }
+  } catch (rewardErr) {
+    console.log("[PAID RECEIPT] reward snapshot failed:", rewardErr.message || rewardErr);
+  }
   $app.save(receipt);
   return receipt.id;
 }

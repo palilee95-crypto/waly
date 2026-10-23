@@ -498,6 +498,24 @@ routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
     }
 
     const oldStatus = booking.getString("status");
+
+    // Arrival is a same-day action: the appointment can only be marked arrived
+    // on its scheduled store-local day. The customer's self check-in applies
+    // the same rule in booking_pass_helper.
+    if (newStatus === "arrived" && oldStatus !== "arrived") {
+      let storeToday = "";
+      try {
+        storeToday = require(`${__hooks}/booking_pass_helper.js`).storeTodayIso();
+      } catch (dayErr) {
+        storeToday = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().substring(0, 10);
+      }
+      if (booking.getString("booking_date") !== storeToday) {
+        return e.json(409, {
+          code: "BOOKING_NOT_TODAY",
+          message: "This appointment can only be marked arrived on its scheduled day."
+        });
+      }
+    }
     // Reopening a finished booking is allowed, but it cannot skip straight to
     // completed — the visit has to be in progress first.
     if (newStatus === "completed" && (oldStatus === "no_show" || oldStatus === "cancelled")) {
@@ -520,6 +538,209 @@ routerAdd("POST", "/api/risev/merchant/booking-status", (e) => {
   } catch (err) {
     console.log("[MERCHANT BOOKING STATUS ERROR]", err.message || err);
     return e.json(500, { error: err.message || "Failed to update booking status" });
+  }
+});
+
+// -------------------------------------------------------------
+// 2c. REST API: Merchant reschedule (date / time / staff)
+// -------------------------------------------------------------
+routerAdd("POST", "/api/risev/merchant/booking-reschedule", (e) => {
+  try {
+    const availability = require(`${__hooks}/booking_availability.js`);
+    const passHelper = require(`${__hooks}/booking_pass_helper.js`);
+
+    let data = {};
+    try {
+      data = e.requestInfo().body || {};
+    } catch (bErr) {
+      try {
+        data = $apis.requestInfo(e).body || {};
+      } catch (bErr2) {
+        data = {};
+      }
+    }
+
+    const auth = e.auth;
+    if (!auth) {
+      return e.json(401, { code: "AUTH_REQUIRED", message: "Sign in to update a booking." });
+    }
+
+    const bookingId = String(data.booking_id || data.id || "").trim();
+    if (!bookingId) {
+      return e.json(400, { code: "BOOKING_ID_REQUIRED", message: "Missing booking id." });
+    }
+
+    let booking = null;
+    try {
+      booking = $app.findRecordById("service_bookings", bookingId);
+    } catch (fErr) {
+      booking = null;
+    }
+    if (!booking) {
+      return e.json(404, { code: "BOOKING_NOT_FOUND", message: "Booking not found." });
+    }
+
+    const merchantId = booking.getString("merchant");
+    let isOwner = false;
+    try {
+      isOwner = $app.findRecordById("merchants", merchantId).getString("owner") === auth.id;
+    } catch (mErr) {}
+    const authMerchantId = typeof auth.getString === "function" ? auth.getString("merchant_id") : "";
+    const isSuperuser = auth.isSuperuser === true ||
+      (auth.collection && auth.collection().name === "_superusers");
+    if (!isSuperuser && !isOwner && authMerchantId !== merchantId) {
+      return e.json(403, { code: "BOOKING_FORBIDDEN", message: "That booking belongs to another store." });
+    }
+
+    const currentStatus = booking.getString("status");
+    if (["booked", "arrived", "in_service"].indexOf(currentStatus) < 0) {
+      return e.json(409, { code: "BOOKING_NOT_ACTIVE", message: "This booking can no longer be moved." });
+    }
+
+    const bookingDate = String(data.booking_date || booking.getString("booking_date")).trim();
+    const startTime = String(data.start_time || booking.getString("start_time")).trim();
+    if (!availability.isValidIsoDate(bookingDate)) {
+      return e.json(400, { code: "BOOKING_DATE_INVALID", message: "Choose a valid date." });
+    }
+    const startMinutes = availability.toMinutes(startTime);
+    if (!startMinutes) {
+      return e.json(400, { code: "BOOKING_TIME_INVALID", message: "Choose a valid time slot." });
+    }
+
+    const today = passHelper.storeTodayIso();
+    if (bookingDate < today) {
+      return e.json(409, { code: "BOOKING_SLOT_PAST", message: "That date is in the past." });
+    }
+    if (bookingDate === today) {
+      const nowMy = new Date(Date.now() + 8 * 60 * 60 * 1000);
+      const nowMinutes = nowMy.getUTCHours() * 60 + nowMy.getUTCMinutes();
+      if (startMinutes <= nowMinutes) {
+        return e.json(409, { code: "BOOKING_SLOT_PAST", message: "That time has already passed today." });
+      }
+    }
+
+    const staffId = String(data.staff_id !== undefined && data.staff_id !== null
+      ? data.staff_id
+      : booking.getString("staff")).trim();
+    // Same provider checks booking creation applies. They run for the retained
+    // provider too, because the assignment is moving to a new slot.
+    if (staffId) {
+      let staffRecord = null;
+      try {
+        staffRecord = $app.findRecordById("merchant_staff", staffId);
+      } catch (staffErr) {
+        staffRecord = null;
+      }
+      if (!staffRecord || staffRecord.getString("merchant") !== merchantId) {
+        return e.json(400, { code: "BOOKING_STAFF_INVALID", message: "That provider is not available for this store." });
+      }
+
+      let unavailableName = "";
+      if (staffRecord.get("is_active") === false || staffRecord.getString("attendance_status") === "on_leave") {
+        unavailableName = staffRecord.getString("name") || "This provider";
+      } else {
+        const staffUserId = staffRecord.getString("user");
+        if (staffUserId) {
+          try {
+            const staffUser = $app.findRecordById("users", staffUserId);
+            if (staffUser.getString("attendance_status") === "on_leave") {
+              unavailableName = staffUser.getString("name") || unavailableName;
+            }
+          } catch (staffUserErr) {}
+        }
+      }
+      if (unavailableName) {
+        return e.json(409, {
+          code: "BOOKING_STAFF_UNAVAILABLE",
+          message: unavailableName + " is inactive or on leave. Choose another provider.",
+        });
+      }
+    }
+
+    // `end_time` is the service end; the conflict window adds the same
+    // turnaround booking creation reserves (booking_system onRecordCreate).
+    const TURNAROUND_MINUTES = 10;
+    const duration = availability.durationMinutes(booking);
+    const serviceEndMinutes = startMinutes + duration;
+    const slotEndMinutes = serviceEndMinutes + TURNAROUND_MINUTES;
+
+    let conflict = null;
+    try {
+      conflict = availability.findStaffConflict(merchantId, staffId, bookingDate, startMinutes, slotEndMinutes, bookingId);
+    } catch (availabilityErr) {
+      // Never treat an unverified slot as free.
+      console.log("[BOOKING RESCHEDULE] availability query failed:", availabilityErr.message || availabilityErr);
+      return e.json(500, {
+        code: "BOOKING_AVAILABILITY_UNAVAILABLE",
+        message: "Could not verify provider availability. Please try again.",
+      });
+    }
+    if (conflict) {
+      return e.json(409, {
+        code: "BOOKING_SLOT_TAKEN",
+        message: "That provider already has an appointment at this time.",
+      });
+    }
+
+    let existingMeta = {};
+    try {
+      const rawMeta = booking.getString("metadata");
+      const parsed = rawMeta && rawMeta !== "null" ? JSON.parse(rawMeta) : null;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) existingMeta = parsed;
+    } catch (metaErr) {
+      existingMeta = {};
+    }
+    const changeLog = Array.isArray(existingMeta.change_log) ? existingMeta.change_log.slice(-20) : [];
+    changeLog.push({
+      at: new Date().toISOString(),
+      by: auth.id,
+      from: {
+        booking_date: booking.getString("booking_date"),
+        start_time: booking.getString("start_time"),
+        end_time: booking.getString("end_time"),
+        staff: booking.getString("staff"),
+      },
+      to: { booking_date: bookingDate, start_time: startTime, staff: staffId },
+    });
+
+    booking.set("booking_date", bookingDate);
+    booking.set("start_time", startTime);
+    booking.set("end_time", availability.formatMinutes(serviceEndMinutes));
+    booking.set("staff", staffId || null);
+    existingMeta.change_log = changeLog;
+    booking.set("metadata", existingMeta);
+    $app.save(booking);
+
+    // Nudge the customer; the PWA reads the live record, so the change is
+    // already visible there.
+    try {
+      const push = require(`${__hooks}/push_notify.js`);
+      let slug = "";
+      try {
+        slug = $app.findRecordById("merchants", merchantId).getString("pwa_slug") || "";
+      } catch (slugErr) {}
+      if (typeof push.sendPushNotification === "function") {
+        push.sendPushNotification(
+          booking.getString("customer"),
+          "Appointment updated",
+          "Your appointment is now " + bookingDate + " at " + startTime + ".",
+          {
+            phone: booking.getString("customer_phone"),
+            url: slug ? "/b/" + slug + "?pass=" + bookingId : "/(customer)",
+            tag: "booking-move-" + bookingId,
+            type: "booking_rescheduled",
+            merchantId: merchantId,
+          }
+        );
+      }
+    } catch (pushErr) {
+      console.log("[BOOKING RESCHEDULE] push note:", pushErr.message || pushErr);
+    }
+
+    return e.json(200, { success: true, booking: passHelper.buildPassPayload(booking) });
+  } catch (err) {
+    console.log("[MERCHANT BOOKING RESCHEDULE ERROR]", err.message || err);
+    return e.json(500, { code: "BOOKING_RESCHEDULE_FAILED", message: "Could not update this booking." });
   }
 });
 
@@ -625,6 +846,8 @@ routerAdd("GET", "/api/risev/customer/active-booking", (e) => {
             id: m.id,
             name: m.getString("name"),
             logo: m.getString("logo"),
+            banner: m.getString("banner"),
+            cover_url: m.getString("cover_url"),
             pwa_slug: m.getString("pwa_slug")
           };
         }

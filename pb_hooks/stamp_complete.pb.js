@@ -27,6 +27,18 @@ onRecordUpdate((e) => {
     const customerId = e.record.get('customer');
     const merchantId = program.get('merchant') || e.record.get('merchant');
 
+    // The milestone editor saves reward_type as free_item / discount_amount /
+    // discount_percent (with 'discount' from the first editor). The checkout
+    // only understands fixed_amount / percentage / none, so map explicitly —
+    // an unknown value silently became "no discount" but still consumed the
+    // voucher.
+    const toDiscountType = (rewardType) => {
+      const value = String(rewardType || '').toLowerCase();
+      if (value === 'discount_amount' || value === 'discount') return 'fixed_amount';
+      if (value === 'discount_percent') return 'percentage';
+      return 'none';
+    };
+
     console.log(`[STAMP COMPLETE] Card ${cardId}: prev_stamps=${prev_stamps}, new_stamps=${new_stamps}, goal=${goal}, customer=${customerId}`);
 
     // Helper function to generate a random coupon code
@@ -118,8 +130,14 @@ onRecordUpdate((e) => {
         r.set('points_cost', 1);
         r.set('stock', 1000000);
         r.set('is_active', true);
-        r.set('type', type === 'free_item' ? 'free_item' : 'discount');
+        r.set('reward_scope', 'milestone');
+        const shadowDiscountType = toDiscountType(type);
+        r.set('type', shadowDiscountType === 'none' ? 'free_item' : 'discount');
+        // A milestone worth money has to say so, or the checkout cannot price it.
+        r.set('discount_type', shadowDiscountType);
         r.set('discount_value', parseFloat(value) || 0);
+        r.set('min_spend', 0);
+        r.set('max_discount', 0);
         $app.save(r);
         return r.id;
       } catch (err) {
@@ -155,7 +173,13 @@ onRecordUpdate((e) => {
           snapshot_title: subReward.reward_title || 'Sub-Reward',
           snapshot_description: `Sub-Reward for Stamp #${subReward.at_stamp}`,
           snapshot_type: subReward.reward_type || 'free_item',
+          // Without the type the checkout read the value as an untagged number
+          // and fell back to "free item", which zeroed the bill instead of
+          // taking the milestone's value off it.
+          discount_type: toDiscountType(subReward.reward_type),
           discount_value: parseFloat(subReward.reward_value) || 0,
+          min_spend: 0,
+          max_discount: 0,
           merchant_id: mId || '',
           is_sub_reward: true,
           at_stamp: subReward.at_stamp

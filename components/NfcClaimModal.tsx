@@ -24,6 +24,7 @@ import FullPosCheckout from './FullPosCheckout';
 import ManualPosCustomerStep from './ManualPosCustomerStep';
 import ThermalReceiptScreen from './ThermalReceiptScreen';
 import { PaidReceipt } from '@/lib/paidReceipt';
+import { shortPassRef } from '@/lib/bookingPass';
 import { normalizeManualPosPhone } from '@/lib/manualPosPhone';
 import { getRecommendedVisuals } from '@/lib/rewardVisuals';
 
@@ -229,6 +230,12 @@ export default function NfcClaimModal() {
   // Customer Vouchers & Smart Discount Engine states
   const [customerVouchers, setCustomerVouchers] = useState<any[]>([]);
   const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+  // Which claim the applied/placeholder voucher belongs to. A new claim must
+  // start with no voucher, even if the last one resolved to a real record.
+  const appliedVoucherClaimRef = React.useRef<string>('');
+  // The cashier explicitly removed this claim's voucher. Honour that even when
+  // the claim's own lookup is still in flight and resolves afterwards.
+  const voucherDeselectedRef = React.useRef(false);
   const [isVouchersExpanded, setIsVouchersExpanded] = useState<boolean>(false);
   const [customBillInput, setCustomBillInput] = useState<string>('20');
   const [subtotalAmount, setSubtotalAmount] = useState<number>(20);
@@ -272,7 +279,7 @@ export default function NfcClaimModal() {
     try {
       const response = await pb.send<{ success: boolean; claim_id?: string }>('/api/risev/nfc/request', {
         method: 'POST',
-        body: { merchant_id: merchantId, phone, branch_id: user?.branch || '', branch_name: user?.branch_name || '', manual_pos: true },
+        body: { merchant_id: merchantId, phone, branch_id: user?.branch || '', branch_name: user?.branch_name || '', manual_pos: true, ...(scannedBookingId ? { booking_id: scannedBookingId } : {}) },
       });
       if (!response.success || !response.claim_id) throw new Error('Could not prepare this sale.');
       createdId = response.claim_id;
@@ -282,6 +289,7 @@ export default function NfcClaimModal() {
       }
       const oldClaimId = claim._local_pos_draft ? '' : claim.id;
       setClaim(nextClaim);
+      voucherDeselectedRef.current = false;
       setAppliedVoucher(null);
       setCustomerVouchers([]);
       setPosCustomerStep(false);
@@ -291,6 +299,8 @@ export default function NfcClaimModal() {
       }
     } catch (err: any) {
       if (createdId) pb.collection('nfc_claims').update(createdId, { status: 'cancelled' }).catch(() => {});
+      // Let the next opening retry the attachment for this booking.
+      autoAttachBookingRef.current = '';
       setPosCustomerError(String(err?.data?.message || err?.message || (locale === 'ms' ? 'Tidak dapat meneruskan. Cuba lagi.' : 'Could not continue. Please try again.')));
     } finally {
       posCustomerBusyRef.current = false;
@@ -326,19 +336,26 @@ export default function NfcClaimModal() {
           : (appliedVoucher.metadata || {});
       } catch (e) {}
 
-      const discType = meta.discount_type || 'none';
-      const discVal = parseFloat(meta.discount_value) || 0;
-      const minSpend = parseFloat(meta.min_spend) || 0;
-      const maxDisc = parseFloat(meta.max_discount) || 0;
+      // Older vouchers may predate the metadata snapshot; the linked reward is
+      // the same source the snapshot was taken from.
+      const reward = appliedVoucher.expand?.reward || {};
+      const discType = meta.discount_type || reward.discount_type || 'none';
+      const discVal = parseFloat(meta.discount_value ?? reward.discount_value) || 0;
+      const minSpend = parseFloat(meta.min_spend ?? reward.min_spend) || 0;
+      const maxDisc = parseFloat(meta.max_discount ?? reward.max_discount) || 0;
+      const voucherType = meta.snapshot_type || reward.type || '';
 
       if (subtotal >= minSpend) {
         if (discType === 'percentage' && discVal > 0) {
           disc = (subtotal * discVal) / 100;
           if (maxDisc > 0 && disc > maxDisc) disc = maxDisc;
         } else if (discType === 'fixed_amount' && discVal > 0) {
+          // A priced voucher (e.g. RM20) only ever takes its value off the bill.
           disc = discVal;
-        } else if (meta.snapshot_type === 'free_item' || appliedVoucher.reward) {
-          disc = selectedServices.length > 0 ? (parseFloat(selectedServices[0].price) || 0) : subtotal;
+        } else if (voucherType === 'free_item' && selectedServices.length > 0) {
+          // A free-item voucher covers the item it names. With no item lines it
+          // must not swallow the whole bill.
+          disc = Math.min(subtotal, parseFloat(selectedServices[0].price) || 0);
         }
       }
     }
@@ -411,6 +428,7 @@ export default function NfcClaimModal() {
 
   useEffect(() => {
     if (!merchantId) return;
+    let disposed = false;
     (async () => {
       try {
         const m = await pb.collection('merchants').getOne(merchantId);
@@ -471,6 +489,59 @@ export default function NfcClaimModal() {
       setActiveBooking(null);
       return;
     }
+    const effectClaimId = String(claim.id || '');
+
+    // A new claim starts with no voucher. Without this, a real voucher resolved
+    // for the previous customer stays applied and blocks this claim's own
+    // placeholder and lookup (the guards below only defer to a non-synthetic
+    // *current* selection).
+    if (appliedVoucherClaimRef.current !== effectClaimId) {
+      appliedVoucherClaimRef.current = effectClaimId;
+      voucherDeselectedRef.current = false;
+      setAppliedVoucher(null);
+    }
+
+    const claimVoucherId = String(claim.voucher || claim.voucher_id || '').trim();
+    const claimVoucherTitle = String(claim.voucher_title || claim.voucher_name || '').trim();
+
+    // Show the customer's voucher the moment the modal opens: the claim already
+    // carries its id and title. The single lookup below upgrades this to the
+    // real record (with its discount snapshot) without waiting for the
+    // booking/catalogue queries that used to hold it back by 2–3 seconds.
+    if (claimVoucherId || claimVoucherTitle) {
+      setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : {
+        id: claimVoucherId || 'v_selected',
+        title: claimVoucherTitle || 'Selected Customer Voucher',
+        code: '',
+        status: 'active',
+        metadata: { snapshot_title: claimVoucherTitle || 'Selected Customer Voucher', discount_type: 'none' },
+        _synthetic: true,
+        _pending: true,
+      }));
+    }
+    const claimVoucherPromise: Promise<any> = claimVoucherId
+      ? pb.collection('vouchers').getOne(claimVoucherId, { expand: 'reward' }).catch(() => null)
+      : Promise.resolve(null);
+    let active = true;
+
+    // Every asynchronous write goes through here: a lookup that resolves after
+    // the active claim changed must not repaint the modal with the old voucher.
+    const applyVoucherForClaim = (next: any) => {
+      if (!active || voucherDeselectedRef.current) return;
+      setAppliedVoucher((prev: any) => (prev && !prev._synthetic ? prev : next));
+    };
+
+    void claimVoucherPromise.then((voucher) => {
+      if (!active) return;
+      if (voucher) {
+        applyVoucherForClaim(voucher);
+        return;
+      }
+      // The record could not be read: settle the placeholder so the cashier is
+      // never stuck on a disabled Confirm button.
+      setAppliedVoucher((prev: any) => (prev && prev._pending ? { ...prev, _pending: false } : prev));
+    });
+
     (async () => {
       const todayStr = new Date().toISOString().split('T')[0];
       let bk: any = null;
@@ -619,18 +690,23 @@ export default function NfcClaimModal() {
           }
 
           // The claim's voucher may be used/expired, so it isn't in the active
-          // list. Fetch it by id so the cashier sees its real title/metadata.
+          // list. The lookup for it was already started above — await that
+          // promise instead of issuing a second request.
           if (!matched && targetVoucherId) {
             try {
-              matched = await pb.collection('vouchers').getOne(targetVoucherId, { expand: 'reward' });
+              matched = claimVoucherId === targetVoucherId
+                ? await claimVoucherPromise
+                : await pb.collection('vouchers').getOne(targetVoucherId, { expand: 'reward' });
             } catch (oneErr) {}
           }
 
           if (matched) {
-            setAppliedVoucher(matched);
+            // Never replace a voucher the cashier picked while this was loading,
+            // and never write it after the active claim changed.
+            applyVoucherForClaim(matched);
           } else {
             // Synthetic fallback so the cashier at least sees the customer's choice.
-            setAppliedVoucher({
+            applyVoucherForClaim({
               id: targetVoucherId || 'v_selected',
               title: voucherTitleHint || 'Selected Customer Voucher',
               code: '',
@@ -644,15 +720,20 @@ export default function NfcClaimModal() {
         setCustomerVouchers([]);
       }
     })();
+    return () => { active = false; };
   }, [claim?.id, claim?.customer_phone, claim?.customer_name, claim?.voucher, claim?.voucher_id, merchantId, scannedBookingId]);
 
   const activeClaimRef = React.useRef<any>(null);
   activeClaimRef.current = claim;
   const isSuccessRef = React.useRef(false);
   isSuccessRef.current = isSuccess;
+  const showPaidReceiptRef = React.useRef(false);
+  showPaidReceiptRef.current = showPaidReceipt;
+  const localCompletionRef = React.useRef(false);
 
   useEffect(() => {
     if (!merchantId) return;
+    let disposed = false;
 
     // 1. Initial fetch for any unhandled pending claims.
     //    POS claims (manual_pos) are opened explicitly by ManualPosLauncher;
@@ -663,8 +744,10 @@ export default function NfcClaimModal() {
           filter: `merchant = '${merchantId}' && status = 'pending'`,
           sort: '-created',
         });
+        if (disposed) return;
         const customerClaim = records.items.find((r: any) => r.manual_pos !== true);
-        if (customerClaim) {
+        if (customerClaim && customerClaim.id !== activeClaimRef.current?.id &&
+            !localCompletionRef.current && !isSuccessRef.current && !showPaidReceiptRef.current) {
           setClaim(customerClaim);
           setIsVisible(true);
         }
@@ -674,10 +757,12 @@ export default function NfcClaimModal() {
     };
 
     fetchPendingClaims();
+    const pollPendingClaims = setInterval(fetchPendingClaims, 10000);
 
     // 2. Realtime PocketBase SSE Subscription
-    let unsubscribe: any = null;
+    let unsubscribe: (() => Promise<void>) | null = null;
     pb.collection('nfc_claims').subscribe('*', (e: any) => {
+      if (disposed) return;
       const record = e.record;
       const action = e.action;
       if (!record || record.merchant !== merchantId) return;
@@ -686,6 +771,7 @@ export default function NfcClaimModal() {
         // POS claims are opened by the launcher (and on iOS only after its own
         // modal dismisses). Letting SSE open them here races the two modals.
         if (record.manual_pos === true) return;
+        if (localCompletionRef.current || isSuccessRef.current || showPaidReceiptRef.current) return;
         setClaim(record);
         setIsSuccess(false);
         setErrorMsg(null);
@@ -696,8 +782,12 @@ export default function NfcClaimModal() {
         (record.status === 'completed' || record.status === 'cancelled' || action === 'delete')) ||
         (record.status === 'completed' || record.status === 'cancelled')
       ) {
-        if (record.id === activeClaimRef.current?.id && isSuccessRef.current) {
-          // Cashier is looking at in-modal success view, retain until Done is pressed
+        if (
+          record.id === activeClaimRef.current?.id &&
+          (isSuccessRef.current || showPaidReceiptRef.current || localCompletionRef.current)
+        ) {
+          // The cashier is completing this claim, looking at the success view, or
+          // reading the receipt. Keep the claim mounted until Done is pressed.
         } else if (activeClaimRef.current && record.id === activeClaimRef.current.id) {
           setIsVisible(false);
           setClaim(null);
@@ -705,13 +795,14 @@ export default function NfcClaimModal() {
         }
       }
     }).then((unsub) => {
-      unsubscribe = unsub;
+      if (disposed) void unsub().catch(() => {});
+      else unsubscribe = unsub;
     }).catch(() => {});
 
     return () => {
-      if (typeof unsubscribe === 'function') {
-        try { unsubscribe(); } catch (e) {}
-      }
+      disposed = true;
+      clearInterval(pollPendingClaims);
+      if (unsubscribe) void unsubscribe().catch(() => {});
     };
   }, [merchantId]);
 
@@ -724,8 +815,10 @@ export default function NfcClaimModal() {
 
     fetchMerchantServices();
 
-    let unsubServices: any = null;
+    let servicesDisposed = false;
+    let unsubServices: (() => Promise<void>) | null = null;
     pb.collection('merchant_services').subscribe('*', (e: any) => {
+      if (servicesDisposed) return;
       const rec = e.record;
       if (rec && rec.merchant && rec.merchant !== merchantId) return;
 
@@ -737,7 +830,8 @@ export default function NfcClaimModal() {
         fetchMerchantServices();
       }
     }).then((unsub) => {
-      unsubServices = unsub;
+      if (servicesDisposed) void unsub().catch(() => {});
+      else unsubServices = unsub;
     }).catch(() => {});
 
     const localSub = DeviceEventEmitter.addListener('MERCHANT_SERVICES_UPDATED', () => {
@@ -745,8 +839,8 @@ export default function NfcClaimModal() {
     });
 
     return () => {
-      if (unsubServices) unsubServices();
-      pb.collection('merchant_services').unsubscribe('*').catch(() => {});
+      servicesDisposed = true;
+      if (unsubServices) void unsubServices().catch(() => {});
       localSub.remove();
     };
   }, [merchantId, fetchMerchantServices]);
@@ -761,6 +855,8 @@ export default function NfcClaimModal() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('OPEN_NFC_CLAIM', (targetClaim) => {
       if (targetClaim && targetClaim.status === 'pending') {
+        // A fresh opening is a fresh attachment attempt for this booking.
+        autoAttachBookingRef.current = '';
         setClaim(targetClaim);
         setScannedBookingId(String(targetClaim.booking_id || ''));
         if (targetClaim.manual_pos) {
@@ -771,6 +867,7 @@ export default function NfcClaimModal() {
           setCheckoutStep('review');
           setCustomBillInput('0');
           setSelectedServices([]);
+          voucherDeselectedRef.current = false;
           setAppliedVoucher(null);
           setCustomerVouchers([]);
           setPaymentFromPos(false);
@@ -837,21 +934,59 @@ export default function NfcClaimModal() {
 
       setIsSuccess(true);
     } catch (err: any) {
-      if (err?.message?.includes('already been completed') || err?.message?.includes('completed')) {
+      const errorMessage = String(err?.message || '');
+      const errorCode = err?.response?.code || err?.data?.code || '';
+      if (errorCode === 'BOOKING_NOT_ACTIVE' || errorMessage.includes('already been completed') || errorMessage.includes('already completed')) {
         DeviceEventEmitter.emit('merchant_transaction_completed');
-        handleClose();
+        // The appointment was settled by another checkout. Use the receipt id
+        // the server returned; fall back to a claim lookup for older servers.
+        const settledReceiptId = String(err?.response?.receipt_id || err?.data?.receipt_id || '');
+        // This attempt's claim is orphaned; cancel it so it stops showing as pending.
+        try {
+          if (claim?.id) await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
+        } catch (cancelErr) {}
+        try {
+          const shown = await loadPaidReceipt(settledReceiptId || undefined);
+          if (shown) {
+            localCompletionRef.current = false;
+            return;
+          }
+        } catch (receiptErr) {}
+        localCompletionRef.current = false;
+        setErrorMsg(locale === 'ms' ? 'Tempahan ini sudah selesai.' : 'This appointment was already completed.');
         return;
       }
+      // Release the "this claim is being completed" latch: left set, it makes the
+      // poll and the SSE handler ignore the next customer's claim until this one
+      // is closed.
+      localCompletionRef.current = false;
       setErrorMsg(err?.message || 'Failed to issue stamps.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // A free-item voucher is only worth redeeming when the cart carries the item
+  // it covers. With a bare bill amount it cannot discount anything, so applying
+  // it would consume it for nothing.
+  const voucherNeedsItemLine = (v: any): boolean => {
+    let meta: any = {};
+    try {
+      meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {});
+    } catch (e) {}
+    const reward = v.expand?.reward || {};
+    const voucherType = meta.snapshot_type || reward.type || '';
+    const discType = meta.discount_type || reward.discount_type || 'none';
+    const discVal = parseFloat(meta.discount_value ?? reward.discount_value) || 0;
+    return voucherType === 'free_item' && discType === 'none' && discVal <= 0;
+  };
+
   // Why a voucher cannot be applied right now (empty string = usable).
   const getVoucherIssue = (v: any): string => {
     if (!v) return '';
-    if (v._synthetic) return locale === 'ms' ? 'Baucar tidak dijumpai' : 'Voucher not found';
+    // A pending placeholder is the claim's own voucher, still being fetched; it
+    // is not an error. A settled synthetic means the record could not be read.
+    if (v._synthetic) return v._pending ? '' : (locale === 'ms' ? 'Baucar tidak dijumpai' : 'Voucher not found');
     if (v.status && v.status !== 'active') {
       if (v.status === 'used') return locale === 'ms' ? 'Sudah ditebus' : 'Already used';
       if (v.status === 'expired') return locale === 'ms' ? 'Tamat tempoh' : 'Expired';
@@ -865,15 +1000,54 @@ export default function NfcClaimModal() {
     if (voucherMerchant && merchantId && voucherMerchant !== merchantId) {
       return locale === 'ms' ? 'Bukan untuk kedai ini' : 'Not valid for this store';
     }
+    if (voucherNeedsItemLine(v) && selectedServices.length === 0) {
+      return locale === 'ms'
+        ? 'Tambah item yang dilindungi baucar ini'
+        : 'Add the item this voucher covers';
+    }
     return '';
+  };
+
+  const loadPaidReceipt = async (receiptId?: string) => {
+    let id = receiptId || '';
+    if (!id && claim?.id) {
+      const match = await pb.send<{ receipt_id?: string }>('/api/risev/nfc/receipt', {
+        method: 'GET',
+        params: { claim_id: claim.id, phone: claim.customer_phone || '' },
+        requestKey: null,
+      });
+      id = match?.receipt_id || '';
+    }
+    if (!id) return false;
+    const saved = await pb.collection('digital_receipts').getOne<PaidReceipt>(id, { expand: 'merchant', requestKey: null });
+    if (saved.payment_status !== 'paid') return false;
+    setPaidReceipt(saved);
+    setShowPaidReceipt(true);
+    setIsVisible(false);
+    setErrorMsg(null);
+    return true;
   };
 
   const handleConfirm = async () => {
     if (!claim) return;
+    if (appliedVoucher?._pending) {
+      // The claim's voucher is still being read; confirming now would charge the
+      // full bill and then consume the voucher.
+      setErrorMsg(locale === 'ms' ? 'Baucar masih dimuatkan. Cuba sebentar.' : 'The voucher is still loading. Try again in a moment.');
+      return;
+    }
+    // Never submit a voucher the modal already flags (used, expired, wrong store,
+    // or a free item with no line to cover) — the server would consume it.
+    const voucherIssue = appliedVoucher ? getVoucherIssue(appliedVoucher) : '';
+    if (voucherIssue) {
+      setErrorMsg(voucherIssue);
+      return;
+    }
     if (claim.manual_pos && !normalizeManualPosPhone(claim.customer_phone || '')) {
       setErrorMsg(locale === 'ms' ? 'Nombor telefon pelanggan diperlukan untuk pembayaran.' : 'A valid customer phone number is required for payment.');
       return;
     }
+    localCompletionRef.current = true;
     const bill = netTotalAmount;
     // 0 is valid: a POS sale can be completed without issuing a stamp.
     const hasStampInput = String(stampAmount).trim() !== '';
@@ -940,30 +1114,45 @@ export default function NfcClaimModal() {
 
       // Both booking and walk-in receipts are now created by the completion
       // endpoint from the same transaction snapshot. Never fabricate one here.
-      if (completeRes.receipt_id) {
+      if (completeRes.receipt_id || bill > 0 || appliedVoucher) {
         try {
-          const saved = await pb.collection('digital_receipts').getOne<PaidReceipt>(completeRes.receipt_id, { expand: 'merchant', requestKey: null });
-          if (saved.payment_status === 'paid') {
-            setPaidReceipt(saved);
-            setShowPaidReceipt(true);
-            setIsVisible(false);
-          }
+          const shown = await loadPaidReceipt(completeRes.receipt_id);
+          if (!shown) setErrorMsg(completeRes.receipt_error || 'Payment was recorded, but the receipt is not ready. Please try again.');
         } catch (receiptErr) {
           console.warn('Paid receipt could not be loaded:', receiptErr);
           setErrorMsg('Payment was recorded, but the receipt could not be loaded. Open transaction history to try again.');
         }
-      } else if (bill > 0) {
-        setErrorMsg(completeRes.receipt_error || 'Payment was recorded, but the receipt is not ready. Please try again.');
       }
 
       // Show sleek in-modal success view
       setIsSuccess(true);
     } catch (err: any) {
-      if (err?.message?.includes('already been completed') || err?.message?.includes('completed')) {
+      const errorMessage = String(err?.message || '');
+      const errorCode = err?.response?.code || err?.data?.code || '';
+      if (errorCode === 'BOOKING_NOT_ACTIVE' || errorMessage.includes('already been completed') || errorMessage.includes('already completed')) {
         DeviceEventEmitter.emit('merchant_transaction_completed');
-        handleClose();
+        // The appointment was settled by another checkout. Use the receipt id
+        // the server returned; fall back to a claim lookup for older servers.
+        const settledReceiptId = String(err?.response?.receipt_id || err?.data?.receipt_id || '');
+        // This attempt's claim is orphaned; cancel it so it stops showing as pending.
+        try {
+          if (claim?.id) await pb.collection('nfc_claims').update(claim.id, { status: 'cancelled' });
+        } catch (cancelErr) {}
+        try {
+          const shown = await loadPaidReceipt(settledReceiptId || undefined);
+          if (shown) {
+            localCompletionRef.current = false;
+            return;
+          }
+        } catch (receiptErr) {}
+        localCompletionRef.current = false;
+        setErrorMsg(locale === 'ms' ? 'Tempahan ini sudah selesai.' : 'This appointment was already completed.');
         return;
       }
+      // Release the "this claim is being completed" latch: left set, it makes the
+      // poll and the SSE handler ignore the next customer's claim until this one
+      // is closed.
+      localCompletionRef.current = false;
       setErrorMsg(err?.message || 'Failed to issue stamps.');
     } finally {
       setIsLoading(false);
@@ -977,15 +1166,15 @@ export default function NfcClaimModal() {
       const result = await pb.send<{ receipt_id?: string; receipt_error?: string }>('/api/risev/nfc/complete', {
         method: 'POST', body: { claim_id: claim.id }, requestKey: null,
       });
-      if (!result.receipt_id) throw new Error(result.receipt_error || 'Receipt is not available yet. Please try again shortly.');
-      const saved = await pb.collection('digital_receipts').getOne<PaidReceipt>(result.receipt_id, { expand: 'merchant', requestKey: null });
-      if (saved.payment_status !== 'paid') throw new Error('Paid receipt is not available yet.');
-      setPaidReceipt(saved); setShowPaidReceipt(true); setIsVisible(false); setErrorMsg(null);
+      const shown = await loadPaidReceipt(result.receipt_id);
+      if (!shown) throw new Error(result.receipt_error || 'Receipt is not available yet. Please try again shortly.');
     } catch (error: any) { setErrorMsg(error?.message || 'Could not load the receipt. Please try again.'); }
     finally { setIsLoading(false); }
   };
 
   const handleClose = () => {
+    localCompletionRef.current = false;
+    autoAttachBookingRef.current = '';
     setIsVisible(false);
     setClaim(null);
     setFullPosOpen(false);
@@ -998,6 +1187,7 @@ export default function NfcClaimModal() {
     setErrorMsg(null);
     setBillAmount('20');
     setCustomBillInput('20');
+    voucherDeselectedRef.current = false;
     setAppliedVoucher(null);
     setStampAmount('1');
     setSelectedServices([]);
@@ -1016,6 +1206,9 @@ export default function NfcClaimModal() {
   };
 
   const handleMinimize = () => {
+    // Minimizing means the cashier is not completing this claim right now, so the
+    // completion latch must be released or the next claim is ignored.
+    localCompletionRef.current = false;
     // If the active claim is already completed or cancelled, dismiss it completely instead of keeping banner
     if (!claim || claim.status !== 'pending') {
       handleClose();
@@ -1042,6 +1235,17 @@ export default function NfcClaimModal() {
     handleClose();
   };
 
+  if (!claim && paidReceipt) {
+    return (
+      <ThermalReceiptScreen
+        visible={showPaidReceipt}
+        receipt={paidReceipt}
+        mode="merchant"
+        animate
+        onClose={handleClose}
+      />
+    );
+  }
   if (!claim || (!isSuccess && claim.status !== 'pending')) return null;
 
   const bannerMinutes = Math.max(0, Math.floor((bannerNow - new Date(claim.created).getTime()) / 60000));
@@ -1108,12 +1312,12 @@ export default function NfcClaimModal() {
               <View style={styles.successIconBg}>
                 <Ionicons name="checkmark-circle" size={42} color="#10B981" />
               </View>
-              <Text style={styles.successTitle}>{netTotalAmount > 0 ? 'Payment recorded' : 'Stamps issued!'}</Text>
+              <Text style={styles.successTitle}>{netTotalAmount > 0 ? 'Payment recorded' : appliedVoucher ? 'Voucher redeemed' : 'Stamps issued!'}</Text>
               <Text style={styles.successSubtitle}>
                 {netTotalAmount > 0 ? `Payment of RM${netTotalAmount.toFixed(2)} recorded for ` : `${stampAmount} stamp(s) credited to `}<Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400' }}>{getCleanCustomerName(claim.customer_name)}</Text>
               </Text>
               {!!errorMsg && <Text style={{ textAlign: 'center', color: '#B45309', marginTop: 12, fontSize: 12 }}>{errorMsg}</Text>}
-              {!!errorMsg && netTotalAmount > 0 && <TouchableOpacity style={styles.doneBtn} onPress={retryPaidReceipt} disabled={isLoading}><Text style={styles.doneBtnText}>{isLoading ? 'Checking…' : 'Try receipt again'}</Text></TouchableOpacity>}
+              {!!errorMsg && (netTotalAmount > 0 || appliedVoucher) && <TouchableOpacity style={styles.doneBtn} onPress={retryPaidReceipt} disabled={isLoading}><Text style={styles.doneBtnText}>{isLoading ? 'Checking…' : 'Try receipt again'}</Text></TouchableOpacity>}
 
               <View style={styles.summaryBox}>
                 <View style={styles.summaryRow}>
@@ -1563,7 +1767,7 @@ export default function NfcClaimModal() {
                       <TouchableOpacity
                         style={styles.payConfirmBtn}
                         onPress={handleConfirm}
-                        disabled={isLoading}
+                        disabled={isLoading || !!appliedVoucher?._pending}
                         activeOpacity={0.88}
                       >
                         {isLoading ? (
@@ -1600,7 +1804,7 @@ export default function NfcClaimModal() {
                         try { meta = typeof v.metadata === 'string' ? JSON.parse(v.metadata) : (v.metadata || {}); } catch {}
                         const selected = appliedVoucher?.id === v.id;
                         const issue = getVoucherIssue(v);
-                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }, issue && { opacity: 0.6 }]} onPress={() => { if (issue) { Alert.alert(locale === 'ms' ? 'Baucar tidak sah' : 'Voucher unavailable', issue); return; } setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
+                        return <TouchableOpacity key={v.id} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.compactVoucherOption, selected && { borderColor: '#FFCC00', backgroundColor: '#FFFBEA' }, issue && { opacity: 0.6 }]} onPress={() => { if (issue) { Alert.alert(locale === 'ms' ? 'Baucar tidak sah' : 'Voucher unavailable', issue); return; } voucherDeselectedRef.current = selected; setAppliedVoucher(selected ? null : v); setIsVouchersExpanded(false); }}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.compactLabel}>{meta.snapshot_title || v.expand?.reward?.name || v.code}</Text>
                             <Text style={styles.compactMuted}>{v.code}</Text>
@@ -1636,7 +1840,7 @@ export default function NfcClaimModal() {
                       <View style={styles.compactLine}>
                         <Ionicons name="calendar-outline" size={14} color="#64748B" />
                         <Text style={[styles.compactMuted, { flex: 1 }]} numberOfLines={1}>
-                          {[activeBooking.booking_date, activeBooking.start_time, activeBooking.expand?.staff?.name].filter(Boolean).join(' · ')}
+                          {[activeBooking.id ? `#${shortPassRef(activeBooking.id)}` : '', activeBooking.booking_date, activeBooking.start_time, activeBooking.expand?.staff?.name].filter(Boolean).join(' · ')}
                         </Text>
                       </View>
                     ) : upcomingFutureBooking ? (
@@ -1688,7 +1892,7 @@ export default function NfcClaimModal() {
                         </View>
                         <Ionicons name="chevron-forward" size={16} color="#64748B" />
                       </TouchableOpacity>
-                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove voucher" style={styles.compactIconButton} onPress={() => setAppliedVoucher(null)}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
+                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove voucher" style={styles.compactIconButton} onPress={() => { voucherDeselectedRef.current = true; setAppliedVoucher(null); }}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
                     </View>
                     <View style={styles.compactLine}>
                       <Text style={styles.compactLabel}>{locale === 'ms' ? 'Cop diberikan' : 'Stamps to give'}</Text>

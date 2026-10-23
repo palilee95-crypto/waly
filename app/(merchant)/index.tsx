@@ -535,7 +535,7 @@ export default function MerchantDashboard() {
       pb.collection('merchants').subscribe(user.merchant_id, () => {
         invalidate('merchant:');
         fetchMerchantData(true);
-      }).then((u) => { unsubMerchants = u; }).catch(() => {});
+      }).then((u) => { if (claimsDisposed) void u().catch(() => {}); else unsubMerchants = u; }).catch(() => {});
 
       // Realtime transactions - refresh on new records (scoped: was every tenant's)
       pb.collection('transactions').subscribe('*', () => {
@@ -544,14 +544,14 @@ export default function MerchantDashboard() {
         fetchMerchantData(true);
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      }).then((u) => { unsubTransactions = u; }).catch(() => {});
+      }).then((u) => { if (claimsDisposed) void u().catch(() => {}); else unsubTransactions = u; }).catch(() => {});
 
       pb.collection('subscriptions').subscribe('*', () => {
         invalidate('sub:merchant');
         fetchMerchantData(true);
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      }).then((u) => { unsubSubscriptions = u; }).catch(() => {});
+      }).then((u) => { if (claimsDisposed) void u().catch(() => {}); else unsubSubscriptions = u; }).catch(() => {});
 
       pb.collection('nfc_claims').subscribe('*', () => {
         invalidate(CACHE_PREFIX.pendingClaims);
@@ -559,7 +559,7 @@ export default function MerchantDashboard() {
       }, {
         filter: `merchant = '${user.merchant_id}'`
       }).then((u) => {
-        if (claimsDisposed) { u(); return; }
+        if (claimsDisposed) { void u().catch(() => {}); return; }
         unsubClaims = u;
         setClaimsSubscribed(true);
       }).catch(() => { if (!claimsDisposed) setClaimsSubscribed(false); });
@@ -568,23 +568,20 @@ export default function MerchantDashboard() {
         fetchMerchantData();
       }, {
         filter: `merchant = '${user.merchant_id}'`
-      }).then((u) => { unsubBookings = u; }).catch(() => {});
+      }).then((u) => { if (claimsDisposed) void u().catch(() => {}); else unsubBookings = u; }).catch(() => {});
 
       pb.collection('vouchers').subscribe('*', () => {
         fetchMerchantData();
-      }).then((u) => { unsubVouchers = u; }).catch(() => {});
+      }).then((u) => { if (claimsDisposed) void u().catch(() => {}); else unsubVouchers = u; }).catch(() => {});
     }
 
     return () => {
       claimsDisposed = true;
       txnCompleteSub.remove();
       claimDeclinedSub.remove();
-      if (typeof unsubMerchants === 'function') { try { unsubMerchants(); } catch (e) {} }
-      if (typeof unsubTransactions === 'function') { try { unsubTransactions(); } catch (e) {} }
-      if (typeof unsubSubscriptions === 'function') { try { unsubSubscriptions(); } catch (e) {} }
-      if (typeof unsubClaims === 'function') { try { unsubClaims(); } catch (e) {} }
-      if (typeof unsubBookings === 'function') { try { unsubBookings(); } catch (e) {} }
-      if (typeof unsubVouchers === 'function') { try { unsubVouchers(); } catch (e) {} }
+      for (const unsubscribe of [unsubMerchants, unsubTransactions, unsubSubscriptions, unsubClaims, unsubBookings, unsubVouchers]) {
+        if (typeof unsubscribe === 'function') void unsubscribe().catch(() => {});
+      }
     };
   }, [user]);
 

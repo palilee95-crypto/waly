@@ -103,6 +103,7 @@ routerAdd("POST", "/api/risev/merchant/campaigns/auto-drop", (e) => {
             r.set("name", "Campaign Reward");
             r.set("points_cost", 1);
             r.set("is_active", true);
+            r.set("reward_scope", "system");
             r.set("type", discountType === "percentage" ? "discount" : "free_item");
             r.set("discount_value", parseFloat(discountValue) || 0);
             $app.save(r);

@@ -354,18 +354,23 @@ export default function MerchantLayout() {
   React.useEffect(() => {
     if (!user?.merchant_id) return;
 
-    try {
-      pb.collection('nfc_claims').subscribe('*', (e: any) => {
-        if (e.action === 'create' || (e.action === 'update' && e.record?.status === 'pending')) {
-          playClaimChime();
-        }
-      }, {
-        filter: `merchant = '${user.merchant_id}'`
-      }).catch(() => {});
-    } catch (err) {}
+    let disposed = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
+    pb.collection('nfc_claims').subscribe('*', (e: any) => {
+      if (disposed) return;
+      if (e.action === 'create' || (e.action === 'update' && e.record?.status === 'pending')) {
+        playClaimChime();
+      }
+    }, {
+      filter: `merchant = '${user.merchant_id}'`
+    }).then((remove) => {
+      if (disposed) void remove().catch(() => {});
+      else unsubscribe = remove;
+    }).catch(() => {});
 
     return () => {
-      pb.collection('nfc_claims').unsubscribe('*').catch(() => {});
+      disposed = true;
+      if (unsubscribe) void unsubscribe().catch(() => {});
     };
   }, [user?.merchant_id]);
 
@@ -993,7 +998,7 @@ export default function MerchantLayout() {
       <ManualPosLauncher />
 
       {/* Global Customer Support FAB (Risev Yellow Chat Bubble) */}
-      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && !pathname.includes('manage-customers') && !pathname.includes('customer-detail') && (
+      {!pathname.includes('profile-onboarding') && !pathname.includes('nfc-marketplace') && !pathname.includes('edit-profile') && !pathname.includes('branches') && !pathname.includes('staff') && !pathname.includes('rewards') && !pathname.includes('subscription') && !pathname.includes('manage-customers') && !pathname.includes('customer-detail') && !pathname.endsWith('/give') && (
         <TouchableOpacity
           activeOpacity={0.85}
           accessibilityRole="button"

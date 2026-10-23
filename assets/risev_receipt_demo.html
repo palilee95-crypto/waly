@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Risev — Connected Digital Receipt Experience</title>
+  <style>
+    :root { --black:#000; --yellow:#ffcc00; --white:#fff; --ink:#131313; --muted:#85858b; --line:#e8e8eb; --soft:#f6f6f7; --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",Arial,sans-serif; }
+    * { box-sizing:border-box; }
+    html { -webkit-text-size-adjust:100%; }
+    body { margin:0; color:var(--ink); font-family:var(--font); background:radial-gradient(circle at 49% 0%,#fff 0%,#f6f6f8 42%,#f0f0f2 100%); }
+    button,input { font:inherit; }
+    button { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    button:focus-visible, input:focus-visible { outline:3px solid #c49c00; outline-offset:3px; }
+    .svg-icon { display:block; width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.85; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+    .svg-icon.sm { width:16px; height:16px; } .svg-icon.lg { width:25px; height:25px; }
+    .page-shell { max-width:1050px; margin:0 auto; padding:31px 26px 52px; }
+    .top-strip { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:22px; }
+    .wordmark { font-size:31px; color:#000; font-weight:850; line-height:1; letter-spacing:-2.2px; }
+    .tag { border-radius:99px; background:#f0f0f2; border:1px solid #e5e5e8; padding:7px 11px; color:#6b6c74; font-size:11px; font-weight:690; letter-spacing:.01em; }
+    .top-actions { display:flex; align-items:center; gap:9px; }
+    .replay-btn { display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #dddde2; font-weight:750; font-size:12px; padding:9px 13px; border-radius:99px; color:#161616; }
+    .intro { max-width:675px; margin-bottom:28px; }
+    .eyebrow { font-size:11px; font-weight:820; text-transform:uppercase; letter-spacing:.13em; color:#85858a; margin:0 0 11px; }
+    .intro h1 { font-size:clamp(27px,4.5vw,46px); line-height:1.08; letter-spacing:-.055em; font-weight:830; margin:0 0 11px; }
+    .intro p { color:#6f7078; font-size:14px; line-height:1.6; max-width:610px; margin:0; }
+    .flow-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-top:19px; }
+    .flow-chip { display:flex; align-items:center; gap:9px; padding:10px 12px; background:#fff; border:1px solid #e3e3e7; border-radius:12px; color:#5e5f67; font-weight:660; font-size:11px; }
+    .flow-chip strong { color:#111; background:#ffcc00; font-size:10px; width:21px; height:21px; display:grid; place-items:center; border-radius:7px; }
+    .flow-arr { color:#9d9da2; }
+    .preview-grid { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start; }
+    .preview-col { min-width:0; display:flex; flex-direction:column; align-items:center; }
+    .preview-heading { display:flex; align-items:center; justify-content:space-between; width:100%; max-width:393px; margin-bottom:14px; }
+    .preview-title { font-size:14px; font-weight:790; letter-spacing:-.018em; }
+    .preview-title span { display:inline-block; width:8px; height:8px; background:#ffcc00; border-radius:99px; margin-right:7px; vertical-align:1px; }
+    .preview-side { color:#898991; font-size:11px; font-weight:630; }
+    .device { position:relative; width:100%; max-width:393px; height:752px; border:8px solid #171719; border-radius:45px; overflow:hidden; background:#fff; box-shadow:0 28px 65px #1c1c2724,0 7px 17px #00000018,inset 0 0 0 1px #1f1f22; isolation:isolate; }
+    .device::after { content:""; position:absolute; z-index:100; width:112px; height:4px; border-radius:8px; background:#131313; bottom:8px; left:50%; transform:translateX(-50%); pointer-events:none; }
+    .status-bar { position:absolute; height:35px; width:100%; display:flex; align-items:center; justify-content:space-between; top:5px; left:0; z-index:50; padding:0 24px 0 27px; color:#0c0c0e; font-size:13px; font-weight:740; pointer-events:none; }
+    .status-icons { display:flex; gap:4px; align-items:center; }
+    .status-icons svg { width:16px; height:14px; stroke-width:2.4px; }
+    .status-icons .battery { width:20px; height:13px; }
+    .inner-screen { position:absolute; inset:0; overflow:hidden; background:#fff; }
+    .app-topbar { display:flex; align-items:center; justify-content:space-between; height:53px; padding:0 20px; position:relative; z-index:2; }
+    .app-brand { font-size:23px; font-weight:850; letter-spacing:-1.5px; }
+    .circle-icon { display:grid; place-items:center; border:0; background:#f6f6f7; height:36px; width:36px; border-radius:50%; color:#141414; }
+    .circle-icon.empty { background:transparent; }
+    .app-content { position:absolute; inset:39px 0 0; overflow-y:auto; scrollbar-width:none; }
+    .app-content::-webkit-scrollbar,.payment-options::-webkit-scrollbar,.receipt-scroll::-webkit-scrollbar,.customer-main::-webkit-scrollbar { display:none; }
+    /* Merchant POS background */
+    .dashboard-bg { padding:22px 19px 18px; }
+    .small-greeting { font-size:12px; color:#939399; font-weight:610; }
+    .overview-num { font-size:37px; font-weight:840; letter-spacing:-.065em; color:#111; margin:7px 0 5px; }
+    .merchant-stats { display:flex; align-items:center; justify-content:space-between; background:#fff7d0; border-radius:15px; padding:14px; margin-top:18px; }
+    .merchant-stats strong { font-size:14px; }.merchant-stats small { color:#80754b; font-size:10px; }
+    .merchant-card-line { width:100%; background:#fff; border:1px solid #eee; padding:15px; border-radius:16px; display:flex; gap:11px; align-items:center; margin-top:13px; }
+    .yellow-ico { width:42px; height:42px; border-radius:13px; display:grid; place-items:center; background:#ffcc00; }
+    .merchant-card-line strong { font-size:13px; }.merchant-card-line span { display:block; font-size:10px; margin-top:4px; color:#929298; }
+    .bottom-nav { position:absolute; bottom:4px; left:0; width:100%; height:61px; display:flex; align-items:center; justify-content:space-around; background:#fff; border-top:1px solid #efeff1; z-index:1; padding-bottom:8px; }
+    .nav-item { display:flex; align-items:center; flex-direction:column; justify-content:center; gap:3px; font-size:9px; font-weight:650; color:#9c9ca1; }.nav-item.on { color:#111; }
+    .scan-tab { background:#ffcc00; color:#111; width:49px; height:49px; border-radius:16px; display:grid; place-items:center; transform:translateY(-12px); box-shadow:0 6px 16px #ffc9003d; }
+    .sheet-mask { position:absolute; inset:0; z-index:8; background:#00000081; }
+    .pay-sheet { position:absolute; z-index:9; bottom:0; left:8px; right:8px; top:173px; background:#fff; border-radius:29px 29px 0 0; display:flex; flex-direction:column; box-shadow:0 -12px 40px #00000011; overflow:hidden; }
+    .sheet-handle { width:37px; height:4px; background:#cfd5de; border-radius:4px; margin:15px auto 8px; flex-shrink:0; }
+    .sheet-head { flex-shrink:0; display:flex; align-items:center; justify-content:center; position:relative; height:38px; margin:0 13px; }
+    .sheet-head strong { font-size:18px; font-weight:780; letter-spacing:-.04em; }
+    .sheet-head .circle-icon { position:absolute; left:0; width:32px; height:32px; }
+    .pay-body { padding:10px 19px 0; overflow-y:auto; scrollbar-width:none; flex:1; }
+    .customer-pill { display:flex; align-items:center; gap:11px; border:1px solid #e3e3e8; border-radius:15px; padding:10px 11px; }
+    .avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; border:1px solid #dedfe4; background:#f5f5f6; font-size:14px; font-weight:800; }
+    .customer-pill strong { font-size:13px; font-weight:780; display:block; }.customer-pill small { display:block; margin-top:2px; color:#9b9ba0; font-size:10px; }
+    .amount-row { display:flex; align-items:center; justify-content:space-between; margin:14px 1px 17px; }
+    .amount-row span { color:#898a90; font-size:12px; font-weight:660; }.amount-row strong { letter-spacing:-.065em; font-size:25px; font-weight:850; }
+    .pay-subhead { font-size:12px; font-weight:800; margin-bottom:12px; }
+    .payment-options { overflow-y:auto; scrollbar-width:none; }
+    .pay-option { background:#fff; width:100%; border:1.5px solid #e5e5eb; display:flex; align-items:center; gap:10px; text-align:left; border-radius:15px; padding:10px 11px; margin-bottom:9px; min-height:62px; }
+    .pay-option.selected { border-color:#ffcc00; background:#fffbee; }
+    .radio { width:20px; height:20px; border:1.5px solid #c6cfdd; border-radius:50%; display:grid; place-items:center; flex-shrink:0; }
+    .pay-option.selected .radio { border-color:#ffcc00; background:#ffcc00; }.pay-option.selected .radio::after { content:""; width:8px; height:8px; background:#171717; border-radius:50%; }
+    .pay-icon { border:1px solid #e8e8ee; background:#f4f4f6; border-radius:10px; display:grid; place-items:center; width:36px; height:36px; flex-shrink:0; }.pay-icon.cash { background:#fff8da; border-color:#ffe99f; }
+    .pay-description { flex:1; min-width:0; }.pay-description b { font-size:12px; display:block; font-weight:780; }.pay-description small { font-size:10px; color:#8a8a92; line-height:1.3; display:block; margin-top:2px; }
+    .pay-badge { font-size:9px; font-weight:800; padding:5px 6px; border-radius:6px; white-space:nowrap; background:#f0f0f3; color:#555; }.pay-badge.yellow { background:#ffec8a; color:#302300; }
+    .sheet-footer { background:#fff; padding:10px 18px 25px; border-top:1px solid #f0f0f3; flex-shrink:0; }
+    .btn { display:flex; align-items:center; justify-content:center; gap:9px; text-align:center; border:1px solid transparent; min-height:47px; border-radius:14px; font-size:13px; font-weight:780; transition:transform .15s ease,background .15s ease,opacity .15s ease; }
+    .btn:active { transform:scale(.985); }.btn:disabled { opacity:.6; cursor:wait; }.btn.primary { background:#101012; color:#fff; box-shadow:0 4px 11px #0000001c; }
+    .btn.outline { background:#fff; color:#151515; border-color:#dddddf; }.btn.yellow { background:#ffcc00; color:#0b0b0b; }.btn.full { width:100%; }
+    .fineprint { text-align:center; color:#8a8b92; font-size:9.7px; line-height:1.45; margin-top:9px; display:flex; justify-content:center; align-items:center; gap:6px; }
+    .fineprint .svg-icon { width:12px; height:12px; }
+    /* Receipt screen / animation */
+    .receipt-screen { position:absolute; inset:40px 0 0; background:#fff; z-index:12; display:flex; flex-direction:column; }
+    .receipt-topbar { flex-shrink:0; display:flex; height:50px; justify-content:space-between; align-items:center; padding:0 18px; }
+    .receipt-topbar strong { font-size:19px; letter-spacing:-.08em; font-weight:830; }
+    .receipt-intro { text-align:center; flex-shrink:0; padding-top:15px; margin-bottom:12px; }
+    .receipt-intro h2 { font-size:25px; font-weight:820; letter-spacing:-.062em; margin:0 0 6px; }.receipt-intro p { color:#8f8f95; font-size:12px; margin:0; }
+    .receipt-scroll { position:relative; width:100%; flex:1; overflow:auto; scrollbar-width:none; padding:1px 28px 25px; display:flex; flex-direction:column; align-items:center; }
+    .printer-slot { flex-shrink:0; width:100%; max-width:298px; height:28px; position:relative; border-radius:11px; background:linear-gradient(180deg,#29292c,#070707 61%,#27272a); box-shadow:0 5px 13px #00000023; z-index:2; margin:1px auto -7px; }
+    .printer-slot::after { content:""; position:absolute; left:13px; right:13px; top:10px; height:8px; border-radius:9px; background:#030303; box-shadow:inset 0 1px 5px #000; }
+    .paper-window { width:calc(100% - 22px); max-width:280px; overflow:hidden; flex-shrink:0; position:relative; filter:drop-shadow(0 12px 14px #00000013); }
+    .paper-window.animate { animation:paper-reveal 2.25s cubic-bezier(.23,.7,.18,1) both; }
+    .receipt-paper { position:relative; padding:24px 16px 20px; background:#fff; border-left:1px solid #efefef; border-right:1px solid #efefef; min-height:438px; }
+    .receipt-paper::after { content:""; position:absolute; height:11px; bottom:-10px; left:0; right:0; background:linear-gradient(135deg,#fff 25%,transparent 25%) -5px 0/10px 10px,linear-gradient(225deg,#fff 25%,transparent 25%) -5px 0/10px 10px; }
+    .paper-window .receipt-paper { margin-bottom:13px; }
+    .paper-logo { width:42px; height:42px; background:#ffcc00; border-radius:13px; display:grid; place-items:center; margin:0 auto 8px; font-size:20px; font-weight:870; letter-spacing:-.08em; color:#171717; }
+    .paper-merchant { text-align:center; font-size:17px; font-weight:850; letter-spacing:-.055em; margin:0 0 2px; }
+    .paper-subtitle { text-align:center; font-size:8px; font-weight:760; color:#8b8b90; letter-spacing:.11em; margin:0 0 19px; }
+    .paper-rule { height:1px; border-top:1px dashed #cfcfd2; margin:13px 0; }
+    .paper-line { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; font-size:9.5px; line-height:1.55; }
+    .paper-line .label { color:#8d8d92; }.paper-line strong { font-weight:680; text-align:right; }
+    .paper-item { display:flex; justify-content:space-between; align-items:flex-start; gap:9px; margin:10px 0; }
+    .paper-item strong { font-size:10px; font-weight:770; display:block; }.paper-item small { font-size:8.8px; color:#9999a0; margin-top:4px; display:block; }.paper-item .item-total { font-size:10px; font-weight:730; }
+    .paper-total { display:flex; align-items:center; justify-content:space-between; gap:5px; margin:4px 0 3px; }.paper-total b { font-size:12px; font-weight:830; }.paper-total strong { font-size:22px; font-weight:870; letter-spacing:-.066em; }
+    .paid-label { display:flex; align-items:center; gap:4px; font-size:10px; font-weight:820; }.paid-dot { width:12px; height:12px; border-radius:50%; display:grid; place-items:center; background:#ffcc00; }
+    .reward-bonus { background:#ffcc00; border-radius:11px; padding:11px 10px; margin-top:15px; }
+    .bonus-top { display:flex; align-items:center; justify-content:space-between; font-size:10px; font-weight:800; gap:6px; }.bonus-top .svg-icon { width:15px;height:15px; }.bonus-top-left { display:flex; align-items:center; gap:5px; }.bonus-detail { font-size:9px; margin-top:8px; }
+    .stamp-progress { display:flex; gap:7px; margin-top:9px; }.stamp-progress span { border-radius:50%; width:13px; height:13px; border:1px solid #141414; }.stamp-progress span.earned { background:#111; }
+    .receipt-thanks { text-align:center; font-size:10px; font-weight:790; margin:16px 0 8px; }.barcode { height:30px; width:152px; margin:0 auto 5px; background:repeating-linear-gradient(90deg,#0a0a0a 0 2px,transparent 2px 4px,#101010 4px 5px,transparent 5px 7px,#101010 7px 10px,transparent 10px 13px); }.paper-code { font-size:8px; text-align:center; color:#777; letter-spacing:.07em; }
+    .powered { text-align:center; color:#98989e; margin-top:13px; font-size:9px; }.powered b { color:#000; font-size:13px; letter-spacing:-.08em; }
+    .receipt-actions { flex-shrink:0; padding:13px 19px 29px; background:linear-gradient(180deg,#ffffffed,#fff 12%); border-top:1px solid #f1f1f4; display:flex; flex-direction:column; gap:9px; }
+    .receipt-actions.pending { visibility:hidden; opacity:0; }.receipt-actions.ready { animation:rise-in .35s ease both; }
+    @keyframes paper-reveal { from { max-height:0; } 15% { max-height:38px; } to { max-height:750px; } }
+    @keyframes rise-in { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:translateY(0); } }
+    /* Customer NFC screen */
+    .customer-main { position:absolute; inset:41px 0 0; overflow-y:auto; scrollbar-width:none; background:#fff; padding-bottom:25px; }
+    .customer-brandbar { height:52px; display:flex; justify-content:space-between; align-items:center; padding:0 19px; }
+    .customer-brandbar .brand-mini { font-weight:870; font-size:23px; letter-spacing:-1.65px; }.brandbar-bubble { width:29px; height:29px; border:1px solid #e6e6e9; border-radius:99px; display:grid; place-items:center; font-size:11px; font-weight:830; }
+    .stamp-card { margin:5px 16px 13px; padding:16px 17px 18px; border-radius:21px; background:#ffcc00; color:#090909; position:relative; overflow:hidden; }
+    .stamp-card::after { content:""; position:absolute; right:-21px; bottom:-35px; width:135px; height:135px; border:26px solid #ffffff38; border-radius:50%; pointer-events:none; }.stamp-brand { letter-spacing:.22em; font-size:13px; font-weight:880; text-transform:uppercase; position:relative; z-index:1; }
+    .stamp-strapline { font-size:8.5px; letter-spacing:.1em; font-weight:720; opacity:.7; margin-top:5px; }
+    .stamp-count { display:flex; justify-content:space-between; align-items:center; margin:25px 0 13px; position:relative; z-index:1; }.stamp-count span { font-size:10px; font-weight:820; }.stamp-count strong { font-size:17px; letter-spacing:-.04em; }
+    .stamp-circles { display:grid; grid-template-columns:repeat(5,1fr); justify-items:center; gap:12px 6px; position:relative; z-index:1; }.stamp-circle { width:39px; height:39px; border:1.4px dashed #00000047; border-radius:50%; display:grid; place-items:center; color:#ae900a; font-size:14px; }.stamp-circle.filled { border:0; background:#111; color:#ffcc00; font-weight:800; }
+    .stamp-card-footer { font-size:10px; display:flex; justify-content:space-between; align-items:center; margin-top:18px; position:relative; z-index:1; font-weight:820; }.stamp-card-footer .small-risev { letter-spacing:-.08em; font-size:19px; font-weight:860; }
+    .rewards-panel { margin:0 16px 12px; border:1px solid #e8e8ea; border-radius:18px; padding:15px 14px; display:flex; gap:12px; align-items:center; }.rewards-emblem { width:54px; height:54px; border-radius:13px; background:#fff3ac; display:grid; place-items:center; font-size:23px; flex-shrink:0; }.rewards-emblem .svg-icon { width:30px; height:30px; }
+    .reward-info { flex:1; min-width:0; }.reward-info small { font-size:9px; color:#99999e; display:block; text-transform:uppercase; font-weight:780; letter-spacing:.04em; }.reward-info strong { display:block; font-size:13px; letter-spacing:-.02em; margin:5px 0; line-height:1.25; font-weight:830; }.reward-info .progress-rail { height:5px; width:100%; background:#ededf0; border-radius:99px; margin:8px 0 5px; overflow:hidden; }.progress-rail span { display:block; width:10%; height:100%; background:#ffcc00; border-radius:99px; }.reward-info .progress-caption { font-size:10px; color:#909097; }
+    .stamp-approved { display:flex; margin:0 auto 12px; width:fit-content; align-items:center; gap:5px; background:#fff8d3; border:1px solid #ffe37b; border-radius:50px; padding:7px 12px; font-weight:790; font-size:10px; }.stamp-approved i { width:7px; height:7px; border-radius:100%; background:#111; display:block; }
+    .customer-receipt-trigger { width:calc(100% - 32px); margin:0 16px 14px; padding:11px 13px; border:1px solid #dedee3; border-radius:15px; background:#fff; display:flex; align-items:center; gap:11px; text-align:left; box-shadow:0 5px 15px #10101008; animation:rise-in .42s ease both; }
+    .customer-receipt-trigger .receipt-icon { border-radius:11px; background:#ffcc00; width:38px; height:38px; display:grid; place-items:center; }.customer-receipt-trigger .receipt-copy { flex:1; }.customer-receipt-trigger b { font-size:12px; display:block; }.customer-receipt-trigger small { font-size:10px; color:#85858b; display:block; margin-top:3px; }.new-indicator { border-radius:99px; background:#ffcc00; padding:5px 6px; font-size:8px; font-weight:850; }
+    .visit-card { margin:0 16px; padding:18px 17px; border-radius:21px; border:1px solid #ebebee; box-shadow:0 7px 20px #00000009; }
+    .visit-pill { border-radius:99px; width:fit-content; padding:6px 9px; background:#fff4b9; font-size:10px; font-weight:760; }.visit-card h3 { font-size:19px; letter-spacing:-.06em; line-height:1.16; margin:13px 0 5px; font-weight:870; }.visit-card p { font-size:11px; line-height:1.55; color:#82828b; margin:0 0 13px; }.visit-card .btn { margin-top:8px; }
+    .customer-alert { position:absolute; top:100px; left:28px; right:28px; z-index:35; border-radius:13px; background:#121212; color:#fff; padding:12px 14px; box-shadow:0 8px 24px #0003; font-size:11px; font-weight:720; display:flex; align-items:center; gap:9px; animation:rise-in .32s ease both; }
+    /* Customer receipt full screen */
+    .customer-receipt-view { position:absolute; inset:40px 0 0; background:#fff; z-index:21; display:flex; flex-direction:column; }
+    .customer-receipt-top { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:7px 19px 3px; height:56px; }.customer-receipt-top b { font-size:17px; letter-spacing:-.045em; }
+    .customer-receipt-scroll { flex:1; overflow-y:auto; background:#f9f9f9; padding:18px 35px 28px; scrollbar-width:none; display:flex; flex-direction:column; align-items:center; }.customer-receipt-scroll .receipt-paper { width:100%; max-width:290px; box-shadow:0 8px 25px #0000000d; border:1px solid #efefef; margin-bottom:16px; }
+    .customer-receipt-note { font-size:10px; color:#9d9da3; text-align:center; }
+    .customer-receipt-buttons { display:flex; flex-direction:column; gap:9px; padding:13px 18px 28px; background:#fff; border-top:1px solid #eaeaec; }
+    /* Share modal */
+    .modal-backdrop { position:fixed; inset:0; background:#0009; display:grid; place-items:center; padding:15px; z-index:1000; }
+    .modal { width:min(390px,100%); background:white; border-radius:23px; padding:24px; box-shadow:0 25px 60px #0005; }
+    .modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }.modal h3 { letter-spacing:-.04em; font-weight:840; margin:0; font-size:21px; }.modal p { color:#74747a; font-size:12px; line-height:1.55; margin:9px 0 15px; }.modal label { display:block; font-size:11px; font-weight:780; margin:13px 0 8px; }
+    .modal input { width:100%; min-height:42px; border:1px solid #dddde3; background:#fafafa; padding:0 12px; border-radius:11px; font-size:13px; }.modal .btn { margin-top:10px; }
+    .modal-help { padding:10px 12px; border-radius:10px; background:#fff8d9; color:#655719; font-size:11px; line-height:1.5; margin-top:13px; }
+    .toast { position:fixed; left:50%; bottom:25px; transform:translate(-50%,15px); background:#141414; color:#fff; border-radius:14px; padding:13px 17px; font-size:12px; font-weight:730; z-index:1100; box-shadow:0 8px 30px #0003; opacity:0; transition:transform .28s,opacity .28s; pointer-events:none; max-width:90%; text-align:center; }.toast.show { transform:translate(-50%,0); opacity:1; }
+    .note { text-align:center; max-width:790px; margin:27px auto 0; font-size:11px; color:#93939b; line-height:1.65; }
+    .mobile-mode { display:none; }
+    [hidden] { display:none!important; }
+    @media(max-width:830px) { .page-shell { padding:23px 16px 35px; }.preview-grid { gap:17px; }.device { height:705px; border-width:7px; border-radius:38px; }.pay-sheet { top:145px; } .pay-option { padding:8px; min-height:58px; }.pay-body { padding:8px 13px 0; }.payment-options { padding-bottom:4px; }.sheet-footer { padding:9px 13px 23px; }.receipt-scroll { padding:1px 19px 20px; }.preview-col { width:100%; } }
+    @media(max-width:680px) { .page-shell { padding:19px 15px 30px; }.intro h1 { font-size:33px; }.intro { margin-bottom:17px; }.intro p { font-size:13px; }.flow-tabs { gap:6px; }.flow-chip { padding:7px 8px; font-size:10px; gap:5px; }.flow-arr { display:none; }.preview-grid { display:block; }.preview-col { max-width:450px; margin:0 auto; }.mobile-mode { display:flex; padding:4px; background:#eaeaed; border-radius:13px; margin:0 auto 17px; width:min(393px,100%); }.mobile-mode button { flex:1; border:0; border-radius:10px; background:transparent; color:#6f7076; min-height:38px; font-size:12px; font-weight:780; }.mobile-mode button.active { background:#fff; color:#111; box-shadow:0 1px 4px #00000012; }.preview-col.mobile-hidden { display:none; }.device { max-width:393px; height:744px; }.pay-sheet { top:164px; }.preview-heading { margin-bottom:10px; } .tag { display:none; } .top-strip { margin-bottom:25px; } }
+    @media(max-width:370px) { .device { height:715px; } .pay-sheet { top:151px; } .pay-option { margin-bottom:7px; }.stamp-circle { width:34px; height:34px; } .sheet-footer { padding-bottom:21px; }.intro h1 { font-size:29px; } }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+  </style>
+</head>
+<body>
+  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="ico-arrow-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="ico-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="ico-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="ico-receipt" viewBox="0 0 24 24"><path d="M4 3h16v18l-4-2.4L12 21l-4-2.4L4 21zM8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="ico-reload" viewBox="0 0 24 24"><path d="M21 11a9 9 0 1 0-2.3 6M21 4v7h-7"/></symbol>
+    <symbol id="ico-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M15 14h2v2h-2zM20 14v3M14 20h3M20 20h1"/></symbol>
+    <symbol id="ico-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></symbol>
+    <symbol id="ico-money" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="4"/><path d="M5 8h2M17 16h2"/></symbol>
+    <symbol id="ico-bank" viewBox="0 0 24 24"><path d="m3 9 9-5 9 5H3zm2 3v7m5-7v7m4-7v7m5-7v7M3 21h18"/></symbol>
+    <symbol id="ico-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18m-12 4h2m3 0h2"/></symbol>
+    <symbol id="ico-gift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="12" rx="1"/><path d="M12 9v12M2 9h20v4H2zM12 9c-9-2-8-7-5-7 4 0 5 7 5 7zm0 0c9-2 8-7 5-7-4 0-5 7-5 7z"/></symbol>
+    <symbol id="ico-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+    <symbol id="ico-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4 20-7ZM11 13 22 2"/></symbol>
+    <symbol id="ico-share" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M5 13v8h14v-8"/></symbol>
+    <symbol id="ico-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v11h-7v-7h-4v7H3z"/></symbol>
+    <symbol id="ico-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19v-1c0-3 3-5 6-5s6 2 6 5v1H3zm13-14c2 0 3 1.5 3 3s-1 3-3 3m2 3c2 1 3 2 3 5h-3"/></symbol>
+    <symbol id="ico-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-5 3-7 8-7s8 2 8 7"/></symbol>
+    <symbol id="ico-megaphone" viewBox="0 0 24 24"><path d="M3 10h5l12-6v16L8 14H3v-4zm5 4 2 6"/></symbol>
+    <symbol id="ico-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 11v6m0-10v.5"/></symbol>
+    <symbol id="ico-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="ico-x" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
+    <symbol id="ico-signal" viewBox="0 0 24 24"><path d="M3 19v-4m5 4v-7m5 7v-10m5 10V5"/></symbol>
+    <symbol id="ico-wifi" viewBox="0 0 24 24"><path d="M3 9a14 14 0 0 1 18 0M6 13a9 9 0 0 1 12 0M9 17a5 5 0 0 1 6 0M12 20v.1"/></symbol>
+    <symbol id="ico-battery" viewBox="0 0 24 24"><rect x="2" y="6" width="19" height="12" rx="2"/><path d="M23 10v4"/><rect x="4" y="8" width="14" height="8" fill="currentColor" stroke="none" rx="1"/></symbol>
+  </svg>
+
+  <div class="page-shell">
+    <header class="top-strip">
+      <div class="wordmark">risev</div>
+      <div class="top-actions"><span class="tag">INTERACTIVE FRONTEND PROTOTYPE</span><button class="replay-btn" id="resetDemo"><svg class="svg-icon sm"><use href="#ico-reload"></use></svg> Restart demo</button></div>
+    </header>
+    <div class="intro">
+      <p class="eyebrow">Risev experience system / Digital receipt</p>
+      <h1>One checkout.<br>Two connected experiences.</h1>
+      <p>Complete a sample payment on the merchant phone. Watch the receipt print, share its PDF, then open the same receipt on the customer's NFC success page.</p>
+      <div class="flow-tabs">
+        <span class="flow-chip"><strong>1</strong> Confirm payment</span><span class="flow-arr">→</span>
+        <span class="flow-chip"><strong>2</strong> Animated receipt</span><span class="flow-arr">→</span>
+        <span class="flow-chip"><strong>3</strong> Customer receipt</span>
+      </div>
+    </div>
+    <div class="mobile-mode" role="tablist" aria-label="Preview mode"><button type="button" class="active" id="tabMerchant" role="tab" aria-selected="true">Merchant POS</button><button type="button" id="tabCustomer" role="tab" aria-selected="false">Customer NFC</button></div>
+    <main class="preview-grid">
+      <section class="preview-col" id="merchantCol" aria-label="Merchant POS preview">
+        <div class="preview-heading"><span class="preview-title"><span></span>Merchant POS</span><span class="preview-side">localhost / customers</span></div>
+        <div class="device">
+          <div class="status-bar"><span>9:41</span><span class="status-icons"><svg class="svg-icon"><use href="#ico-signal"></use></svg><svg class="svg-icon"><use href="#ico-wifi"></use></svg><svg class="svg-icon battery"><use href="#ico-battery"></use></svg></span></div>
+          <div class="inner-screen">
+            <div class="app-content" id="dashboardStage">
+              <div class="app-topbar"><span class="app-brand">risev</span><span class="brandbar-bubble">SC</span></div>
+              <div class="dashboard-bg"><div class="small-greeting">Welcome back, Scoop Creamy</div><div class="overview-num">RM8,610.00</div><div class="small-greeting">Total sales this month</div><div class="merchant-stats"><div><strong>Monthly overview</strong><br/><small>Keep growing with every visit</small></div><svg class="svg-icon lg"><use href="#ico-receipt"></use></svg></div><div class="merchant-card-line"><div class="yellow-ico"><svg class="svg-icon"><use href="#ico-users"></use></svg></div><div><strong>Customer requests</strong><span>Review and approve new activity</span></div></div></div>
+              <div class="bottom-nav"><div class="nav-item"><svg class="svg-icon"><use href="#ico-home"></use></svg>Home</div><div class="nav-item on"><svg class="svg-icon"><use href="#ico-users"></use></svg>Customers</div><div class="scan-tab"><svg class="svg-icon lg"><use href="#ico-qr"></use></svg></div><div class="nav-item"><svg class="svg-icon"><use href="#ico-megaphone"></use></svg>Marketing</div><div class="nav-item"><svg class="svg-icon"><use href="#ico-user"></use></svg>Profile</div></div>
+            </div>
+            <div id="paymentOverlay">
+              <div class="sheet-mask"></div>
+              <div class="pay-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-head"><button class="circle-icon" id="paymentBack" type="button" aria-label="Back"><svg class="svg-icon"><use href="#ico-arrow-left"></use></svg></button><strong>Payment</strong></div>
+                <div class="pay-body">
+                  <div class="customer-pill"><div class="avatar">FA</div><div><strong>Fazli</strong><small>Sample customer • Scoop Creamy</small></div></div>
+                  <div class="amount-row"><span>Total Amount</span><strong>RM25.00</strong></div>
+                  <div class="pay-subhead">Select Payment Method</div>
+                  <div class="payment-options" role="group" aria-label="Payment method">
+                    <button class="pay-option selected" data-method="QR Payment" type="button" aria-pressed="true"><span class="radio"></span><span class="pay-icon"><svg class="svg-icon"><use href="#ico-qr"></use></svg></span><span class="pay-description"><b>QR Payment</b><small>DuitNow, TNG eWallet, GrabPay</small></span><span class="pay-badge yellow">DuitNow</span></button>
+                    <button class="pay-option" data-method="Card Payment" type="button" aria-pressed="false"><span class="radio"></span><span class="pay-icon"><svg class="svg-icon"><use href="#ico-card"></use></svg></span><span class="pay-description"><b>Card Payment</b><small>Visa, Mastercard, MyDebit</small></span><span class="pay-badge">VISA / MC</span></button>
+                    <button class="pay-option" data-method="Cash" type="button" aria-pressed="false"><span class="radio"></span><span class="pay-icon cash"><svg class="svg-icon"><use href="#ico-money"></use></svg></span><span class="pay-description"><b>Cash</b><small>Counter cash settlement</small></span></button>
+                    <button class="pay-option" data-method="Bank Transfer" type="button" aria-pressed="false"><span class="radio"></span><span class="pay-icon"><svg class="svg-icon"><use href="#ico-bank"></use></svg></span><span class="pay-description"><b>Bank Transfer</b><small>Manual transfer confirmation</small></span></button>
+                  </div>
+                </div>
+                <div class="sheet-footer"><button class="btn primary full" id="confirmPayment" type="button"><svg class="svg-icon sm"><use href="#ico-lock"></use></svg><span>Confirm Payment</span></button><div class="fineprint"><svg class="svg-icon"><use href="#ico-info"></use></svg> Demo mode — no actual charge will be made.</div></div>
+              </div>
+            </div>
+            <div class="receipt-screen" id="merchantReceiptStage" hidden>
+              <div class="receipt-topbar"><button class="circle-icon empty" id="receiptBack" type="button" aria-label="Return to payment"><svg class="svg-icon"><use href="#ico-arrow-left"></use></svg></button><strong>risev</strong><span style="width:36px"></span></div>
+              <div class="receipt-intro"><h2>Your receipt</h2><p id="printingStatus">Preparing your receipt...</p></div>
+              <div class="receipt-scroll"><div class="printer-slot"></div><div class="paper-window" id="merchantPaperWindow"><div id="merchantReceiptContent"></div></div></div>
+              <div class="receipt-actions pending" id="merchantReceiptActions"><button class="btn primary full" id="whatsappShare"><svg class="svg-icon"><use href="#ico-send"></use></svg> Send PDF via WhatsApp</button><button class="btn outline full" id="merchantDone">Done</button></div>
+            </div>
+            <div class="app-content" id="merchantFinishedStage" hidden>
+              <div class="app-topbar"><span class="app-brand">risev</span><span class="brandbar-bubble">SC</span></div>
+              <div style="padding:80px 25px 10px;text-align:center"><div style="background:#ffcc00;display:grid;place-items:center;margin:0 auto 23px;width:72px;height:72px;border-radius:50%"><svg class="svg-icon lg"><use href="#ico-check"></use></svg></div><h2 style="letter-spacing:-.06em;margin:0 0 8px">Payment recorded</h2><p style="color:#8b8b91;font-size:12px;line-height:1.6">Sample transaction RV-1021-0082 is completed. The same receipt is available on the customer NFC page.</p><button class="btn primary full" id="viewMerchantReceiptAgain" style="margin-top:27px"><svg class="svg-icon sm"><use href="#ico-receipt"></use></svg> View completed receipt</button><button class="btn outline full" id="newTransaction" style="margin-top:10px">Start new demo transaction</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="preview-col" id="customerCol" aria-label="Customer NFC preview">
+        <div class="preview-heading"><span class="preview-title"><span></span>Customer NFC</span><span class="preview-side">localhost / nfc</span></div>
+        <div class="device">
+          <div class="status-bar"><span>9:41</span><span class="status-icons"><svg class="svg-icon"><use href="#ico-signal"></use></svg><svg class="svg-icon"><use href="#ico-wifi"></use></svg><svg class="svg-icon battery"><use href="#ico-battery"></use></svg></span></div>
+          <div class="inner-screen">
+            <div class="customer-main" id="customerMain">
+              <div class="customer-brandbar"><span class="brand-mini">risev</span><span class="brandbar-bubble">FA</span></div>
+              <div class="stamp-card">
+                <div class="stamp-brand">Scoop Creamy</div><div class="stamp-strapline">A LITTLE JOY IN EVERY VISIT</div>
+                <div class="stamp-count"><span>YOUR STAMPS</span><strong>1 / 10</strong></div>
+                <div class="stamp-circles"><span class="stamp-circle filled">✓</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span><span class="stamp-circle">✦</span></div>
+                <div class="stamp-card-footer"><span>YOUR REWARDS CARD</span><span class="small-risev">risev</span></div>
+              </div>
+              <div class="rewards-panel"><div class="rewards-emblem"><svg class="svg-icon"><use href="#ico-gift"></use></svg></div><div class="reward-info"><small>Your next reward</small><strong>FREE AISKRIM Premium 3 scoop</strong><div class="progress-rail"><span></span></div><div class="progress-caption">1 out of 10 stamps collected</div></div></div>
+              <div class="stamp-approved"><i></i> STAMP APPROVED!</div>
+              <button type="button" id="customerReceiptButton" class="customer-receipt-trigger" hidden><span class="receipt-icon"><svg class="svg-icon"><use href="#ico-receipt"></use></svg></span><span class="receipt-copy"><b>View / Download Receipt</b><small>Payment completed • RM25.00</small></span><span class="new-indicator">NEW</span><svg class="svg-icon sm"><use href="#ico-chevron-right"></use></svg></button>
+              <div class="visit-card"><div class="visit-pill">✦ Plan your next visit</div><h3>Loved today's visit?<br/>Skip the line next time!</h3><p>Book your next appointment seamlessly from your phone.</p><button class="btn yellow full" id="bookAppointment"><svg class="svg-icon sm"><use href="#ico-calendar"></use></svg> Book Next Appointment <span aria-hidden="true">→</span></button><button class="btn outline full" id="viewStampCard">View My Stamp Card <svg class="svg-icon sm"><use href="#ico-chevron-right"></use></svg></button></div>
+            </div>
+            <div class="customer-receipt-view" id="customerReceiptStage" hidden>
+              <div class="customer-receipt-top"><button class="circle-icon empty" id="customerReceiptBack" aria-label="Back to stamp card"><svg class="svg-icon"><use href="#ico-arrow-left"></use></svg></button><b>Your receipt</b><span style="width:36px"></span></div>
+              <div class="customer-receipt-scroll"><div id="customerReceiptContent"></div><div class="customer-receipt-note">This receipt is also available in your transaction history.</div></div>
+              <div class="customer-receipt-buttons"><button class="btn primary full" id="customerDownload"><svg class="svg-icon sm"><use href="#ico-download"></use></svg> Download PDF receipt</button><button class="btn outline full" id="customerDone">Done</button></div>
+            </div>
+            <div class="customer-alert" id="customerAlert" role="status" hidden><svg class="svg-icon sm"><use href="#ico-receipt"></use></svg> Payment complete. Your receipt is ready.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <p class="note">This is a self-contained UI prototype with sample data, animated receipt and locally generated PDF. It does not process real payments, send automatic WhatsApp messages or store customer information. Production integration requires Risev's backend, payment verification and approved messaging service.</p>
+  </div>
+  <div class="modal-backdrop" id="shareModalBackdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <div class="modal-head"><h3 id="shareModalTitle">Share receipt on WhatsApp</h3><button class="circle-icon empty" id="closeShareModal" aria-label="Close"><svg class="svg-icon"><use href="#ico-x"></use></svg></button></div>
+      <p>Your browser cannot attach a PDF directly to WhatsApp from this page. Download the PDF first, then attach it as a document in WhatsApp. On compatible phones, the main button opens the native share sheet.</p>
+      <button class="btn primary full" id="modalDownload"><svg class="svg-icon sm"><use href="#ico-download"></use></svg> 1. Download receipt PDF</button>
+      <label for="whatsappNumber">2. Customer WhatsApp number (optional)</label><input id="whatsappNumber" type="tel" inputmode="tel" autocomplete="off" placeholder="e.g. 60123456789" />
+      <button class="btn outline full" id="modalOpenWhatsapp"><svg class="svg-icon sm"><use href="#ico-send"></use></svg> Open WhatsApp chat</button>
+      <div class="modal-help">The demo never sends a message automatically. Attach the downloaded PDF manually after WhatsApp opens. A WhatsApp Business API is required for direct server-side document delivery.</div>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    'use strict';
+    // Sample data only. In production use the completed, verified POS transaction.
+    const SAMPLE = Object.freeze({
+      receiptId: 'RV-1021-0082', date: '21 Oct 2026', time:'14:36', merchant:'Scoop Creamy',
+      customer:'Fazli', staff:'Emma', items:[{name:'Triple Scoop Ice Cream',qty:1,price:18},{name:'Chocolate Waffle',qty:1,price:12}],
+      subtotal:30, discount:5, total:25, stamps:1, stampProgress:1, stampTarget:10
+    });
+    const $ = id => document.getElementById(id);
+    let receiptAvailable = false;
+    let selectedMethod = 'QR Payment';
+    let merchantMode = 'payment';
+    let isProcessing = false;
+    let receiptTimer = null;
+    let toastTimer = null;
+    const formatRM = n => 'RM' + Number(n).toFixed(2);
+    function icon(id, cls='') { return `<svg class="svg-icon ${cls}" aria-hidden="true"><use href="#ico-${id}"></use></svg>`; }
+    function receiptHTML(paymentMethod) {
+      return `<div class="receipt-paper">
+        <div class="paper-logo">SC</div><h3 class="paper-merchant">${SAMPLE.merchant}</h3><div class="paper-subtitle">ICE CREAM & DESSERT</div>
+        <div class="paper-rule"></div>
+        <div class="paper-line"><span class="label">Receipt no.</span><strong>${SAMPLE.receiptId}</strong></div>
+        <div class="paper-line"><span class="label">Date & time</span><strong>${SAMPLE.date} ${SAMPLE.time}</strong></div>
+        <div class="paper-line"><span class="label">Customer</span><strong>${SAMPLE.customer}</strong></div>
+        <div class="paper-line"><span class="label">Staff</span><strong>${SAMPLE.staff}</strong></div>
+        <div class="paper-rule"></div>
+        ${SAMPLE.items.map(i=>`<div class="paper-item"><div><strong>${i.name}</strong><small>${i.qty} × ${formatRM(i.price)}</small></div><div class="item-total">${formatRM(i.price*i.qty)}</div></div>`).join('')}
+        <div class="paper-rule"></div>
+        <div class="paper-line"><span class="label">Subtotal</span><strong>${formatRM(SAMPLE.subtotal)}</strong></div>
+        <div class="paper-line"><span class="label">Voucher discount</span><strong>−${formatRM(SAMPLE.discount)}</strong></div>
+        <div class="paper-rule"></div><div class="paper-total"><b>Total paid</b><strong>${formatRM(SAMPLE.total)}</strong></div>
+        <div class="paper-line"><span class="label">Payment method</span><strong>${paymentMethod}</strong></div>
+        <div class="paper-line"><span class="label">Payment status</span><span class="paid-label"><span class="paid-dot">${icon('check','sm')}</span> PAID</span></div>
+        <div class="reward-bonus"><div class="bonus-top"><div class="bonus-top-left">${icon('gift')} Rewards earned</div><strong>+${SAMPLE.stamps} Stamp</strong></div><div class="bonus-detail">You now have ${SAMPLE.stampProgress} of ${SAMPLE.stampTarget} stamps!</div><div class="stamp-progress">${Array.from({length:6},(_,i)=>`<span class="${i<SAMPLE.stampProgress?'earned':''}"></span>`).join('')}</div></div>
+        <div class="receipt-thanks">Thank you for visiting!</div><div class="barcode" aria-hidden="true"></div><div class="paper-code">${SAMPLE.receiptId.replaceAll('-','')}</div>
+        <div class="powered">Powered by <b>risev</b></div>
+      </div>`;
+    }
+    function renderReceipt() {
+      $('merchantReceiptContent').innerHTML=receiptHTML(selectedMethod);
+      $('customerReceiptContent').innerHTML=receiptHTML(selectedMethod);
+    }
+    function showToast(message) {
+      clearTimeout(toastTimer); $('toast').textContent=message; $('toast').classList.add('show');
+      toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3100);
+    }
+    function switchMobile(which) {
+      const merchant=which==='merchant';
+      $('merchantCol').classList.toggle('mobile-hidden',!merchant);
+      $('customerCol').classList.toggle('mobile-hidden',merchant);
+      $('tabMerchant').classList.toggle('active',merchant);
+      $('tabCustomer').classList.toggle('active',!merchant);
+      $('tabMerchant').setAttribute('aria-selected',String(merchant));
+      $('tabCustomer').setAttribute('aria-selected',String(!merchant));
+    }
+    function showMerchant(which) {
+      merchantMode=which;
+      $('paymentOverlay').hidden=which!=='payment';
+      $('merchantReceiptStage').hidden=which!=='receipt';
+      $('merchantFinishedStage').hidden=which!=='finished';
+    }
+    function paymentComplete() {
+      if(isProcessing || receiptAvailable) return;
+      isProcessing=true;
+      $('confirmPayment').disabled=true;
+      $('confirmPayment').innerHTML=`<span>Recording demo payment...</span>`;
+      setTimeout(()=>{
+        receiptAvailable=true;
+        isProcessing=false;
+        renderReceipt();
+        $('customerReceiptButton').hidden=false;
+        $('customerAlert').hidden=false;
+        setTimeout(()=>$('customerAlert').hidden=true,3200);
+        openMerchantReceipt(true);
+        showToast('Payment recorded in demo. Customer receipt is ready.');
+      },650);
+    }
+    function openMerchantReceipt(animate) {
+      clearTimeout(receiptTimer);
+      showMerchant('receipt');
+      $('merchantReceiptActions').className='receipt-actions pending';
+      $('merchantPaperWindow').className='paper-window';
+      $('printingStatus').textContent=animate?'Printing your receipt...':'Your receipt is ready.';
+      if(animate) {
+        void $('merchantPaperWindow').offsetWidth;
+        $('merchantPaperWindow').classList.add('animate');
+        const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        receiptTimer=setTimeout(()=>{
+          $('printingStatus').textContent='Payment successful · '+formatRM(SAMPLE.total);
+          $('merchantReceiptActions').className='receipt-actions ready';
+          $('merchantPaperWindow').classList.remove('animate');
+        },reduceMotion?30:2580);
+      } else {
+        $('merchantReceiptActions').className='receipt-actions ready';
+      }
+    }
+    function openCustomerReceipt() {
+      if(!receiptAvailable) {showToast('Receipt will appear after merchant confirms payment.');return;}
+      $('customerReceiptStage').hidden=false;
+      $('customerReceiptStage').querySelector('.customer-receipt-scroll').scrollTop=0;
+    }
+    function closeCustomerReceipt() { $('customerReceiptStage').hidden=true; }
+    function resetDemo() {
+      clearTimeout(receiptTimer);isProcessing=false;receiptAvailable=false;
+      selectedMethod='QR Payment';
+      document.querySelectorAll('.pay-option').forEach(b=>{const chosen=b.dataset.method===selectedMethod;b.classList.toggle('selected',chosen);b.setAttribute('aria-pressed',String(chosen));});
+      $('customerReceiptButton').hidden=true;
+      $('customerReceiptStage').hidden=true;
+      $('customerAlert').hidden=true;
+      $('shareModalBackdrop').hidden=true;
+      $('confirmPayment').disabled=false;
+      $('confirmPayment').innerHTML=`${icon('lock','sm')}<span>Confirm Payment</span>`;
+      $('merchantReceiptActions').className='receipt-actions pending';
+      $('merchantPaperWindow').className='paper-window';
+      renderReceipt();
+      showMerchant('payment');
+      switchMobile('merchant');
+    }
+    // Pure browser PDF writer. Generated receipt is downloadable without external libraries.
+    function makeReceiptPDF() {
+      const cmds=[];
+      const escapePDF=str=>String(str).replace(/[\\()]/g,m=>'\\'+m).replace(/[^\x20-\x7E]/g,'-');
+      const t=(str,x,y,size=11,bold=false)=>cmds.push(`BT /${bold?'F2':'F1'} ${size} Tf 0 0 0 rg 1 0 0 1 ${x} ${y} Tm (${escapePDF(str)}) Tj ET`);
+      const rect=(x,y,w,h,r,g,b)=>cmds.push(`${r} ${g} ${b} rg ${x} ${y} ${w} ${h} re f`);
+      const line=(y)=>cmds.push(`0.87 0.87 0.87 RG 0.8 w 43 ${y} m 552 ${y} l S`);
+      rect(0,0,595,842,1,1,1); rect(0,816,595,26,1,.8,0);
+      t('SCOOP CREAMY',43,754,27,true); t('ICE CREAM & DESSERT',44,735,9,false);
+      t('CUSTOMER DIGITAL RECEIPT',370,748,11,true);line(708);
+      const fields=[['Receipt number',SAMPLE.receiptId],['Date',`${SAMPLE.date}  ${SAMPLE.time}`],['Customer',SAMPLE.customer],['Staff',SAMPLE.staff],['Payment method',selectedMethod]];
+      let y=681; for(const [key,val] of fields) {t(key,44,y,11,false);t(val,318,y,11,true);y-=23;}
+      line(548); t('ITEM',44,520,10,true);t('QTY',360,520,10,true);t('AMOUNT',463,520,10,true);line(508);
+      let iy=484;for(const i of SAMPLE.items){t(i.name,44,iy,12,true);t(String(i.qty),368,iy,11);t(formatRM(i.price*i.qty),460,iy,11);iy-=29;}
+      line(415);t('Subtotal',44,390,11);t(formatRM(SAMPLE.subtotal),460,390,11,true);t('Voucher discount',44,366,11);t('-'+formatRM(SAMPLE.discount),460,366,11,true);
+      line(347);t('TOTAL PAID',44,316,15,true);t(formatRM(SAMPLE.total),415,311,23,true);
+      rect(43,263,509,33,1,.8,0);t('PAYMENT STATUS: PAID',56,274,12,true);
+      rect(43,206,509,43,1,.8,0);t(`REWARDS EARNED: +${SAMPLE.stamps} STAMP`,56,232,11,true);t(`${SAMPLE.stampProgress} of ${SAMPLE.stampTarget} stamps collected`,56,216,9);
+      t('Thank you for visiting!',221,155,12,true);t('Powered by risev',248,127,10);
+      t('Demo receipt - no real purchase processed.',175,91,9);
+      const stream=cmds.join('\n')+'\n';
+      const objs=[];
+      objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+      objs.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+      objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>');
+      objs.push(`<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}endstream`);
+      objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+      objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+      let pdf='%PDF-1.4\n';let offsets=[0];const encoder=new TextEncoder();
+      objs.forEach((o,i)=>{offsets.push(encoder.encode(pdf).length);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`;});
+      const start=encoder.encode(pdf).length;
+      pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;
+      offsets.slice(1).forEach(offset=>{pdf+=String(offset).padStart(10,'0')+' 00000 n \n';});
+      pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
+      return new Blob([pdf],{type:'application/pdf'});
+    }
+    function receiptFile() { return new File([makeReceiptPDF()],`Risev-Receipt-${SAMPLE.receiptId}.pdf`,{type:'application/pdf'}); }
+    function downloadPDF() {
+      if(!receiptAvailable) return showToast('Complete the sample payment first.');
+      const url=URL.createObjectURL(makeReceiptPDF());
+      const a=document.createElement('a');a.href=url;a.download=`Risev-Receipt-${SAMPLE.receiptId}.pdf`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),12000);
+      showToast('Receipt PDF downloaded.');
+    }
+    async function sharePDF() {
+      if(!receiptAvailable) return;
+      const file=receiptFile();
+      try {
+        if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+          await navigator.share({title:'Risev Receipt '+SAMPLE.receiptId,text:`${SAMPLE.merchant} receipt - ${formatRM(SAMPLE.total)}. Select WhatsApp to share.`,files:[file]});
+          showToast('Share sheet completed. Delivery must be confirmed in the chosen app.');
+        } else { $('shareModalBackdrop').hidden=false; }
+      } catch(e) { if(e.name!=='AbortError') $('shareModalBackdrop').hidden=false; }
+    }
+    function openWhatsApp() {
+      const raw=$('whatsappNumber').value.trim().replace(/[\s\-()+]/g,'');
+      if(!/^\d{9,15}$/.test(raw)) { showToast('Enter a valid international number, e.g. 60123456789.'); $('whatsappNumber').focus();return; }
+      const message=`Hi, here is your receipt from ${SAMPLE.merchant} (${SAMPLE.receiptId}), total ${formatRM(SAMPLE.total)}. I will attach the PDF document in this chat.`;
+      window.open('https://wa.me/'+encodeURIComponent(raw)+'?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');
+      showToast('WhatsApp opened. Please attach the downloaded PDF manually.');
+    }
+    document.querySelectorAll('.pay-option').forEach(b=>b.addEventListener('click',()=>{
+      selectedMethod=b.dataset.method;
+      document.querySelectorAll('.pay-option').forEach(item=>{const chosen=item===b;item.classList.toggle('selected',chosen);item.setAttribute('aria-pressed',String(chosen));});
+    }));
+    $('confirmPayment').addEventListener('click',paymentComplete);
+    $('receiptBack').addEventListener('click',()=>{if(receiptAvailable)showMerchant('finished');else showMerchant('payment');});
+    $('merchantDone').addEventListener('click',()=>showMerchant('finished'));
+    $('viewMerchantReceiptAgain').addEventListener('click',()=>openMerchantReceipt(false));
+    $('newTransaction').addEventListener('click',resetDemo);
+    $('resetDemo').addEventListener('click',resetDemo);
+    $('paymentBack').addEventListener('click',()=>showToast('Select a payment method, then confirm this sample transaction.'));
+    $('whatsappShare').addEventListener('click',sharePDF);
+    $('customerReceiptButton').addEventListener('click',openCustomerReceipt);
+    $('customerReceiptBack').addEventListener('click',closeCustomerReceipt);
+    $('customerDone').addEventListener('click',closeCustomerReceipt);
+    $('customerDownload').addEventListener('click',downloadPDF);
+    $('closeShareModal').addEventListener('click',()=>{$('shareModalBackdrop').hidden=true;});
+    $('shareModalBackdrop').addEventListener('click',e=>{if(e.target===$('shareModalBackdrop')) $('shareModalBackdrop').hidden=true;});
+    $('modalDownload').addEventListener('click',downloadPDF);
+    $('modalOpenWhatsapp').addEventListener('click',openWhatsApp);
+    $('bookAppointment').addEventListener('click',()=>showToast('Booking is not part of this receipt prototype.'));
+    $('viewStampCard').addEventListener('click',()=>showToast('Your stamp card is displayed above.'));
+    $('tabMerchant').addEventListener('click',()=>switchMobile('merchant'));
+    $('tabCustomer').addEventListener('click',()=>switchMobile('customer'));
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('shareModalBackdrop').hidden) $('shareModalBackdrop').hidden=true;else closeCustomerReceipt();}});
+    renderReceipt();
+    if(window.innerWidth<=680) switchMobile('merchant');
+  </script>
+</body>
+</html>

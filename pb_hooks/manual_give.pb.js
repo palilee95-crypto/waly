@@ -1,5 +1,81 @@
-// pb_hooks/manual_give.pb.js
+﻿// pb_hooks/manual_give.pb.js
 // Endpoint for merchant to manually issue stamps to a customer by phone number
+
+routerAdd("GET", "/api/risev/merchant/give-customer", (e) => {
+  if (!e.auth) return e.json(401, { message: "Sign in to look up a customer." });
+
+  let merchantId = e.auth.getString("merchant_id");
+  if (!merchantId) {
+    const merchants = $app.findRecordsByFilter("merchants", `owner = '${e.auth.id}'`, "created", 1, 0);
+    if (merchants.length) merchantId = merchants[0].id;
+  }
+  if (!merchantId) return e.json(403, { message: "No merchant profile is linked to this account." });
+
+  const query = (e.requestInfo() && e.requestInfo().query) || {};
+  let digits = String(query.phone || "").replace(/[^\d]/g, "");
+  if (digits.startsWith("0")) digits = "6" + digits;
+  if (!digits.startsWith("60")) digits = "60" + digits;
+  const subscriber = digits.slice(2);
+  if (!/^1\d{8,9}$/.test(subscriber) || (subscriber.startsWith("11") && subscriber.length !== 10)) {
+    return e.json(400, { message: "Enter a complete Malaysian mobile number." });
+  }
+
+  const local = "0" + subscriber;
+  try {
+    const users = $app.findRecordsByFilter(
+      "users",
+      `phone = '+${digits}' || phone = '${digits}' || phone = '${local}'`,
+      "-created", 1, 0
+    );
+    if (!users.length) return e.json(200, { found: false, requiresName: true });
+
+    const customer = users[0];
+
+    // A phone number alone must not reveal who it belongs to: only surface the
+    // name once this customer already has a relationship with THIS merchant.
+    // Otherwise any merchant could resolve arbitrary numbers into names.
+    let knownHere = false;
+    try {
+      knownHere = $app.findRecordsByFilter("loyalty_cards", `customer = '${customer.id}' && merchant = '${merchantId}'`, "-created", 1, 0).length > 0
+        || $app.findRecordsByFilter("transactions", `customer = '${customer.id}' && merchant = '${merchantId}'`, "-created", 1, 0).length > 0
+        || $app.findRecordsByFilter("service_bookings", `customer = '${customer.id}' && merchant = '${merchantId}'`, "-created", 1, 0).length > 0;
+    } catch (histErr) {
+      knownHere = false;
+    }
+
+    const name = knownHere ? customer.getString("name").trim() : "";
+    const requiresName = !name || /^Customer(?:[ _]|$)/i.test(name);
+    let stamps = 0;
+    let points = 0;
+    try {
+      // Same program resolution as the NFC/POS path (nfc_transaction.pb.js):
+      // oldest program, regardless of is_active. Manual and NFC stamps must land
+      // on the same card, otherwise a customer sees two balances.
+      let programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "created", 1, 0);
+      if (programs.length) {
+        const cards = $app.findRecordsByFilter(
+          "loyalty_cards",
+          `customer = '${customer.id}' && merchant = '${merchantId}' && program = '${programs[0].id}'`,
+          "-created", 1, 0
+        );
+        if (cards.length) {
+          stamps = Number(cards[0].get("stamps_collected")) || 0;
+          points = Number(cards[0].get("points_balance")) || 0;
+        }
+      }
+    } catch (cardErr) {
+      console.log("[GIVE CUSTOMER LOOKUP] Could not load loyalty balance:", cardErr.message || cardErr);
+    }
+    return e.json(200, {
+      found: true,
+      requiresName,
+      customer: { id: customer.id, name: requiresName ? "" : name, stamps, points }
+    });
+  } catch (err) {
+    console.log("[GIVE CUSTOMER LOOKUP] Failed:", err.message || err);
+    return e.json(500, { message: "Could not check this number. Try again." });
+  }
+});
 
 routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
   try {
@@ -22,6 +98,10 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     let digits = rawPhone.replace(/[^\d]/g, '');
     if (digits.startsWith('0')) digits = '6' + digits;
     if (!digits.startsWith('60') && digits.length >= 9) digits = '60' + digits;
+    const subscriber = digits.startsWith('60') ? digits.slice(2) : digits;
+    if (!/^1\d{8,9}$/.test(subscriber) || (subscriber.startsWith('11') && subscriber.length !== 10)) {
+      return e.json(400, { message: "Enter a complete Malaysian mobile number." });
+    }
     const cleanPhone = '+' + digits;
 
     // Get merchant ID linked to current authenticated user
@@ -43,30 +123,42 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       try {
         const users = $app.findRecordsByFilter("users", phoneFilter, "-created", 1, 0);
         if (users.length > 0) customer = users[0];
-      } catch (err) { /* ignore */ }
+      } catch (err) {
+        console.log("[MANUAL GIVE] Customer lookup failed:", err.message || err);
+        return e.json(500, { message: "Could not check this number. Try again." });
+      }
     }
 
     if (!customer) {
+      if (!customerNameInput) {
+        return e.json(400, { message: "Enter a customer name for a new phone number." });
+      }
       const userCol = $app.findCollectionByNameOrId("users");
       customer = new Record(userCol);
       customer.set("id", $security.randomString(15).toLowerCase());
       customer.set("phone", cleanPhone);
       customer.set("email", `shadow_cust_${digits}@risev.app`);
-      customer.set("name", customerNameInput || ("Customer " + digits.slice(-4)));
+      customer.set("name", customerNameInput);
       customer.set("role", "customer");
       customer.set("birthday", "2000-01-01 00:00:00.000Z");
       customer.setPassword($security.randomString(20));
       $app.save(customer);
-    } else if (customerNameInput) {
-      // If merchant supplied a name and existing name is missing or placeholder, update it
+    } else {
+      // Existing placeholder records also need a real name before issuing rewards.
       const currentName = customer.getString("name");
-      if (!currentName || currentName.startsWith("Customer ") || currentName.startsWith("Customer_")) {
+      const needsName = !currentName || /^Customer(?:[ _]|$)/i.test(currentName);
+      if (needsName && !customerNameInput) {
+        return e.json(400, { message: "Enter this customer's name before issuing rewards." });
+      }
+      if (needsName && customerNameInput) {
         customer.set("name", customerNameInput);
         $app.save(customer);
       }
     }
 
-    // 2. Find or auto-create merchant's loyalty program
+    // 2. Find or auto-create merchant's loyalty program.
+    // Oldest program, matching nfc_transaction.pb.js â€” the two entry points must
+    // resolve the same card or stamps split across two programs.
     const programs = $app.findRecordsByFilter("loyalty_programs", `merchant = '${merchantId}'`, "created", 1, 0);
     let program = programs.length > 0 ? programs[0] : null;
     if (!program) {
@@ -128,7 +220,6 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     $app.save(card);
 
     // 4. Record transaction
-    const branchName = (body.branch_name || authRecord.getString("branch_name") || "All Branches (HQ)").trim();
     const branchId = (body.branch_id || authRecord.getString("branch") || "").trim();
 
     function resolveBranchId(mid, candidate) {
@@ -150,14 +241,19 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
     txn.set("merchant", merchantId);
     txn.set("loyalty_card", card.id);
     txn.set("staff", authRecord.id);
-    txn.set("branch", resolveBranchId(merchantId, branchId));
+    const verifiedBranchId = resolveBranchId(merchantId, branchId);
+    let branchName = (body.branch_name || authRecord.getString("branch_name") || "Main Counter").trim();
+    if (verifiedBranchId) {
+      try { branchName = $app.findRecordById("branches", verifiedBranchId).getString("name") || branchName; } catch (branchErr) {}
+    }
+    txn.set("branch", verifiedBranchId);
     
     const txnMeta = {
       source: "manual_give",
       staff_id: authRecord.id,
       staff_name: authRecord.getString("name") || "Merchant",
       branch_name: branchName,
-      branch_id: branchId
+      branch_id: verifiedBranchId
     };
     txn.set("metadata", JSON.stringify(txnMeta));
     $app.save(txn);
@@ -181,6 +277,48 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       if (merchRec) merchantStoreName = merchRec.getString("name");
     } catch (mErr) {}
 
+    // Snapshot a manual SALE as a recorded receipt. The cashier has not
+    // confirmed a payment here, so it must never be labelled PAID like POS.
+    // A receipt failure must not invite a retry that would issue stamps twice.
+    //
+    // Only when money changed hands: digital_receipts.viewRule is public so that
+    // shared receipt links open without a login, which means every receipt is
+    // readable by id. A zero-bill stamp issue is a loyalty event, not a sale, and
+    // must not publish the customer's name and phone.
+    let receiptId = "";
+    if (billAmount > 0) {
+      try {
+        const receipt = new Record($app.findCollectionByNameOrId("digital_receipts"));
+        receipt.set("merchant", merchantId);
+        receipt.set("transaction", txn.id);
+        receipt.set("customer", customer.id);
+        receipt.set("customer_phone", cleanPhone);
+        receipt.set("customer_name", resolvedCustomerName);
+        receipt.set("staff_name", authRecord.getString("name") || "Merchant");
+        receipt.set("branch_name", branchName);
+        receipt.set("receipt_number", "RV-" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + "-" + txn.id.slice(-6).toUpperCase());
+        receipt.set("line_items", [{ name: "Manual sale entry", qty: 1, price: billAmount }]);
+        receipt.set("subtotal", billAmount);
+        receipt.set("discount_amount", 0);
+        receipt.set("total_amount", billAmount);
+        receipt.set("payment_method", "Manual entry");
+        receipt.set("payment_status", "recorded");
+        receipt.set("stamps_earned", actualStampsToAward);
+        receipt.set("share_token", $security.randomString(24));
+        receipt.set("stamps_before", currentStamps);
+        receipt.set("stamps_balance", totalStamps);
+        receipt.set("stamp_goal", goal);
+        receipt.set("reward_name", nextRewardName || program.getString("reward_name") || "");
+        $app.save(receipt);
+        receiptId = receipt.id;
+      } catch (receiptErr) {
+        console.log("[MANUAL GIVE] Transaction saved but receipt unavailable:", receiptErr.message || receiptErr);
+      }
+    }
+
+    let pointsBalance = 0;
+    try { pointsBalance = Number($app.findRecordById("loyalty_cards", card.id).get("points_balance")) || 0; } catch (pointsErr) {}
+
     const successMessage = isStampsEnabled
       ? `${actualStampsToAward} stamp(s) issued to ${resolvedCustomerName}`
       : `Points awarded to ${resolvedCustomerName}`;
@@ -193,11 +331,13 @@ routerAdd("POST", "/api/risev/merchant/give-manual", (e) => {
       totalStamps: totalStamps,
       goal: goal,
       transactionId: txn.id,
+      receiptId: receiptId,
       billAmount: billAmount,
       stampsEarned: actualStampsToAward,
       // Points written by points_multiplier.pb.js during the create. The receipt used
       // to guess floor(bill), which ignored spend_per_point, campaigns and streaks.
       pointsEarned: txn.getInt("points") || 0,
+      pointsBalance: pointsBalance,
       storeName: merchantStoreName,
       branchName: branchName,
       nextRewardName: nextRewardName,

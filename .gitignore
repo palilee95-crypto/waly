@@ -55,6 +55,7 @@ pocketbase.exe
 # agent scratchpads & documentation
 scratch/
 AGENTS.md
+/DEV_HANDOFF.md
 
 
 # documentation

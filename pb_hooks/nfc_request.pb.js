@@ -29,6 +29,8 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
 
     // POS is a paid-plan feature and must be initiated by the merchant or its
     // staff. The customer flow below stays public; only manual_pos is gated.
+    let bookingBypass = false;
+    let checkoutBookingId = "";
     if (isManualPos) {
       const auth = e.auth;
       if (!auth) {
@@ -55,7 +57,25 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
           }
         }
       } catch (posSubErr) {}
-      if (["starter", "pro", "business", "enterprise"].indexOf(posPlan) < 0) {
+
+      // A booking checkout is already covered by the booking add-on, so a manual
+      // POS sale that carries a valid booking id is allowed on any plan. Without
+      // a valid booking id the POS plan gate below still applies.
+      checkoutBookingId = String(body.booking_id || "").trim();
+      if (checkoutBookingId) {
+        try {
+          const digitsOf = (value) => String(value || "").replace(/[^\d]/g, "");
+          const booking = $app.findRecordById("service_bookings", checkoutBookingId);
+          const bookingStatus = booking.getString("status");
+          bookingBypass = booking.getString("merchant") === merchantId &&
+            ["booked", "arrived", "in_service"].indexOf(bookingStatus) >= 0 &&
+            digitsOf(booking.getString("customer_phone")) === digitsOf(rawPhone);
+        } catch (bookingErr) {
+          bookingBypass = false;
+        }
+      }
+
+      if (!bookingBypass && ["starter", "pro", "business", "enterprise"].indexOf(posPlan) < 0) {
         return e.json(403, {
           code: "POS_PLAN_REQUIRED",
           message: "The POS System is available on Starter and PRO plans."
@@ -209,6 +229,34 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     // checkouts always get a fresh claim so they cannot overwrite an NFC
     // request (or a different sale for the same customer).
     let claim = null;
+
+    // A booking-exempt manual claim is reused for the same booking, so one
+    // booking cannot open several exemption claims.
+    if (isManualPos && bookingBypass && checkoutBookingId) {
+      try {
+        const existingBypass = $app.findRecordsByFilter(
+          "nfc_claims",
+          `merchant = '${merchantId}' && booking = '${checkoutBookingId}' && status = 'pending'`,
+          "-created",
+          1,
+          0
+        );
+        if (existingBypass.length > 0) {
+          claim = existingBypass[0];
+          claim.set("customer_name", name);
+          claim.set("customer_phone", cleanPhone);
+          claim.set("session_code", sessionCode);
+          claim.set("status", "pending");
+          if (branchId) claim.set("branch", branchId);
+          if (branchName) claim.set("branch_name", branchName);
+          $app.save(claim);
+          console.log(`[NFC REQUEST] Reused booking claim ${claim.id} for booking ${checkoutBookingId}`);
+        }
+      } catch (bypassErr) {
+        claim = null;
+      }
+    }
+
     if (!isManualPos) try {
       const existingClaims = $app.findRecordsByFilter(
         "nfc_claims",
@@ -252,6 +300,13 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
       if (branchName) claim.set("branch_name", branchName);
       if (customerUser) claim.set("customer", customerUser.id);
       try { claim.set("manual_pos", isManualPos); } catch (vErr) {}
+      // Bind an exempt claim to the booking that justified it. /nfc/complete
+      // requires this booking id back before it will settle the sale.
+      if (bookingBypass && checkoutBookingId) {
+        try { claim.set("booking", checkoutBookingId); } catch (bookErr) {
+          console.log("[NFC REQUEST] Could not bind booking to claim:", bookErr.message || bookErr);
+        }
+      }
       if (appliedVoucherId) {
         try { claim.set("voucher", appliedVoucherId); } catch (vErr) {}
         try { claim.set("voucher_title", voucherTitle); } catch (vErr) {}
@@ -484,10 +539,16 @@ routerAdd("GET", "/api/risev/nfc/receipt", (e) => {
     }
     const receipts = $app.findRecordsByFilter("digital_receipts", "claim = '" + claimId + "'", "-created", 1, 0);
     const receipt = receipts.length ? receipts[0] : null;
-    if (!receipt || receipt.getString("payment_status") !== "paid" || Number(receipt.get("total_amount")) <= 0) {
+    if (!receipt || receipt.getString("payment_status") !== "paid") {
       return e.json(200, { receipt_id: "", paid_sale: Number(claim.get("bill_amount")) > 0 });
     }
-    return e.json(200, { receipt_id: receipt.id, paid_sale: true });
+    // A voucher can cover the whole bill; the receipt still exists as a paid
+    // record with a RM0.00 total and the voucher discount.
+    return e.json(200, {
+      receipt_id: receipt.id,
+      share_token: receipt.getString("share_token"),
+      paid_sale: true
+    });
   } catch (err) {
     return e.json(404, { message: "Receipt not found" });
   }
@@ -505,7 +566,17 @@ routerAdd("GET", "/api/risev/customer/transaction-receipt", (e) => {
     if (transaction.getString("customer") !== e.auth.id) return e.json(403, { message: "This transaction belongs to another customer" });
     const receipts = $app.findRecordsByFilter("digital_receipts", "transaction = '" + transactionId + "'", "-created", 1, 0);
     const receipt = receipts.length ? receipts[0] : null;
-    return e.json(200, { receipt_id: receipt && receipt.getString("payment_status") === "paid" ? receipt.id : "" });
+    if (!receipt) return e.json(200, { receipt_id: "", share_token: "" });
+
+    // Same rule as the public route: a paid receipt may be RM0.00 (voucher), a
+    // "recorded" one only counts when money actually changed hands.
+    const status = receipt.getString("payment_status");
+    const total = Number(receipt.get("total_amount")) || 0;
+    const usable = status === "paid" || (status === "recorded" && total > 0);
+    return e.json(200, {
+      receipt_id: usable ? receipt.id : "",
+      share_token: usable ? receipt.getString("share_token") : ""
+    });
   } catch (err) { return e.json(404, { message: "Transaction not found" }); }
 });
 
