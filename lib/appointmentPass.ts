@@ -29,6 +29,11 @@ export type AppointmentPassData = {
 const PASS_WIDTH = 360;
 const PASS_HEIGHT = 710;
 const PASS_SCALE = 2;
+// Shared with the on-screen ticket so both renderings keep the same silhouette.
+// The surface itself differs by medium (dark sheet vs printed page), so each
+// renderer owns its own.
+export const PASS_CARD_RADIUS = 22;
+const PASS_SURFACE = '#F3F4F6';
 const INK = '#111111';
 const MUTED = '#667085';
 const YELLOW = '#FFC700';
@@ -160,18 +165,20 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageEle
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, r);
   };
-  ctx.fillStyle = '#F3F4F6';
+  ctx.fillStyle = PASS_SURFACE;
   ctx.fillRect(0, 0, PASS_WIDTH, PASS_HEIGHT);
   ctx.fillStyle = '#FFFFFF';
-  round(8, 8, 344, 702, 22);
+  round(8, 8, 344, 702, PASS_CARD_RADIUS);
   ctx.fill();
-  if (assets.risev) ctx.drawImage(assets.risev, 28, 25, 83, 27);
+  if (assets.risev) ctx.drawImage(assets.risev, 28, 25, 80, 27);
   else t('risev', 28, 46, 25, 800);
   t('A P P O I N T M E N T   P A S S', 28, 69, 9, 700, MUTED);
 
-  // Merchant photograph with a dark scrim; the branded fallback is deliberate.
+  // Merchant photograph with a dark scrim; full-bleed to the card edges, like
+  // the on-screen ticket, with the branded fallback kept deliberate.
   ctx.save();
-  round(8, 84, 344, 145, 12);
+  ctx.beginPath();
+  ctx.rect(8, 84, 344, 145);
   ctx.clip();
   if (assets.cover) {
     const ratio = Math.max(344 / assets.cover.width, 145 / assets.cover.height);
@@ -205,15 +212,15 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageEle
   ctx.fillStyle = tone === 'positive' ? '#BBF7D0' : tone === 'negative' ? '#FECACA' : YELLOW;
   round(253, 202, 83, 20, 10);
   ctx.fill();
-  t(status, 260, 215, 8, 800);
+  t(status, 260, 215, 8.5, 800);
   ctx.restore();
 
   serviceLines.forEach((line, index) => t(fitted(line, 306, 21, 800), 27, 263 + index * 24, 21, 800));
   t(fitted(`${pass.bookingDate} · ${pass.startTime}`, 309, 12, 700), 27, 311, 12, 700, '#30343B');
   ctx.fillStyle = '#E6E8EC'; ctx.fillRect(27, 328, 306, 1);
-  t(copy.location, 27, 349, 9, 700, '#818A9B');
+  t(copy.location, 27, 349, 8.5, 700, '#818A9B');
   t(fitted(pass.branchName, 165, 12), 27, 369, 12);
-  t(copy.total, 225, 349, 9, 700, '#818A9B');
+  t(copy.total, 225, 349, 8.5, 700, '#818A9B');
   t(`RM${Number(pass.total || 0).toFixed(2)}`, 225, 369, 12);
   const provider = pass.staffName && !['Any Available', 'Any Provider'].includes(pass.staffName) ? pass.staffName : '';
   if (provider) t(fitted(`${copy.provider}: ${provider}`, 306, 11), 27, 393, 11);
@@ -222,7 +229,7 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageEle
   // Perforation and QR retain a white quiet zone for reliable scanning.
   ctx.strokeStyle = '#CBD0D9'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
   ctx.beginPath(); ctx.moveTo(21, 427); ctx.lineTo(339, 427); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = '#F3F4F6';
+  ctx.fillStyle = PASS_SURFACE;
   ctx.beginPath(); ctx.arc(8, 427, 12, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(352, 427, 12, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(79, 439, 202, 202);
@@ -237,9 +244,15 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageEle
     ctx.fillText(copy.qrUnavailable, 180, 545);
     ctx.textAlign = 'left';
   }
-  t(copy.show, 81, 652, 9, 700, MUTED);
-  ctx.fillStyle = INK; ctx.fillRect(8, 666, 344, 44);
-  t(footerLabel(pass.status, pass.locale), 105, 694, 11, 800, YELLOW);
+  t(copy.show, 81, 652, 8.5, 700, MUTED);
+  // Clip the footer to the card silhouette so its bottom corners stay rounded,
+  // exactly like the on-screen ticket instead of squaring off the card.
+  ctx.save();
+  round(8, 8, 344, 702, PASS_CARD_RADIUS);
+  ctx.clip();
+  ctx.fillStyle = INK; ctx.fillRect(8, 664, 344, 46);
+  ctx.restore();
+  t(footerLabel(pass.status, pass.locale), 105, 695, 10.5, 800, YELLOW);
   return canvas;
 }
 
