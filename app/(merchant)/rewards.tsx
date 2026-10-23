@@ -1962,12 +1962,12 @@ export default function UnifiedRewardsScreen() {
           const bdayCount = hasBirthday ? 1 : 0;
           // The stamp prize is rendered from the program, and milestone records are
           // internal shadows for sub-reward vouchers. Neither is merchant content.
-          // With the Points engine off the catalogue has nothing to spend against,
-          // so the whole list goes with the toggle (the birthday card is separate
-          // and still renders).
-          const catalogueRewards = enablePoints
-            ? rewards.filter((r) => r.id !== linkedRewardId && r.reward_scope !== 'milestone')
-            : [];
+          // The catalogue itself is the merchant's inventory and stays visible with
+          // the Points engine off — the rewards are just dormant (the server
+          // refuses redemptions while points are paused).
+          const catalogueRewards = rewards.filter(
+            (r) => r.id !== linkedRewardId && r.reward_scope !== 'milestone'
+          );
           const stampReward = linkedRewardId
             ? rewards.find((r) => r.id === linkedRewardId) || null
             : null;
@@ -2034,18 +2034,16 @@ export default function UnifiedRewardsScreen() {
                     {locale === 'en' ? 'Manage point redemptions & rewards' : 'Urus penebusan mata & ganjaran'}
                   </Text>
                 </View>
-                {enablePoints && (
-                  <TouchableOpacity
-                    style={styles.addRewardBtn}
-                    onPress={handleOpenCreate}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="add" size={18} color="#FFC700" />
-                    <Text style={styles.addRewardBtnText}>
-                      {t('create_reward')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.addRewardBtn}
+                  onPress={handleOpenCreate}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={18} color="#FFC700" />
+                  <Text style={styles.addRewardBtnText}>
+                    {t('create_reward')}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Stamp engine: one prize, owned by Card Design. Read-only here. */}
@@ -2145,6 +2143,31 @@ export default function UnifiedRewardsScreen() {
                         : `${pointsPerRm} mata = diskaun RM 1.00 · ditukar dalam kad pelanggan`}
                     </Text>
                   </View>
+                </View>
+              )}
+
+              {/* Engine off is not delete: the catalogue stays, redemptions pause. */}
+              {!enablePoints && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    backgroundColor: '#FFFBEB',
+                    borderWidth: 1,
+                    borderColor: '#FDE68A',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  <Ionicons name="pause-circle" size={17} color="#B45309" />
+                  <Text style={{ flex: 1, fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#92400E', lineHeight: 15 }}>
+                    {locale === 'en'
+                      ? 'Points is off. These rewards stay in your catalogue, but customers cannot redeem them until you turn Points back on.'
+                      : 'Mata ditutup. Ganjaran ini kekal dalam katalog anda, tetapi pelanggan tidak boleh menebusnya sehingga anda menghidupkan semula Mata.'}
+                  </Text>
                 </View>
               )}
 
