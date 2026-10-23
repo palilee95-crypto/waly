@@ -750,6 +750,7 @@ export default function NfcLandingScreen() {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [receiptExpected, setReceiptExpected] = useState(false);
   const [receiptRetry, setReceiptRetry] = useState(0);
+  const [receiptLoading, setReceiptLoading] = useState(false);
 
   // Loyalty Mode
   const isPointsOnly = program?.enable_stamps === false && program?.enable_points === true;
@@ -1139,7 +1140,7 @@ export default function NfcLandingScreen() {
   }, [isApproved, step, merchant?.id, unlockedReward, showRewardModal]);
 
   useEffect(() => {
-    if (!isApproved || step !== 'sent') { setReceiptData(null); setReceiptExpected(false); return; }
+    if (!isApproved || step !== 'sent') { setReceiptData(null); setReceiptExpected(false); setReceiptLoading(false); return; }
     const activeClaimId = claimIdRef.current || claimId;
     const phone = phoneInput || sessionPhone;
     if (!activeClaimId || !phone) return;
@@ -1165,14 +1166,21 @@ export default function NfcLandingScreen() {
             const mapped = receiptFromPublicPayload(saved, match.share_token || '');
             if (mapped) {
               setReceiptData(mapped);
+              if (!cancelled) setReceiptLoading(false);
               return;
             }
           }
         }
       } catch (error) { /* The purchase may not have produced a paid receipt. */ }
-      if (!cancelled && ++attempts < 6) timer = setTimeout(load, 1500);
+      if (cancelled) return;
+      attempts += 1;
+      // Poll briefly for a receipt that is still being written; after that the
+      // button stays tappable so the customer can ask again.
+      if (attempts < 6) timer = setTimeout(load, 1500);
+      else setReceiptLoading(false);
     };
     setReceiptData(null);
+    setReceiptLoading(true);
     load();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [isApproved, step, claimId, phoneInput, sessionPhone, receiptRetry]);
@@ -2622,14 +2630,23 @@ export default function NfcLandingScreen() {
                   if (receiptData) setShowReceiptModal(true);
                   else setReceiptRetry((current) => current + 1);
                 }}
+                disabled={receiptLoading && !receiptData}
                 accessibilityRole="button"
                 accessibilityLabel={receiptData ? 'View or download receipt' : 'Check for your receipt again'}
               >
                 <Ionicons name="receipt-outline" size={20} color="#141722" />
                 <Text style={styles.receiptAccessText}>
-                  {receiptData ? 'View / Download Receipt' : 'Receipt preparing · Tap to retry'}
+                  {receiptData
+                    ? 'View / Download Receipt'
+                    : receiptLoading
+                      ? 'Checking receipt…'
+                      : 'Receipt preparing · Tap to retry'}
                 </Text>
-                <Ionicons name={receiptData ? 'chevron-forward' : 'refresh'} size={17} color="#677080" />
+                {receiptLoading && !receiptData ? (
+                  <ActivityIndicator size="small" color="#677080" />
+                ) : (
+                  <Ionicons name={receiptData ? 'chevron-forward' : 'refresh'} size={17} color="#677080" />
+                )}
               </TouchableOpacity>
             ) : null}
           </View>
@@ -4019,15 +4036,20 @@ export default function NfcLandingScreen() {
                     <TouchableOpacity
                       style={styles.receiptBanner}
                       onPress={() => setReceiptRetry((current) => current + 1)}
+                      disabled={receiptLoading}
                       activeOpacity={0.8}
                       accessibilityRole="button"
                       accessibilityLabel="Check for your receipt again"
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Ionicons name="receipt-outline" size={17} color="#111111" />
-                        <Text style={styles.receiptBannerText}>Receipt preparing · Tap to retry</Text>
+                        <Text style={styles.receiptBannerText}>
+                          {receiptLoading ? 'Checking receipt…' : 'Receipt preparing · Tap to retry'}
+                        </Text>
                       </View>
-                      <Ionicons name="refresh" size={16} color="#64748B" />
+                      {receiptLoading
+                        ? <ActivityIndicator size="small" color="#64748B" />
+                        : <Ionicons name="refresh" size={16} color="#64748B" />}
                     </TouchableOpacity>
                   )}
 
