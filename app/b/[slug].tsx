@@ -24,7 +24,8 @@ import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
 import { ALL_TIME_SLOTS, getPeriodForSlot, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
-import { AppointmentPassData, passStatusLabel, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import { AppointmentPassData, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import AppointmentTicket from '@/components/AppointmentTicket';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -822,6 +823,7 @@ export default function CustomerBookingPwaScreen() {
     status: bookingStatus === 'booked' && hasArrived ? 'arrived' : bookingStatus,
     merchantName: merchant?.store_name || merchant?.name || passBooking?.merchant_name || 'Risev merchant',
     merchantLogoUrl: merchant?.logo_url || null,
+    merchantCoverUrl: liveCoverUrl || merchant?.cover_url || null,
     passUrl: passUrlForBooking,
     qrUrl: passUrlForBooking
       ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(passUrlForBooking)}`
@@ -836,15 +838,7 @@ export default function CustomerBookingPwaScreen() {
     customerPhone: String(passBooking?.customer_phone || customerPhone || ''),
   };
   const passStatus = passData.status;
-  // One label for the sheet and the PDF; inactive passes get a red pill and no
-  // check-in action.
-  const passStatusText = passStatusLabel(passStatus);
   const passInactive = ['completed', 'cancelled', 'no_show'].includes(passStatus);
-  const passPillStyle = passStatusText === 'CONFIRMED'
-    ? { bg: '#FEF9C3', dot: '#EAB308', text: '#111111' }
-    : (passStatus === 'cancelled' || passStatus === 'no_show')
-      ? { bg: '#FEE2E2', dot: '#DC2626', text: '#B91C1C' }
-      : { bg: '#DCFCE7', dot: '#16A34A', text: '#15803D' };
   const passActionLabel = passStatus === 'completed'
     ? 'Appointment completed'
     : passStatus === 'cancelled'
@@ -900,8 +894,7 @@ export default function CustomerBookingPwaScreen() {
   const handleSharePass = async () => {
     if (passIsDemo) return;
     try {
-      const result = await shareAppointmentPass(passData);
-      if (result === 'copied') showToast('Pass link copied');
+      await shareAppointmentPass(passData);
     } catch (e) {
       showToast('Could not share the pass. Please try again.');
     }
@@ -3406,7 +3399,7 @@ export default function CustomerBookingPwaScreen() {
                 onPress={handleSharePass}
                 activeOpacity={0.8}
               >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#000000" />
+                <Ionicons name="logo-whatsapp" size={20} color="#000000" />
               </TouchableOpacity>
             </View>
 
@@ -4300,225 +4293,38 @@ export default function CustomerBookingPwaScreen() {
         </View>
       </Modal>
 
-      {/* 🎫 Appointment Pass Sheet (QR + same-day check-in) */}
-      <Modal
-        visible={showPassSheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPassSheet(false)}
-      >
+      {/* Shared appointment ticket: the same booking details are used for PDF export. */}
+      <Modal visible={showPassSheet} transparent animationType="fade" onRequestClose={() => setShowPassSheet(false)}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdropPress} onPress={() => setShowPassSheet(false)} />
-          <View style={[styles.loyaltyCardModalContent, {
-            backgroundColor: '#FFFFFF',
-            maxHeight: '92%',
-            boxShadow: 'none',
-            shadowColor: 'transparent',
-            shadowOpacity: 0,
-            shadowRadius: 0,
-            elevation: 0,
-          }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFCC00', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  {merchant?.logo_url ? (
-                    <Image source={{ uri: merchant.logo_url }} style={{ width: 44, height: 44 }} resizeMode="cover" />
-                  ) : (
-                    <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111' }}>
-                      {(passData.merchantName || 'Risev').slice(0, 1).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1.4 }}>
-                    APPOINTMENT PASS
-                  </Text>
-                  <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: -0.3, marginTop: 1 }} numberOfLines={1}>
-                    {passData.merchantName}
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 0.8, marginTop: 2 }}>
-                    #{passData.shortRef || 'DEMO'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.modalCloseBtn, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9' }]}
-                  onPress={() => setShowPassSheet(false)}
-                >
-                  <Ionicons name="close" size={18} color="#111111" />
-                </TouchableOpacity>
-              </View>
-
-              {/* QR */}
-              <View style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: 22,
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-                paddingVertical: 18,
-                alignItems: 'center',
-              }}>
-                {passIsDemo ? (
-                  <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="qr-code-outline" size={64} color="#CBD5E1" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8', marginTop: 8 }}>
-                      Demo booking — no live pass
-                    </Text>
-                  </View>
-                ) : (
-                  <Image
-                    source={{
-                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(buildPassUrl(String(slug), passBookingId))}`,
-                    }}
-                    style={{ width: 200, height: 200 }}
-                    resizeMode="contain"
-                  />
-                )}
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginTop: 10,
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: 999,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                }}>
-                  <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 1 }}>
-                    PASS
-                  </Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111111', letterSpacing: 1.2 }}>
-                    #{shortPassRef(passBookingId)}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: 8 }}>
-                  Show this at the counter
-                </Text>
-              </View>
-
-              {/* Details */}
-              <View style={{ marginTop: 14, gap: 10 }}>
-                {[
-                  { icon: 'cut-outline', label: 'SERVICE', value: passData.serviceText },
-                  { icon: 'calendar-outline', label: 'SLOT', value: `${passData.bookingDate} @ ${passData.startTime}` },
-                  { icon: 'location-outline', label: 'LOCATION', value: passData.branchName },
-                  { icon: 'person-outline', label: 'PROVIDER', value: passData.staffName },
-                  { icon: 'cash-outline', label: 'TOTAL', value: `RM${Number(passData.total || 0).toFixed(2)}` },
-                  ...(passData.customerName ? [{ icon: 'person-circle-outline', label: 'CUSTOMER', value: passData.customerName }] : []),
-                ].map((row) => (
-                  <View key={row.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={row.icon as any} size={15} color="#111111" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 0.6 }}>
-                        {row.label}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', marginTop: 1 }}>
-                        {row.value}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              {/* Status */}
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                marginTop: 16,
-                backgroundColor: passPillStyle.bg,
-                borderRadius: 999,
-                paddingVertical: 8,
-              }}>
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: passPillStyle.dot }} />
-                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: passPillStyle.text, letterSpacing: 0.6 }}>
-                  {passStatusText}
-                </Text>
-              </View>
-
-              {/* Primary action */}
+          <View style={[styles.loyaltyCardModalContent, { backgroundColor: 'transparent', padding: 0, maxHeight: '92%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+              <TouchableOpacity
+                onPress={() => setShowPassSheet(false)}
+                accessibilityLabel="Close appointment pass"
+                style={{ alignSelf: 'flex-end', width: 38, height: 38, borderRadius: 19, backgroundColor: '#303238', alignItems: 'center', justifyContent: 'center', marginBottom: 9 }}
+              >
+                <Ionicons name="close" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+              <AppointmentTicket pass={passData} demo={passIsDemo} />
               <TouchableOpacity
                 onPress={handleCheckIn}
-                disabled={hasArrived || checkingIn || passLoading || passInactive}
+                disabled={hasArrived || checkingIn || passLoading || passInactive || passIsDemo}
                 activeOpacity={0.85}
-                style={{
-                  marginTop: 12,
-                  backgroundColor: passInactive ? '#E2E8F0' : hasArrived ? '#16A34A' : '#000000',
-                  borderRadius: 16,
-                  paddingVertical: 15,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  opacity: checkingIn ? 0.7 : 1,
-                }}
+                style={{ marginTop: 12, backgroundColor: passInactive ? '#59606B' : hasArrived ? '#15803D' : '#FFC700', borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
-                {checkingIn ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name={passInactive ? 'close-circle-outline' : hasArrived ? 'checkmark-circle' : 'navigate'} size={18} color={passInactive ? '#64748B' : '#FFFFFF'} />
-                )}
-                <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_700Bold', color: passInactive ? '#64748B' : '#FFFFFF' }}>
-                  {passActionLabel}
-                </Text>
+                {checkingIn ? <ActivityIndicator size="small" color="#111111" /> : <Ionicons name={hasArrived ? 'checkmark-circle' : 'location-outline'} size={18} color={hasArrived || passInactive ? '#FFFFFF' : '#111111'} />}
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: hasArrived || passInactive ? '#FFFFFF' : '#111111' }}>{passActionLabel}</Text>
               </TouchableOpacity>
-
-              {passError ? (
-                <Text style={{
-                  marginTop: 10,
-                  fontSize: 12,
-                  fontFamily: 'PlusJakartaSans_600SemiBold',
-                  color: '#B91C1C',
-                  textAlign: 'center',
-                }}>
-                  {passError}
-                </Text>
-              ) : null}
-
-              {/* Save (PDF) + Share (link) */}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                <TouchableOpacity
-                  onPress={savePass}
-                  disabled={passLoading || passIsDemo}
-                  activeOpacity={0.85}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#111111',
-                    borderRadius: 16,
-                    paddingVertical: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 7,
-                    opacity: passLoading || passIsDemo ? 0.4 : 1,
-                  }}
-                >
-                  <Ionicons name="download-outline" size={17} color="#FFFFFF" />
-                  <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Save pass</Text>
+              {passError ? <Text style={{ color: '#FCA5A5', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, marginTop: 8, textAlign: 'center' }}>{passError}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 9 }}>
+                <TouchableOpacity onPress={savePass} disabled={passLoading || passIsDemo} accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: passLoading || passIsDemo ? 0.45 : 1 }}>
+                  <Ionicons name="download-outline" size={17} color="#111111" />
+                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', fontSize: 11.5 }}>Save PDF</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSharePass}
-                  disabled={passLoading || passIsDemo}
-                  activeOpacity={0.85}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 1.5,
-                    borderColor: '#111111',
-                    borderRadius: 16,
-                    paddingVertical: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 7,
-                    opacity: passLoading || passIsDemo ? 0.4 : 1,
-                  }}
-                >
-                  <Ionicons name="share-outline" size={17} color="#111111" />
-                  <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#111111' }}>Share pass</Text>
+                <TouchableOpacity onPress={handleSharePass} disabled={passLoading || passIsDemo} accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, backgroundColor: '#25D366', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: passLoading || passIsDemo ? 0.45 : 1 }}>
+                  <Ionicons name="logo-whatsapp" size={17} color="#062D17" />
+                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#062D17', fontSize: 11.5 }}>WhatsApp</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
