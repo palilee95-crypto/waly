@@ -1695,6 +1695,42 @@ export default function CustomerBookingPwaScreen() {
     return selectedServices.reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
   };
 
+  // What the chosen provider already has that day. The create endpoint rejects an
+  // overlap, but the grid must not offer it in the first place.
+  const [busyWindows, setBusyWindows] = useState<Array<{ start: number; end: number }>>([]);
+  useEffect(() => {
+    let active = true;
+    const slug = merchant?.pwa_slug;
+    const staffId = selectedStaff?.id;
+    if (!slug || !selectedIsoDate || !staffId) {
+      setBusyWindows([]);
+      return;
+    }
+    pb.send<any>(
+      `/api/risev/booking/availability?slug=${encodeURIComponent(String(slug))}&date=${encodeURIComponent(selectedIsoDate)}&staff=${encodeURIComponent(staffId)}`,
+      { method: 'GET', requestKey: null }
+    )
+      .then((res) => {
+        if (!active) return;
+        const list = Array.isArray(res?.busy) ? res.busy : [];
+        setBusyWindows(
+          list
+            .map((b: any) => ({ start: Number(b.start_minutes) || 0, end: Number(b.end_minutes) || 0 }))
+            .filter((w: any) => w.start > 0 && w.end > w.start)
+        );
+      })
+      .catch(() => { if (active) setBusyWindows([]); });
+    return () => { active = false; };
+  }, [merchant?.pwa_slug, selectedIsoDate, selectedStaff?.id]);
+
+  const slotIsTaken = (slot: string) => {
+    if (!busyWindows.length) return false;
+    const start = parseSlotToMinutes(slot);
+    if (!start) return false;
+    const end = start + (calculateTotalDuration() || 30) + 10;
+    return busyWindows.some(w => start < w.end && w.start < end);
+  };
+
   const handleNextStep = async () => {
     if (currentStep === 0) {
       setCurrentStep(1);
@@ -1707,6 +1743,10 @@ export default function CustomerBookingPwaScreen() {
     } else if (currentStep === 2) {
       if (isSlotInPast(selectedTime, selectedIsoDate)) {
         Alert.alert('Slot Unavailable', 'The selected time slot has already passed. Please choose an upcoming time or another date.');
+        return;
+      }
+      if (slotIsTaken(selectedTime)) {
+        Alert.alert('Slot Unavailable', 'Your provider is already booked for that time. Please choose another slot.');
         return;
       }
       setCurrentStep(3);
@@ -3105,7 +3145,7 @@ export default function CustomerBookingPwaScreen() {
             <View style={[styles.periodSegmentTrack, themeStyles.neumorphicInset]}>
               {(['Morning', 'Afternoon', 'Evening'] as const).map(p => {
                 const pSlots = timeSlotsByPeriod[p] || [];
-                const isAllPast = pSlots.every(s => isSlotInPast(s, selectedIsoDate));
+                const isAllPast = pSlots.every(s => isSlotInPast(s, selectedIsoDate) || slotIsTaken(s));
                 const isSelectedPeriod = selectedTimePeriod === p;
                 return (
                   <TouchableOpacity
@@ -3117,7 +3157,7 @@ export default function CustomerBookingPwaScreen() {
                     ]}
                     onPress={() => {
                       setSelectedTimePeriod(p);
-                      const validInPeriod = pSlots.filter(s => !isSlotInPast(s, selectedIsoDate));
+                      const validInPeriod = pSlots.filter(s => !isSlotInPast(s, selectedIsoDate) && !slotIsTaken(s));
                       if (validInPeriod.length > 0 && !validInPeriod.includes(selectedTime)) {
                         setSelectedTime(validInPeriod[0]);
                       }
@@ -3142,21 +3182,23 @@ export default function CustomerBookingPwaScreen() {
             <View style={styles.timeSlotsGrid}>
               {(timeSlotsByPeriod[selectedTimePeriod] || []).map(tm => {
                 const isPast = isSlotInPast(tm, selectedIsoDate);
-                const isSelected = selectedTime === tm && !isPast;
+                const isTaken = slotIsTaken(tm);
+                const isBlocked = isPast || isTaken;
+                const isSelected = selectedTime === tm && !isBlocked;
                 return (
                   <TouchableOpacity
                     key={tm}
-                    disabled={isPast}
+                    disabled={isBlocked}
                     style={[
                       styles.timeSlotGridPill,
                       isSelected
                         ? themeStyles.neumorphicActiveBtn
-                        : isPast
+                        : isBlocked
                         ? [themeStyles.neumorphicInset, { opacity: 0.35 }]
                         : themeStyles.neumorphicInset
                     ]}
                     onPress={() => setSelectedTime(tm)}
-                    activeOpacity={isPast ? 1 : 0.85}
+                    activeOpacity={isBlocked ? 1 : 0.85}
                   >
                     <Text
                       style={[
@@ -3164,10 +3206,10 @@ export default function CustomerBookingPwaScreen() {
                         {
                           color: isSelected
                             ? themeStyles.contrastColor
-                            : isPast
+                            : isBlocked
                             ? themeStyles.textMutedColor
                             : themeStyles.textPrimaryColor,
-                          textDecorationLine: isPast ? 'line-through' : 'none'
+                          textDecorationLine: isBlocked ? 'line-through' : 'none'
                         }
                       ]}
                     >
