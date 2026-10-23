@@ -321,6 +321,9 @@ export default function CustomerBookingPwaScreen() {
   const [liveBgColor, setLiveBgColor] = useState<string | null>(null);
   const [livePodColor, setLivePodColor] = useState<string | null>(null);
   const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(null);
+  // The page hero may use a demo/stock photo, but a pass must carry only this
+  // merchant's own banner — otherwise someone else's storefront is printed.
+  const [passCoverUrl, setPassCoverUrl] = useState<string | null>(null);
   const [liveTagline, setLiveTagline] = useState<string | null>(null);
   const [liveAllowStaffSelection, setLiveAllowStaffSelection] = useState<boolean | null>(null);
 
@@ -823,7 +826,7 @@ export default function CustomerBookingPwaScreen() {
     status: bookingStatus === 'booked' && hasArrived ? 'arrived' : bookingStatus,
     merchantName: merchant?.store_name || merchant?.name || passBooking?.merchant_name || 'Risev merchant',
     merchantLogoUrl: merchant?.logo_url || null,
-    merchantCoverUrl: liveCoverUrl || merchant?.cover_url || null,
+    merchantCoverUrl: liveCoverUrl || passCoverUrl || null,
     passUrl: passUrlForBooking,
     qrUrl: passUrlForBooking
       ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(passUrlForBooking)}`
@@ -836,6 +839,7 @@ export default function CustomerBookingPwaScreen() {
     total: Number(passBooking?.total_price || 0),
     customerName: String(passBooking?.customer_name || customerName || ''),
     customerPhone: String(passBooking?.customer_phone || customerPhone || ''),
+    locale,
   };
   const passStatus = passData.status;
   const passInactive = ['completed', 'cancelled', 'no_show'].includes(passStatus);
@@ -894,7 +898,8 @@ export default function CustomerBookingPwaScreen() {
   const handleSharePass = async () => {
     if (passIsDemo) return;
     try {
-      await shareAppointmentPass(passData);
+      const result = await shareAppointmentPass(passData);
+      if (result === 'copied') showToast('Pass link copied');
     } catch (e) {
       showToast('Could not share the pass. Please try again.');
     }
@@ -1228,6 +1233,7 @@ export default function CustomerBookingPwaScreen() {
       const bannerUrl = mRecord.banner 
         ? `${pb.baseUrl}/api/files/merchants/${mRecord.id}/${mRecord.banner}`
         : null;
+      setPassCoverUrl(bannerUrl || (mRecord.cover_url && isValidImageUri(mRecord.cover_url) ? mRecord.cover_url : null));
 
       let fallbackCover = 'https://images.unsplash.com/photo-1567206563064-6f60f4078b57?w=1000&auto=format&fit=crop&q=80';
       if (slug === 'scoop-creamy') {

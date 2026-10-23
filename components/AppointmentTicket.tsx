@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppointmentPassData, passStatusLabel } from '@/lib/appointmentPass';
+import { AppointmentPassData, passCopy, passStatusLabel, passStatusTone } from '@/lib/appointmentPass';
 
 type Props = { pass: AppointmentPassData; demo?: boolean };
 
@@ -13,16 +13,20 @@ const font = {
 } as const;
 
 export default function AppointmentTicket({ pass, demo = false }: Props) {
-  const status = passStatusLabel(pass.status);
-  const inactive = status === 'CANCELLED' || status === 'NO SHOW' || status === 'SLOT PASSED';
-  const arrived = status === 'CHECKED IN';
-  const footerTitle = inactive ? 'PASS INACTIVE' : arrived ? 'YOU’RE CHECKED IN' : status === 'COMPLETED' ? 'VISIT COMPLETE' : 'SEE YOU SOON';
+  const copy = passCopy(pass.locale);
+  const status = passStatusLabel(pass.status, pass.locale);
+  const tone = passStatusTone(pass.status);
+  const inactive = tone === 'negative';
+  const arrived = pass.status === 'arrived' || pass.status === 'in_service';
+  const footerTitle = pass.status === 'completed'
+    ? copy.visitComplete
+    : inactive ? copy.inactive : arrived ? copy.youAreIn : copy.soon;
 
   return (
     <View style={styles.ticket}>
       <View style={styles.top}>
         <Image source={require('../assets/risev logo.png')} style={styles.risevLogo} resizeMode="contain" accessibilityLabel="Risev" />
-        <Text style={styles.eyebrow}>APPOINTMENT PASS</Text>
+        <Text style={styles.eyebrow}>{copy.pass}</Text>
       </View>
 
       <View style={styles.hero}>
@@ -53,21 +57,21 @@ export default function AppointmentTicket({ pass, demo = false }: Props) {
         <View style={styles.rule} />
         <View style={styles.detailRow}>
           <View style={styles.detailBlock}>
-            <Text style={styles.detailLabel}>LOCATION</Text>
+            <Text style={styles.detailLabel}>{copy.location}</Text>
             <Text style={styles.detailValue} numberOfLines={2}>{pass.branchName}</Text>
           </View>
           <View style={styles.detailBlock}>
-            <Text style={styles.detailLabel}>TOTAL</Text>
+            <Text style={styles.detailLabel}>{copy.total}</Text>
             <Text style={styles.detailValue}>RM{Number(pass.total || 0).toFixed(2)}</Text>
           </View>
         </View>
         {pass.staffName && pass.staffName !== 'Any Available' && pass.staffName !== 'Any Provider' ? (
           <View style={styles.providerRow}>
             <Ionicons name="person-outline" size={17} color="#111111" />
-            <Text style={styles.providerText}>{pass.staffName}</Text>
+            <Text style={styles.providerText}>{copy.provider}: {pass.staffName}</Text>
           </View>
         ) : null}
-        {pass.customerName ? <Text style={styles.customerText}>Booked for {pass.customerName}</Text> : null}
+        {pass.customerName ? <Text style={styles.customerText}>{copy.bookedFor} {pass.customerName}</Text> : null}
       </View>
 
       <View style={styles.perforation}>
@@ -75,11 +79,11 @@ export default function AppointmentTicket({ pass, demo = false }: Props) {
       </View>
       <View style={styles.qrSection}>
         {demo || !pass.qrUrl ? (
-          <View style={styles.qrPlaceholder}><Ionicons name="qr-code-outline" size={52} color="#A6ADBA" /><Text style={styles.qrHint}>{demo ? 'Demo pass · QR unavailable' : 'QR unavailable'}</Text></View>
+          <View style={styles.qrPlaceholder}><Ionicons name="qr-code-outline" size={52} color="#A6ADBA" /><Text style={styles.qrHint}>{copy.qrUnavailable}</Text></View>
         ) : (
           <Image source={{ uri: pass.qrUrl }} style={styles.qr} resizeMode="contain" accessibilityLabel="Appointment check-in QR code" />
         )}
-        <Text style={styles.qrCaption}>SHOW THIS CODE AT THE COUNTER</Text>
+        <Text style={styles.qrCaption}>{copy.show}</Text>
       </View>
       <View style={styles.footer}>
         <Ionicons name={arrived ? 'checkmark-circle' : inactive ? 'close-circle' : 'sparkles'} size={19} color="#FFC700" />

@@ -1248,6 +1248,7 @@ export default function CustomerDashboard() {
       staffName: upcomingBooking.expand?.staff?.name || upcomingBooking.staff_name || '',
       total: Number(upcomingBooking.total_price || upcomingBooking.total || 0),
       customerName: upcomingBooking.customer_name || user?.name || '',
+      locale,
     };
   })();
 
@@ -1259,8 +1260,10 @@ export default function CustomerDashboard() {
 
   const shareCustomerPass = async () => {
     if (!appointmentPassData?.passUrl) return Alert.alert('Pass unavailable', 'The booking link is not available yet.');
-    try { await shareAppointmentPass(appointmentPassData); }
-    catch { Alert.alert('Could not open WhatsApp', 'Please try again.'); }
+    try {
+      const result = await shareAppointmentPass(appointmentPassData);
+      if (result === 'copied') Alert.alert('Pass link copied', 'Paste it into WhatsApp or anywhere else.');
+    } catch { Alert.alert('Could not share the pass', 'Please try again.'); }
   };
 
   const defaultCard: LoyaltyCardItem = {

@@ -1,6 +1,7 @@
-import { Image as NativeImage, Linking, Platform } from 'react-native';
+import { Image as NativeImage, Linking, Platform, Share } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import { downloadBlob, jpegPdfBlob } from '@/lib/pdfFromCanvas';
 
 // Everything the appointment pass needs, independent of the booking record
@@ -22,6 +23,7 @@ export type AppointmentPassData = {
   total: number;
   customerName?: string;
   customerPhone?: string;
+  locale?: string;
 };
 
 const PASS_WIDTH = 360;
@@ -35,20 +37,75 @@ const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match
 ));
 
-export const passStatusLabel = (status: string) => {
-  if (status === 'slot_passed') return 'SLOT PASSED';
-  if (status === 'completed') return 'COMPLETED';
-  if (status === 'arrived' || status === 'in_service') return 'CHECKED IN';
-  if (status === 'cancelled' || status === 'no_show') return status.toUpperCase().replace('_', ' ');
-  return 'CONFIRMED';
+// The pass is rendered outside React (canvas and expo-print HTML), so its copy
+// cannot come from LanguageContext. Keep the handful of strings here, in both
+// locales the app ships.
+const PASS_COPY = {
+  en: {
+    pass: 'APPOINTMENT PASS',
+    show: 'SHOW THIS CODE AT THE COUNTER',
+    location: 'LOCATION',
+    total: 'TOTAL',
+    provider: 'Provider',
+    bookedFor: 'Booked for',
+    qrUnavailable: 'QR UNAVAILABLE',
+    confirmed: 'CONFIRMED',
+    checkedIn: 'CHECKED IN',
+    completed: 'COMPLETED',
+    cancelled: 'CANCELLED',
+    noShow: 'NO SHOW',
+    slotPassed: 'SLOT PASSED',
+    soon: 'SEE YOU SOON',
+    youAreIn: 'YOU’RE CHECKED IN',
+    visitComplete: 'VISIT COMPLETE',
+    inactive: 'PASS INACTIVE',
+  },
+  ms: {
+    pass: 'PAS TEMUJANJI',
+    show: 'TUNJUKKAN KOD INI DI KAUNTER',
+    location: 'LOKASI',
+    total: 'JUMLAH',
+    provider: 'Penyedia',
+    bookedFor: 'Tempahan untuk',
+    qrUnavailable: 'KOD QR TIADA',
+    confirmed: 'DISAHKAN',
+    checkedIn: 'SUDAH CHECK-IN',
+    completed: 'SELESAI',
+    cancelled: 'DIBATALKAN',
+    noShow: 'TIDAK HADIR',
+    slotPassed: 'MASA TAMAT',
+    soon: 'JUMPA SEGERA',
+    youAreIn: 'ANDA SUDAH CHECK-IN',
+    visitComplete: 'LAWATAN SELESAI',
+    inactive: 'PAS TIDAK AKTIF',
+  },
 };
 
-const footerLabel = (status: string) => {
-  const label = passStatusLabel(status);
-  if (label === 'CHECKED IN') return 'YOU’RE CHECKED IN';
-  if (label === 'COMPLETED') return 'VISIT COMPLETE';
-  if (label === 'CANCELLED' || label === 'NO SHOW' || label === 'SLOT PASSED') return 'PASS INACTIVE';
-  return 'SEE YOU SOON';
+export const passCopy = (locale?: string) => (locale === 'ms' ? PASS_COPY.ms : PASS_COPY.en);
+
+export const passStatusTone = (status: string): 'positive' | 'negative' | 'neutral' => {
+  if (status === 'arrived' || status === 'in_service' || status === 'completed') return 'positive';
+  if (status === 'cancelled' || status === 'no_show' || status === 'slot_passed') return 'negative';
+  return 'neutral';
+};
+
+export const passStatusLabel = (status: string, locale?: string) => {
+  const copy = passCopy(locale);
+  if (status === 'slot_passed') return copy.slotPassed;
+  if (status === 'completed') return copy.completed;
+  if (status === 'arrived' || status === 'in_service') return copy.checkedIn;
+  if (status === 'cancelled') return copy.cancelled;
+  if (status === 'no_show') return copy.noShow;
+  return copy.confirmed;
+};
+
+const footerLabel = (status: string, locale?: string) => {
+  const copy = passCopy(locale);
+  const tone = passStatusTone(status);
+  if (status === 'completed') return copy.visitComplete;
+  if (tone === 'negative') return copy.inactive;
+  if (status === 'arrived' || status === 'in_service') return copy.youAreIn;
+  return copy.soon;
 };
 
 function loadImage(url?: string | null): Promise<HTMLImageElement | null> {
@@ -62,7 +119,8 @@ function loadImage(url?: string | null): Promise<HTMLImageElement | null> {
   });
 }
 
-function renderPassCanvas(pass: AppointmentPassData, assets: { qr: HTMLImageElement; logo?: HTMLImageElement | null; cover?: HTMLImageElement | null; risev?: HTMLImageElement | null }): HTMLCanvasElement {
+function renderPassCanvas(pass: AppointmentPassData, assets: { qr?: HTMLImageElement | null; logo?: HTMLImageElement | null; cover?: HTMLImageElement | null; risev?: HTMLImageElement | null }): HTMLCanvasElement {
+  const copy = passCopy(pass.locale);
   const canvas = document.createElement('canvas');
   canvas.width = PASS_WIDTH * PASS_SCALE;
   canvas.height = PASS_HEIGHT * PASS_SCALE;
@@ -142,8 +200,9 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr: HTMLImageElem
   }
   t(fitted(pass.merchantName, 285, 20, 800), 27, 197, 20, 800, '#FFFFFF');
   t(`PASS #${pass.shortRef}`, 27, 214, 9, 800, '#E4E4E7');
-  const status = passStatusLabel(pass.status);
-  ctx.fillStyle = status === 'CHECKED IN' ? '#BBF7D0' : ['CANCELLED', 'NO SHOW', 'SLOT PASSED'].includes(status) ? '#FECACA' : YELLOW;
+  const status = passStatusLabel(pass.status, pass.locale);
+  const tone = passStatusTone(pass.status);
+  ctx.fillStyle = tone === 'positive' ? '#BBF7D0' : tone === 'negative' ? '#FECACA' : YELLOW;
   round(253, 202, 83, 20, 10);
   ctx.fill();
   t(status, 260, 215, 8, 800);
@@ -152,13 +211,13 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr: HTMLImageElem
   serviceLines.forEach((line, index) => t(fitted(line, 306, 21, 800), 27, 263 + index * 24, 21, 800));
   t(fitted(`${pass.bookingDate} · ${pass.startTime}`, 309, 12, 700), 27, 311, 12, 700, '#30343B');
   ctx.fillStyle = '#E6E8EC'; ctx.fillRect(27, 328, 306, 1);
-  t('LOCATION', 27, 349, 9, 700, '#818A9B');
+  t(copy.location, 27, 349, 9, 700, '#818A9B');
   t(fitted(pass.branchName, 165, 12), 27, 369, 12);
-  t('TOTAL', 225, 349, 9, 700, '#818A9B');
+  t(copy.total, 225, 349, 9, 700, '#818A9B');
   t(`RM${Number(pass.total || 0).toFixed(2)}`, 225, 369, 12);
   const provider = pass.staffName && !['Any Available', 'Any Provider'].includes(pass.staffName) ? pass.staffName : '';
-  if (provider) t(fitted(`Provider: ${provider}`, 306, 11), 27, 393, 11);
-  if (pass.customerName) t(fitted(`Booked for ${pass.customerName}`, 306, 10), 27, provider ? 411 : 394, 10, 700, MUTED);
+  if (provider) t(fitted(`${copy.provider}: ${provider}`, 306, 11), 27, 393, 11);
+  if (pass.customerName) t(fitted(`${copy.bookedFor} ${pass.customerName}`, 306, 10), 27, provider ? 411 : 394, 10, 700, MUTED);
 
   // Perforation and QR retain a white quiet zone for reliable scanning.
   ctx.strokeStyle = '#CBD0D9'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
@@ -167,18 +226,32 @@ function renderPassCanvas(pass: AppointmentPassData, assets: { qr: HTMLImageElem
   ctx.beginPath(); ctx.arc(8, 427, 12, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(352, 427, 12, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(79, 439, 202, 202);
-  ctx.drawImage(assets.qr, 89, 449, 182, 182);
-  t('SHOW THIS CODE AT THE COUNTER', 81, 652, 9, 700, MUTED);
+  if (assets.qr) {
+    ctx.drawImage(assets.qr, 89, 449, 182, 182);
+  } else {
+    // A missing QR must degrade: the pass still carries the booking details and
+    // its sealed footer, so printing it beats failing the download outright.
+    ctx.strokeStyle = '#CBD5E1'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+    round(94, 454, 172, 172, 12); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = MUTED; ctx.font = '700 10px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(copy.qrUnavailable, 180, 545);
+    ctx.textAlign = 'left';
+  }
+  t(copy.show, 81, 652, 9, 700, MUTED);
   ctx.fillStyle = INK; ctx.fillRect(8, 666, 344, 44);
-  t(footerLabel(pass.status), 105, 694, 11, 800, YELLOW);
+  t(footerLabel(pass.status, pass.locale), 105, 694, 11, 800, YELLOW);
   return canvas;
 }
 
 function passHtml(pass: AppointmentPassData): string {
+  const copy = passCopy(pass.locale);
   const logo = pass.merchantLogoUrl ? `<img class="merchant-logo" src="${escapeHtml(pass.merchantLogoUrl)}" alt="">` : '';
   const cover = pass.merchantCoverUrl ? `<img class="cover" src="${escapeHtml(pass.merchantCoverUrl)}" alt="">` : '';
   const provider = pass.staffName && !['Any Available', 'Any Provider'].includes(pass.staffName)
-    ? `<div class="subline">Provider: ${escapeHtml(pass.staffName)}</div>` : '';
+    ? `<div class="subline">${escapeHtml(copy.provider)}: ${escapeHtml(pass.staffName)}</div>` : '';
+  const qr = pass.qrUrl
+    ? `<img src="${escapeHtml(pass.qrUrl)}" alt="Check-in QR">`
+    : `<div class="qr-fallback">${escapeHtml(copy.qrUnavailable)}</div>`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>Appointment pass ${escapeHtml(pass.shortRef)}</title><style>
     @page{size:80mm 150mm;margin:0}*{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif}
     .ticket{width:80mm;height:150mm;margin:auto;background:#fff;overflow:hidden;border-radius:5mm}
@@ -187,18 +260,18 @@ function passHtml(pass: AppointmentPassData): string {
     .details{height:43mm;padding:4mm}.service{font-weight:900;font-size:17px;line-height:1.2;max-height:14mm;overflow:hidden}.date{font-size:10px;font-weight:700;margin-top:2mm}.rule{border-top:1px solid #e6e8ec;margin:3mm 0}.cols{display:flex}.col{width:50%}.label{font-size:7px;font-weight:700;letter-spacing:1px;color:#818a9b}.value{font-size:10px;font-weight:700;margin-top:1mm}.subline{font-size:8px;margin-top:2mm;color:#667085}
     .tear{position:relative;border-top:1px dashed #cbd0d9;margin:0 4mm}.tear:before,.tear:after{content:'';position:absolute;top:-2mm;background:#f3f4f6;width:4mm;height:4mm;border-radius:50%}.tear:before{left:-6mm}.tear:after{right:-6mm}
     .qr{height:43mm;text-align:center;padding-top:2mm}.qr img{width:37mm;height:37mm}.qr p{font-size:7px;letter-spacing:1px;color:#667085;font-weight:700;margin:0}
+    .qr-fallback{width:37mm;height:37mm;margin:0 auto;display:flex;align-items:center;justify-content:center;border:1px dashed #cbd0d9;border-radius:3mm;color:#667085;font-size:7px;font-weight:700;letter-spacing:1px}
     .foot{height:13mm;background:#111;color:#ffc700;text-align:center;padding-top:4mm;font-size:9px;font-weight:900;letter-spacing:1.4px}
-  </style></head><body><div class="ticket"><div class="top"><div class="wordmark">risev</div><div class="eyebrow">APPOINTMENT PASS</div></div>
-    <div class="hero">${cover}<div class="shade"></div><div class="hero-text">${logo}<div class="merchant-name">${escapeHtml(pass.merchantName)}</div><div class="hero-bottom"><span>PASS #${escapeHtml(pass.shortRef)}</span><span class="status">${escapeHtml(passStatusLabel(pass.status))}</span></div></div></div>
-    <div class="details"><div class="service">${escapeHtml(pass.serviceText)}</div><div class="date">${escapeHtml(pass.bookingDate)} · ${escapeHtml(pass.startTime)}</div><div class="rule"></div><div class="cols"><div class="col"><div class="label">LOCATION</div><div class="value">${escapeHtml(pass.branchName)}</div></div><div class="col"><div class="label">TOTAL</div><div class="value">RM${Number(pass.total || 0).toFixed(2)}</div></div></div>${provider}${pass.customerName ? `<div class="subline">Booked for ${escapeHtml(pass.customerName)}</div>` : ''}</div>
-    <div class="tear"></div><div class="qr"><img src="${escapeHtml(pass.qrUrl)}" alt="Check-in QR"><p>SHOW THIS CODE AT THE COUNTER</p></div><div class="foot">${escapeHtml(footerLabel(pass.status))}</div></div></body></html>`;
+  </style></head><body><div class="ticket"><div class="top"><div class="wordmark">risev</div><div class="eyebrow">${escapeHtml(copy.pass)}</div></div>
+    <div class="hero">${cover}<div class="shade"></div><div class="hero-text">${logo}<div class="merchant-name">${escapeHtml(pass.merchantName)}</div><div class="hero-bottom"><span>PASS #${escapeHtml(pass.shortRef)}</span><span class="status">${escapeHtml(passStatusLabel(pass.status, pass.locale))}</span></div></div></div>
+    <div class="details"><div class="service">${escapeHtml(pass.serviceText)}</div><div class="date">${escapeHtml(pass.bookingDate)} · ${escapeHtml(pass.startTime)}</div><div class="rule"></div><div class="cols"><div class="col"><div class="label">${escapeHtml(copy.location)}</div><div class="value">${escapeHtml(pass.branchName)}</div></div><div class="col"><div class="label">${escapeHtml(copy.total)}</div><div class="value">RM${Number(pass.total || 0).toFixed(2)}</div></div></div>${provider}${pass.customerName ? `<div class="subline">${escapeHtml(copy.bookedFor)} ${escapeHtml(pass.customerName)}</div>` : ''}</div>
+    <div class="tear"></div><div class="qr">${qr}<p>${escapeHtml(copy.show)}</p></div><div class="foot">${escapeHtml(footerLabel(pass.status, pass.locale))}</div></div></body></html>`;
 }
 
 export async function saveAppointmentPass(pass: AppointmentPassData): Promise<void> {
   if (Platform.OS === 'web') {
     const risevUrl = NativeImage.resolveAssetSource(require('../assets/risev logo.png'))?.uri;
     const [qr, logo, cover, risev] = await Promise.all([loadImage(pass.qrUrl), loadImage(pass.merchantLogoUrl), loadImage(pass.merchantCoverUrl), loadImage(risevUrl)]);
-    if (!qr) throw new Error('The appointment QR code could not be loaded.');
     const canvas = renderPassCanvas(pass, { qr, logo, cover, risev });
     downloadBlob(jpegPdfBlob(canvas, Math.round((80 / 25.4) * 72)), `risev-pass-${pass.shortRef || pass.bookingId}.pdf`);
     return;
@@ -211,9 +284,26 @@ export async function saveAppointmentPass(pass: AppointmentPassData): Promise<vo
   });
 }
 
-export async function shareAppointmentPass(pass: AppointmentPassData): Promise<'opened'> {
+// WhatsApp is the product's channel, but it must not be the only way out: a
+// device without it still needs the pass link. Fall back to the native share
+// sheet (or the clipboard on web) and report which path ran.
+export async function shareAppointmentPass(pass: AppointmentPassData): Promise<'opened' | 'copied'> {
   if (!pass.passUrl) throw new Error('Appointment pass link is unavailable.');
   const message = `Appointment pass for ${pass.merchantName}\n${pass.serviceText}\n${pass.bookingDate} · ${pass.startTime}\nPass #${pass.shortRef}\n${pass.passUrl}`;
-  await Linking.openURL(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`);
-  return 'opened';
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+
+  if (Platform.OS === 'web') {
+    const opened = typeof window !== 'undefined' && window.open ? window.open(whatsappUrl, '_blank') : null;
+    if (opened) return 'opened';
+    await Clipboard.setStringAsync(message);
+    return 'copied';
+  }
+
+  try {
+    await Linking.openURL(whatsappUrl);
+    return 'opened';
+  } catch (err) {
+    await Share.share({ message, url: pass.passUrl });
+    return 'opened';
+  }
 }
