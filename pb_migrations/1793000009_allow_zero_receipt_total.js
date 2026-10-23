@@ -20,10 +20,18 @@ migrate((app) => {
 }, (app) => {
   try {
     const receipts = app.findCollectionByNameOrId("digital_receipts");
+    // Re-saving the collection does not re-validate rows, so the rollback
+    // "succeeds" while every RM0 receipt it created becomes unsavable.
+    const zero = app.findRecordsByFilter("digital_receipts", "total_amount = 0", "-created", 1, 0);
+    if (zero.length) {
+      console.log("[MIGRATION 1793000009 DOWN] zero-total receipts exist; re-requiring total_amount makes them unsavable");
+    }
     const total = receipts.fields.getByName("total_amount");
     if (total && !total.required) {
       total.required = true;
       app.save(receipts);
     }
-  } catch (err) {}
+  } catch (err) {
+    console.log("[MIGRATION 1793000009 DOWN ERROR]", err.message || err);
+  }
 });
