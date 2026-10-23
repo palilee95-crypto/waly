@@ -39,6 +39,9 @@ import AllCategoriesModal from './_components/AllCategoriesModal';
 import CustomerPushNotificationModal from '@/components/CustomerPushNotificationModal';
 import { isCustomerPushActive, getPushPermissionStatus } from '@/lib/push-notifications';
 import { LinearGradient } from 'expo-linear-gradient';
+import AppointmentTicket from '@/components/AppointmentTicket';
+import { AppointmentPassData, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
 import {
   getForYouRecommendations,
   getNextVisitPrediction,
@@ -1212,6 +1215,57 @@ export default function CustomerDashboard() {
     return require('@/assets/images/scoop_creamy_storefront.jpg');
   };
 
+  const appointmentPassData: AppointmentPassData | null = (() => {
+    if (!upcomingBooking?.id) return null;
+    const merchant = upcomingBooking.expand?.merchant;
+    const merchantId = merchant?.id || upcomingBooking.merchant || upcomingBooking.merchant_id;
+    const imageUrl = (value?: string | null) => {
+      if (!value) return null;
+      if (/^https?:\/\//i.test(value)) return value;
+      if (value.startsWith('/')) return `${pb.baseUrl}${value}`;
+      return merchantId ? `${pb.baseUrl}/api/files/merchants/${merchantId}/${value}` : null;
+    };
+    let items = upcomingBooking.items_summary;
+    if (typeof items === 'string') {
+      try { items = JSON.parse(items); } catch { items = []; }
+    }
+    const serviceNames = Array.isArray(items) ? items.map((item: any) => item?.name || item?.title).filter(Boolean) : [];
+    const slug = merchant?.pwa_slug || upcomingBooking.merchant_pwa_slug;
+    const passUrl = slug ? buildPassUrl(String(slug), String(upcomingBooking.id)) : '';
+    return {
+      bookingId: String(upcomingBooking.id),
+      shortRef: shortPassRef(String(upcomingBooking.id)),
+      status: isBookingMissed && upcomingBooking.status === 'booked' ? 'slot_passed' : String(upcomingBooking.status || 'booked'),
+      merchantName: merchant?.store_name || merchant?.name || upcomingBooking.merchant_name || 'Risev merchant',
+      merchantLogoUrl: imageUrl(merchant?.logo_url || merchant?.logo),
+      merchantCoverUrl: imageUrl(merchant?.banner || merchant?.cover_url || merchant?.background_image),
+      passUrl,
+      qrUrl: passUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(passUrl)}` : '',
+      bookingDate: formatUpcomingDate(upcomingBooking.booking_date),
+      startTime: String(upcomingBooking.start_time || '—'),
+      serviceText: serviceNames.join(', ') || upcomingBooking.expand?.service?.title || upcomingBooking.service_name || 'Appointment',
+      branchName: upcomingBooking.expand?.branch?.name || upcomingBooking.branch_name || merchant?.name || 'Main Store',
+      staffName: upcomingBooking.expand?.staff?.name || upcomingBooking.staff_name || '',
+      total: Number(upcomingBooking.total_price || upcomingBooking.total || 0),
+      customerName: upcomingBooking.customer_name || user?.name || '',
+      locale,
+    };
+  })();
+
+  const saveCustomerPass = async () => {
+    if (!appointmentPassData?.passUrl) return Alert.alert('Pass unavailable', 'The booking link is not available yet.');
+    try { await saveAppointmentPass(appointmentPassData); }
+    catch { Alert.alert('Could not save pass', 'Please try again.'); }
+  };
+
+  const shareCustomerPass = async () => {
+    if (!appointmentPassData?.passUrl) return Alert.alert('Pass unavailable', 'The booking link is not available yet.');
+    try {
+      const result = await shareAppointmentPass(appointmentPassData);
+      if (result === 'copied') Alert.alert('Pass link copied', 'Paste it into WhatsApp or anywhere else.');
+    } catch { Alert.alert('Could not share the pass', 'Please try again.'); }
+  };
+
   const defaultCard: LoyaltyCardItem = {
     id: 'demo-duans-card',
     merchantName: "Duans's Store",
@@ -2171,237 +2225,41 @@ export default function CustomerDashboard() {
         </View>
       </Modal>
 
-      {/* Appointment Pass Pop-up Modal */}
-      <Modal
-        visible={appointmentPassModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAppointmentPassModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { 
-            backgroundColor: '#FFFFFF', 
-            maxWidth: 420, 
-            padding: 22, 
-            borderRadius: 28,
-            borderWidth: 1.5,
-            borderColor: '#FFE38F',
-            shadowColor: '#FFC700',
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.25,
-            shadowRadius: 24,
-            elevation: 10,
-          }]}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 16 }}>
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: isBookingMissed ? '#FEE2E2' : (hasMarkedArrived ? '#DCFCE7' : '#FEF3C7'),
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 16,
-                gap: 6
-              }}>
-                <View style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: isBookingMissed ? '#DC2626' : (hasMarkedArrived ? '#16A34A' : '#D97706')
-                }} />
-                <Text style={{
-                  fontSize: 11,
-                  fontFamily: 'PlusJakartaSans_800ExtraBold',
-                  color: isBookingMissed ? '#DC2626' : (hasMarkedArrived ? '#15803D' : '#B45309')
-                }}>
-                  {isBookingMissed ? 'SLOT MISSED' : (hasMarkedArrived ? 'ARRIVAL CONFIRMED' : 'BOOKING CONFIRMED')}
-                </Text>
-              </View>
-
-              <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1A1400', alignSelf: 'flex-start', marginBottom: 14 }}>
-              Appointment Pass
-            </Text>
-
-            {/* Countdown / Status Box */}
-            <View style={{
-              backgroundColor: isBookingMissed ? '#FEF2F2' : '#FFFBEA',
-              borderWidth: 1,
-              borderColor: isBookingMissed ? '#FECACA' : '#FFE38F',
-              borderRadius: 18,
-              padding: 14,
-              alignItems: 'center',
-              width: '100%',
-              marginBottom: 16,
-              ...(Platform.OS === 'web' ? {
-                boxShadow: isBookingMissed
-                  ? 'inset 2px 2px 5px rgba(239, 68, 68, 0.1), inset -2px -2px 5px #ffffff'
-                  : 'inset 2px 2px 5px rgba(185, 172, 154, 0.2), inset -2px -2px 5px #ffffff',
-              } : {})
-            }}>
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: isBookingMissed ? '#DC2626' : '#806400' }}>
-                {isBookingMissed ? 'Appointment Status:' : (hasMarkedArrived ? 'Arrival Status:' : 'Your appointment starts in:')}
-              </Text>
-              <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: isBookingMissed ? '#DC2626' : '#1A1400', marginTop: 4 }}>
-                {isBookingMissed ? 'Missed Appointment' : (hasMarkedArrived ? 'Checked In at Store' : (bookingCountdown || 'Starting Soon'))}
-              </Text>
-            </View>
-
-            {/* Details Grid */}
-            <View style={{
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderColor: '#F1F5F9',
-              paddingVertical: 14,
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              rowGap: 12,
-              width: '100%',
-              marginBottom: 16
-            }}>
-              <View style={{ width: '50%' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Service</Text>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
-                  {(() => {
-                    let items = upcomingBooking?.items_summary;
-                    if (typeof items === 'string') {
-                      try { items = JSON.parse(items); } catch (e) { items = []; }
-                    }
-                    if (Array.isArray(items) && items.length > 0) {
-                      return items.map((it: any) => it.name).join(', ');
-                    }
-                    return 'Service Appointment';
-                  })()}
-                </Text>
-              </View>
-
-              <View style={{ width: '50%' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Provider</Text>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
-                  {upcomingBooking?.expand?.staff?.name || 'Any Provider'}
-                </Text>
-              </View>
-
-              <View style={{ width: '50%' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Slot Time</Text>
-                <Text style={{
-                  fontSize: 13,
-                  fontFamily: 'PlusJakartaSans_700Bold',
-                  color: isBookingMissed ? '#64748B' : '#1A1400',
-                  marginTop: 2,
-                  textDecorationLine: isBookingMissed ? 'line-through' : 'none'
-                }}>
-                  {upcomingBooking?.booking_date} @ {upcomingBooking?.start_time}
-                </Text>
-              </View>
-
-              <View style={{ width: '50%' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>Branch</Text>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A1400', marginTop: 2 }}>
-                  {upcomingBooking?.expand?.branch?.name || (upcomingBooking?.expand?.merchant?.name ? `${upcomingBooking.expand.merchant.name} (HQ)` : 'Main Store')}
-                </Text>
-              </View>
-            </View>
-
-            {/* Bottom Actions */}
+      {/* The same appointment ticket used on the booking page. */}
+      <Modal visible={appointmentPassModalVisible} transparent animationType="fade" onRequestClose={() => setAppointmentPassModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(10, 12, 16, 0.88)', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setAppointmentPassModalVisible(false)} />
+          <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', maxWidth: 390, maxHeight: '92%' }} contentContainerStyle={{ paddingBottom: 10 }}>
+            <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" style={{ alignSelf: 'flex-end', width: 38, height: 38, borderRadius: 19, backgroundColor: '#303238', alignItems: 'center', justifyContent: 'center', marginBottom: 9 }}>
+              <Ionicons name="close" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} /> : null}
+            {!isBookingMissed && !hasMarkedArrived && bookingCountdown ? <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', textAlign: 'center', fontSize: 12, marginTop: 10 }}>{bookingCountdown}</Text> : null}
             {isBookingMissed ? (
-              <View style={{ width: '100%', gap: 10 }}>
-                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center' }}>
-                  This slot has passed. Would you like to choose another time?
-                </Text>
-
-                <TouchableOpacity
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#0F172A',
-                    borderRadius: 16,
-                    paddingVertical: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    shadowColor: '#0F172A',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }}
-                  onPress={handleRescheduleBooking}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-                  <Text style={{
-                    fontSize: 14,
-                    fontFamily: 'PlusJakartaSans_800ExtraBold',
-                    color: '#FFFFFF'
-                  }}>
-                    Reschedule Appointment ➔
-                  </Text>
+              <View style={{ marginTop: 12, gap: 8 }}>
+                <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, textAlign: 'center' }}>This appointment time has passed.</Text>
+                <TouchableOpacity onPress={handleRescheduleBooking} style={{ backgroundColor: '#FFC700', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}>
+                  <Text style={{ color: '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Choose another time</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{
-                    width: '100%',
-                    paddingVertical: 10,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onPress={handleDismissMissedBooking}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
-                    Dismiss This Pass
-                  </Text>
-                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDismissMissedBooking} style={{ paddingVertical: 9, alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Dismiss pass</Text></TouchableOpacity>
               </View>
             ) : (
-              <>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginBottom: 12 }}>
-                  Tap the button below as soon as you step inside the store:
-                </Text>
-
-                <TouchableOpacity
-                  style={{
-                    width: '100%',
-                    backgroundColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
-                    borderRadius: 16,
-                    paddingVertical: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    shadowColor: hasMarkedArrived ? '#22C55E' : '#FFC700',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }}
-                  onPress={handleMarkArrived}
-                  disabled={hasMarkedArrived || markingArrivedLoading}
-                  activeOpacity={0.85}
-                >
-                  {markingArrivedLoading ? (
-                    <ActivityIndicator color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
-                  ) : (
-                    <>
-                      <Ionicons name="location" size={18} color={hasMarkedArrived ? '#FFFFFF' : '#1A1400'} />
-                      <Text style={{
-                        fontSize: 14,
-                        fontFamily: 'PlusJakartaSans_800ExtraBold',
-                        color: hasMarkedArrived ? '#FFFFFF' : '#1A1400'
-                      }}>
-                        {hasMarkedArrived ? '✓ ARRIVAL CONFIRMED' : '📍 I HAVE ARRIVED'}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity onPress={handleMarkArrived} disabled={hasMarkedArrived || markingArrivedLoading} style={{ backgroundColor: hasMarkedArrived ? '#15803D' : '#FFC700', borderRadius: 14, paddingVertical: 14, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {markingArrivedLoading ? <ActivityIndicator color="#111111" /> : <Ionicons name={hasMarkedArrived ? 'checkmark-circle' : 'location-outline'} size={18} color={hasMarkedArrived ? '#FFFFFF' : '#111111'} />}
+                <Text style={{ color: hasMarkedArrived ? '#FFFFFF' : '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 }}>{hasMarkedArrived ? 'Arrival confirmed' : 'I’m here — Check in'}</Text>
+              </TouchableOpacity>
             )}
-          </View>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 9 }}>
+              <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.5 }}>
+                <Ionicons name="download-outline" size={17} color="#111111" />
+                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#111111', fontSize: 11.5 }}>Save PDF</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, backgroundColor: '#25D366', borderRadius: 13, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.5 }}>
+                <Ionicons name="logo-whatsapp" size={17} color="#062D17" />
+                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#062D17', fontSize: 11.5 }}>WhatsApp</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 

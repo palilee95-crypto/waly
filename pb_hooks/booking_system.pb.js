@@ -846,6 +846,8 @@ routerAdd("GET", "/api/risev/customer/active-booking", (e) => {
             id: m.id,
             name: m.getString("name"),
             logo: m.getString("logo"),
+            banner: m.getString("banner"),
+            cover_url: m.getString("cover_url"),
             pwa_slug: m.getString("pwa_slug")
           };
         }
