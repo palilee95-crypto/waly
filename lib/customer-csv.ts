@@ -8,6 +8,8 @@ import {
   LedgerType,
   fetchAudience,
   fetchTransactions,
+  formatLocalDateFromIso,
+  formatLocalTimeFromIso,
 } from './customer-workspace';
 
 const MAX_ROWS = 2000;
@@ -107,8 +109,8 @@ export function buildLedgerCsv(rows: LedgerRow[]): string {
   const lines = [header.join(',')];
   for (const row of rows) {
     const fields = [
-      row.created.slice(0, 10),
-      row.created.slice(11, 16),
+      formatLocalDateFromIso(row.created),
+      formatLocalTimeFromIso(row.created),
       row.customerName,
       row.customerPhone,
       row.type,

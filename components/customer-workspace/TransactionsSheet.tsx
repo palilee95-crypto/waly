@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radii } from '@/theme';
-import { LedgerRow, LedgerType, type LedgerFocus, fetchTransactions, formatLedgerImpact, formatShortDateFromIso } from '@/lib/customer-workspace';
+import { LedgerRow, LedgerType, type LedgerFocus, fetchTransactions, formatLedgerImpact, formatLocalTimeFromIso, formatShortDateFromIso } from '@/lib/customer-workspace';
 import { collectLedger, buildLedgerCsv, shareCsv } from '@/lib/customer-csv';
 import CustomerDetailSheet from './CustomerDetailSheet';
 import { pb } from '@/lib/pocketbase';
@@ -245,7 +245,7 @@ export default function TransactionsSheet({
                     <View style={styles.rowMain}>
                       <Text style={styles.rowName} numberOfLines={1}>{row.customerName}</Text>
                       <Text style={styles.rowWhen}>
-                        {formatShortDateFromIso(row.created)} · {row.created.slice(11, 16)}
+                        {formatShortDateFromIso(row.created)} · {formatLocalTimeFromIso(row.created)}
                       </Text>
                     </View>
                     <View style={styles.rowRight}>
@@ -267,7 +267,7 @@ export default function TransactionsSheet({
                       </Text>
                     </View>
                     <Text style={styles.rowMeta} numberOfLines={1}>{detail}</Text>
-                    {row.billCents > 0 && <TouchableOpacity onPress={(event) => { event.stopPropagation(); openPaidReceipt(row.id); }} accessibilityRole="button" accessibilityLabel={`View receipt for ${row.customerName}`} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#FFF3B5' }}>
+                    {row.hasReceipt && <TouchableOpacity onPress={(event) => { event.stopPropagation(); openPaidReceipt(row.id); }} accessibilityRole="button" accessibilityLabel={`View receipt for ${row.customerName}`} style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#FFF3B5' }}>
                       <Text style={{ fontSize: 11, fontWeight: '800', color: '#111' }}>{receiptBusyId === row.id ? 'Loading…' : 'Receipt'}</Text>
                     </TouchableOpacity>}
                   </View>
