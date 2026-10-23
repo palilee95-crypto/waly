@@ -40,7 +40,7 @@ import CustomerPushNotificationModal from '@/components/CustomerPushNotification
 import { isCustomerPushActive, getPushPermissionStatus } from '@/lib/push-notifications';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppointmentTicket from '@/components/AppointmentTicket';
-import { AppointmentPassData, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import { AppointmentPassData, PASS_SHEET_SURFACE, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
 import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
 import {
   getForYouRecommendations,
@@ -2227,39 +2227,47 @@ export default function CustomerDashboard() {
 
       {/* The same appointment ticket used on the booking page. */}
       <Modal visible={appointmentPassModalVisible} transparent animationType="fade" onRequestClose={() => setAppointmentPassModalVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: '#0B0D10', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setAppointmentPassModalVisible(false)} />
-          <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', maxWidth: 390, maxHeight: '92%' }} contentContainerStyle={{ paddingBottom: 10, paddingHorizontal: 12 }}>
-            <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" hitSlop={8} style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-              <Ionicons name="close" size={19} color="#FFFFFF" />
-            </TouchableOpacity>
-            {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} surfaceColor="#0B0D10" /> : null}
-            {!isBookingMissed && !hasMarkedArrived && bookingCountdown ? <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', textAlign: 'center', fontSize: 12, marginTop: 10 }}>{bookingCountdown}</Text> : null}
-            {isBookingMissed ? (
-              <View style={{ marginTop: 12, gap: 8 }}>
-                <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, textAlign: 'center' }}>This appointment time has passed.</Text>
-                <TouchableOpacity onPress={handleRescheduleBooking} style={{ backgroundColor: '#FFC700', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}>
-                  <Text style={{ color: '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Choose another time</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleDismissMissedBooking} style={{ paddingVertical: 9, alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Dismiss pass</Text></TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={handleMarkArrived} disabled={hasMarkedArrived || markingArrivedLoading} style={{ backgroundColor: hasMarkedArrived ? '#15803D' : '#FFC700', borderRadius: 14, paddingVertical: 14, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {markingArrivedLoading ? <ActivityIndicator color="#111111" /> : <Ionicons name={hasMarkedArrived ? 'checkmark-circle' : 'location-outline'} size={18} color={hasMarkedArrived ? '#FFFFFF' : '#111111'} />}
-                <Text style={{ color: hasMarkedArrived ? '#FFFFFF' : '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 }}>{hasMarkedArrived ? 'Arrival confirmed' : 'I’m here — Check in'}</Text>
-              </TouchableOpacity>
-            )}
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 9 }}>
-              <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
-                <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', fontSize: 12 }}>Save PDF</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
-                <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF', fontSize: 12 }}>WhatsApp</Text>
+          <View style={{ width: '100%', maxWidth: 390, maxHeight: '92%', backgroundColor: PASS_SHEET_SURFACE, borderRadius: 28, paddingTop: 8, paddingBottom: 14, overflow: 'hidden' }}>
+            <View style={{ paddingHorizontal: 12, alignItems: 'flex-end' }}>
+              <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <Ionicons name="close" size={19} color="#0F172A" />
               </TouchableOpacity>
             </View>
-          </ScrollView>
+            {/* Only the ticket scrolls; the actions stay pinned so the CTA is
+                always reachable on short screens. */}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 4 }}>
+              {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} surfaceColor={PASS_SHEET_SURFACE} /> : null}
+              {!isBookingMissed && !hasMarkedArrived && bookingCountdown ? <Text style={{ color: '#64748B', fontFamily: 'PlusJakartaSans_700Bold', textAlign: 'center', fontSize: 12, marginTop: 10 }}>{bookingCountdown}</Text> : null}
+            </ScrollView>
+            <View style={{ paddingHorizontal: 12, gap: 8, marginTop: 10 }}>
+              {isBookingMissed ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ color: '#0F172A', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, textAlign: 'center' }}>This appointment time has passed.</Text>
+                  <TouchableOpacity onPress={handleRescheduleBooking} style={{ backgroundColor: '#FFC700', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}>
+                    <Text style={{ color: '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Choose another time</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleDismissMissedBooking} style={{ paddingVertical: 9, alignItems: 'center' }}><Text style={{ color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Dismiss pass</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={handleMarkArrived} disabled={hasMarkedArrived || markingArrivedLoading} style={{ backgroundColor: hasMarkedArrived ? '#15803D' : '#FFC700', borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  {markingArrivedLoading ? <ActivityIndicator color="#111111" /> : <Ionicons name={hasMarkedArrived ? 'checkmark-circle' : 'location-outline'} size={18} color={hasMarkedArrived ? '#FFFFFF' : '#111111'} />}
+                  <Text style={{ color: hasMarkedArrived ? '#FFFFFF' : '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 }}>{hasMarkedArrived ? 'Arrival confirmed' : 'I’m here — Check in'}</Text>
+                </TouchableOpacity>
+              )}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 1 }}>
+                <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
+                  <Ionicons name="download-outline" size={16} color="#0F172A" />
+                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', fontSize: 12 }}>Save PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
+                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', fontSize: 12 }}>WhatsApp</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </View>
       </Modal>
 

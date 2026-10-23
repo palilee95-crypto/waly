@@ -24,7 +24,7 @@ import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
 import { ALL_TIME_SLOTS, getPeriodForSlot, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
-import { AppointmentPassData, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
+import { AppointmentPassData, PASS_SHEET_SURFACE, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
 import AppointmentTicket from '@/components/AppointmentTicket';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -4343,20 +4343,25 @@ export default function CustomerBookingPwaScreen() {
 
       {/* Shared appointment ticket: the same booking details are used for PDF export. */}
       <Modal visible={showPassSheet} transparent animationType="fade" onRequestClose={() => setShowPassSheet(false)}>
-        <View style={[styles.modalOverlay, { backgroundColor: '#0B0D10' }]}>
+        <View style={styles.passSheetBackdrop}>
           <TouchableOpacity style={styles.modalBackdropPress} onPress={() => setShowPassSheet(false)} />
-          <View style={[styles.loyaltyCardModalContent, { backgroundColor: 'transparent', padding: 0, maxHeight: '92%' }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8, paddingHorizontal: 12 }}>
+          <View style={styles.passSheetPanel}>
+            <View style={styles.passSheetHeader}>
               <TouchableOpacity
                 onPress={() => setShowPassSheet(false)}
                 accessibilityLabel="Close appointment pass"
                 hitSlop={8}
-                style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
+                style={styles.passSheetClose}
               >
-                <Ionicons name="close" size={19} color="#FFFFFF" />
+                <Ionicons name="close" size={19} color="#0F172A" />
               </TouchableOpacity>
-              <AppointmentTicket pass={passData} demo={passIsDemo} surfaceColor="#0B0D10" />
-              <View style={styles.passActions}>
+            </View>
+            {/* Only the ticket scrolls; the actions stay pinned so the CTA is
+                always reachable on short screens. */}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 4 }}>
+              <AppointmentTicket pass={passData} demo={passIsDemo} surfaceColor={PASS_SHEET_SURFACE} />
+            </ScrollView>
+            <View style={styles.passActions}>
                 <TouchableOpacity
                   onPress={handleCheckIn}
                   disabled={hasArrived || checkingIn || passLoading || passInactive || passIsDemo}
@@ -4407,8 +4412,7 @@ export default function CustomerBookingPwaScreen() {
                       ? (locale === 'ms' ? 'Anda telah check-in. Simpan pas ini untuk lawatan anda.' : 'You are checked in. Keep this pass for your visit.')
                       : (locale === 'ms' ? 'Check-in apabila anda tiba di kedai.' : 'Check in when you arrive at the store.')}
                 </Text>
-              </View>
-            </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -4597,14 +4601,18 @@ export default function CustomerBookingPwaScreen() {
 }
 
 const styles = StyleSheet.create({
-  passActions: { marginTop: 14, gap: 8 },
+  passSheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 18 },
+  passSheetPanel: { width: '100%', maxWidth: 400, maxHeight: '92%', backgroundColor: PASS_SHEET_SURFACE, borderRadius: 28, paddingTop: 8, paddingBottom: 14, overflow: 'hidden' },
+  passSheetHeader: { paddingHorizontal: 12, alignItems: 'flex-end' },
+  passSheetClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  passActions: { marginTop: 10, gap: 8, paddingHorizontal: 12 },
   passPrimary: { height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   passPrimaryText: { fontSize: 13.5, fontFamily: 'PlusJakartaSans_800ExtraBold' },
   passSecondaryRow: { flexDirection: 'row', gap: 8 },
-  passGhost: { flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  passGhostText: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' },
-  passHint: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.60)', textAlign: 'center', marginTop: 2 },
-  passError: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FCA5A5', textAlign: 'center' },
+  passGhost: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  passGhostText: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' },
+  passHint: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 2 },
+  passError: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626', textAlign: 'center' },
   passDisabled: { opacity: 0.4 },
   container: {
     flex: 1,
