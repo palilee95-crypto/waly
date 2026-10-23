@@ -1139,7 +1139,10 @@ function buildTransactions($app, ctx, opts) {
       "CAST(COALESCE(t.points, 0) AS TEXT) as points, " +
       "IFNULL(u.name, '') as customer_name, IFNULL(u.phone, '') as customer_phone, " +
       "IFNULL(b.name, '') as branch_name, IFNULL(s.name, '') as staff_name, " +
-      "IFNULL(json_extract(t.metadata, '$.voucher_code'), '') as voucher_code " +
+      "IFNULL(json_extract(t.metadata, '$.voucher_code'), '') as voucher_code, " +
+      // `transaction` is a reserved word in SQLite, so the column needs quoting.
+      // Only paid receipts are openable — the viewer rejects anything else.
+      "(SELECT COUNT(*) FROM digital_receipts dr WHERE dr.\"transaction\" = t.id AND dr.payment_status = 'paid') as receipt_count " +
       "FROM transactions t LEFT JOIN users u ON u.id = t.customer " +
       "LEFT JOIN branches b ON b.id = t.branch LEFT JOIN users s ON s.id = t.staff WHERE " +
       scopeSql +
@@ -1159,6 +1162,7 @@ function buildTransactions($app, ctx, opts) {
       branch_name: "",
       staff_name: "",
       voucher_code: "",
+      receipt_count: 0,
     }
   ).map(function (r) {
     return {
@@ -1174,6 +1178,8 @@ function buildTransactions($app, ctx, opts) {
       branchName: r.branch_name || "",
       staffName: r.staff_name || "",
       voucherCode: r.voucher_code || "",
+      // A voucher can cover the whole bill, so a RM0 sale still has a receipt.
+      hasReceipt: Number(r.receipt_count) > 0,
     };
   });
 

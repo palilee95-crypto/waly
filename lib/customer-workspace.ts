@@ -224,6 +224,8 @@ export type LedgerRow = {
   branchName: string;
   staffName: string;
   voucherCode: string;
+  /** True when a paid digital receipt exists (a voucher can cover the whole bill). */
+  hasReceipt?: boolean;
 };
 
 /** A ledger event can be a stamp or reward without a sale amount. */
@@ -688,9 +690,24 @@ export function relativeDays(iso: string): string {
 }
 
 export function formatShortDateFromIso(iso: string): string {
-  const t = new Date(iso);
+  const t = new Date(String(iso || '').replace(' ', 'T'));
   if (isNaN(t.getTime())) return iso;
   return t.toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+}
+
+/** PocketBase stores UTC; the ledger must read in the device's local time. */
+export function formatLocalTimeFromIso(iso: string): string {
+  const t = new Date(String(iso || '').replace(' ', 'T'));
+  if (isNaN(t.getTime())) return String(iso || '').slice(11, 16);
+  return t.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/** Local calendar day, so a late-night sale is not exported as the previous day. */
+export function formatLocalDateFromIso(iso: string): string {
+  const t = new Date(String(iso || '').replace(' ', 'T'));
+  if (isNaN(t.getTime())) return String(iso || '').slice(0, 10);
+  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
 /** 'YYYY-MM-DD' (store-local) -> short label, without timezone drift. */
