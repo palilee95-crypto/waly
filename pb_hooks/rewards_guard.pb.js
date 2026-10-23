@@ -76,7 +76,7 @@ onRecordDeleteRequest((e) => {
     );
   } catch (err) {
     console.log("[REWARDS GUARD] program lookup failed:", err && err.message ? err.message : err);
-    throw new ApiError(500, "Could not verify this reward is not in use. Please try again.");
+    throw new BadRequestError("Could not verify this reward is not in use. Please try again.");
   }
   if (linked && linked.length > 0) {
     throw new BadRequestError(
@@ -97,7 +97,7 @@ onRecordDeleteRequest((e) => {
     );
   } catch (err) {
     console.log("[REWARDS GUARD] voucher lookup failed:", err && err.message ? err.message : err);
-    throw new ApiError(500, "Could not verify this reward is not in use. Please try again.");
+    throw new BadRequestError("Could not verify this reward is not in use. Please try again.");
   }
   if (activeVouchers && activeVouchers.length > 0) {
     throw new BadRequestError(
