@@ -544,9 +544,19 @@ routerAdd("GET", "/api/risev/nfc/receipt", (e) => {
     }
     // A voucher can cover the whole bill; the receipt still exists as a paid
     // record with a RM0.00 total and the voucher discount.
+    //
+    // Self-heal: a receipt written before `share_token` existed has no token, and
+    // the customer screen can only open a receipt through that token. Mint one on
+    // read so "tap to retry" resolves instead of looping forever.
+    let shareToken = receipt.getString("share_token");
+    if (!shareToken) {
+      shareToken = $security.randomString(24);
+      receipt.set("share_token", shareToken);
+      $app.save(receipt);
+    }
     return e.json(200, {
       receipt_id: receipt.id,
-      share_token: receipt.getString("share_token"),
+      share_token: shareToken,
       paid_sale: true
     });
   } catch (err) {
@@ -573,9 +583,16 @@ routerAdd("GET", "/api/risev/customer/transaction-receipt", (e) => {
     const status = receipt.getString("payment_status");
     const total = Number(receipt.get("total_amount")) || 0;
     const usable = status === "paid" || (status === "recorded" && total > 0);
+    // Same self-heal as the NFC route: old receipts carry no token.
+    let shareToken = usable ? receipt.getString("share_token") : "";
+    if (usable && !shareToken) {
+      shareToken = $security.randomString(24);
+      receipt.set("share_token", shareToken);
+      try { $app.save(receipt); } catch (saveErr) {}
+    }
     return e.json(200, {
       receipt_id: usable ? receipt.id : "",
-      share_token: usable ? receipt.getString("share_token") : ""
+      share_token: shareToken
     });
   } catch (err) { return e.json(404, { message: "Transaction not found" }); }
 });
