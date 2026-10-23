@@ -40,6 +40,7 @@ interface Reward {
   reward_visual_id?: string;
   discount_type?: string;
   discount_value?: number;
+  reward_scope?: 'catalog' | 'stamp_goal' | 'milestone' | 'system';
   metadata?: Record<string, any>;
 }
 
@@ -709,8 +710,11 @@ export default function UnifiedRewardsScreen() {
     if (!user || !user.merchant_id) return;
     try {
       setLoadingRewards(true);
+      // `system` rows back internal vouchers (points -> cash) and are managed by
+      // Risev. The stamp prize and milestone records are rendered from the program,
+      // never as merchant-owned catalogue cards.
       const records = await pb.collection('rewards').getFullList({
-        filter: `merchant = "${user.merchant_id}"`,
+        filter: `merchant = "${user.merchant_id}" && reward_scope != "system"`,
         sort: '-created',
         requestKey: null,
       });
@@ -1088,6 +1092,9 @@ export default function UnifiedRewardsScreen() {
       formData.append('applicable_items_text', formApplicableItemsText.trim());
       formData.append('discount_scope', formType === 'discount' ? formDiscountScope : 'all');
       formData.append('is_active', String(formIsActive));
+      if (!editingReward) {
+        formData.append('reward_scope', 'catalog');
+      }
       if (formCampaignType) {
         formData.append('metadata', JSON.stringify({
           ...(editingReward?.metadata || {}),
@@ -1143,6 +1150,15 @@ export default function UnifiedRewardsScreen() {
   };
 
   const handleOpenDelete = (reward: Reward) => {
+    if (reward.id === linkedRewardId) {
+      Alert.alert(
+        locale === 'en' ? 'Stamp card prize' : 'Ganjaran kad setem',
+        locale === 'en'
+          ? 'This reward is what your stamp card pays out. Pick a different prize in Card Design first, then you can delete it.'
+          : 'Ganjaran ini ialah hadiah kad setem anda. Pilih ganjaran lain dalam Rekaan Kad dahulu, kemudian anda boleh memadamnya.'
+      );
+      return;
+    }
     setSelectedDeleteReward(reward);
     setDeleteModalVisible(true);
   };
@@ -1157,7 +1173,7 @@ export default function UnifiedRewardsScreen() {
       fetchRewards();
     } catch (err: any) {
       console.warn("Failed to delete reward:", err.message || err);
-      const msg = err?.data?.message || err?.message || "Failed to delete reward.";
+      const msg = err?.response?.message || err?.data?.message || err?.message || "Failed to delete reward.";
       Alert.alert("Error", msg);
     } finally {
       setIsDeletingReward(false);
@@ -1266,6 +1282,7 @@ export default function UnifiedRewardsScreen() {
       formData.append('stock', String(inlineStock ? (parseInt(inlineStock, 10) || 1000000) : 1000000));
       formData.append('points_cost', '0');
       formData.append('is_active', 'true');
+      formData.append('reward_scope', linkToStampCard ? 'stamp_goal' : 'catalog');
       if (inlineCampaignType) {
         formData.append('metadata', JSON.stringify({
           campaign_type: inlineCampaignType,
@@ -1943,11 +1960,22 @@ export default function UnifiedRewardsScreen() {
           const hasBirthday = !!birthdayReward;
           const bdayActive = hasBirthday && (birthdayReward.is_active ?? true);
           const bdayCount = hasBirthday ? 1 : 0;
-          const activeCount = rewards.filter((r) => r.is_active).length + (bdayActive ? 1 : 0);
-          const draftCount = rewards.filter((r) => !r.is_active).length + (hasBirthday && !bdayActive ? 1 : 0);
-          const discountCount = rewards.filter((r) => r.type === 'discount').length;
-          const freeItemCount = rewards.filter((r) => r.type === 'free_item').length;
-          const totalCount = rewards.length + bdayCount;
+          // The stamp prize is rendered from the program, and milestone records are
+          // internal shadows for sub-reward vouchers. Neither is merchant content.
+          // With the Points engine off the catalogue has nothing to spend against,
+          // so the whole list goes with the toggle (the birthday card is separate
+          // and still renders).
+          const catalogueRewards = enablePoints
+            ? rewards.filter((r) => r.id !== linkedRewardId && r.reward_scope !== 'milestone')
+            : [];
+          const stampReward = linkedRewardId
+            ? rewards.find((r) => r.id === linkedRewardId) || null
+            : null;
+          const activeCount = catalogueRewards.filter((r) => r.is_active).length + (bdayActive ? 1 : 0);
+          const draftCount = catalogueRewards.filter((r) => !r.is_active).length + (hasBirthday && !bdayActive ? 1 : 0);
+          const discountCount = catalogueRewards.filter((r) => r.type === 'discount').length;
+          const freeItemCount = catalogueRewards.filter((r) => r.type === 'free_item').length;
+          const totalCount = catalogueRewards.length + bdayCount;
 
           const showBirthdayCard = hasBirthday && (
             catalogueFilter === 'all' ||
@@ -1956,7 +1984,7 @@ export default function UnifiedRewardsScreen() {
             (catalogueFilter === 'draft' && !bdayActive)
           );
 
-          const filteredRewards = rewards.filter((r) => {
+          const filteredRewards = catalogueRewards.filter((r) => {
             if (catalogueFilter === 'birthday') return false;
             if (catalogueFilter === 'active') return r.is_active;
             if (catalogueFilter === 'draft') return !r.is_active;
@@ -2006,17 +2034,119 @@ export default function UnifiedRewardsScreen() {
                     {locale === 'en' ? 'Manage point redemptions & rewards' : 'Urus penebusan mata & ganjaran'}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.addRewardBtn}
-                  onPress={handleOpenCreate}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={18} color="#FFC700" />
-                  <Text style={styles.addRewardBtnText}>
-                    {t('create_reward')}
-                  </Text>
-                </TouchableOpacity>
+                {enablePoints && (
+                  <TouchableOpacity
+                    style={styles.addRewardBtn}
+                    onPress={handleOpenCreate}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={18} color="#FFC700" />
+                    <Text style={styles.addRewardBtnText}>
+                      {t('create_reward')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
+
+              {/* Stamp engine: one prize, owned by Card Design. Read-only here. */}
+              {enableStamps && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setActiveTab('card_design')}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    backgroundColor: stampReward ? '#ECFDF5' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderStyle: stampReward ? 'solid' : 'dashed',
+                    borderColor: stampReward ? '#A7F3D0' : '#CBD5E1',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: stampReward ? '#10B981' : '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="card" size={17} color={stampReward ? '#FFFFFF' : '#64748B'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.6 }}>
+                      STAMP REWARD
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', marginTop: 1 }}>
+                      {stampReward
+                        ? stampReward.name
+                        : (locale === 'en' ? 'Set your stamp reward' : 'Tetapkan ganjaran setem')}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', marginTop: 1 }}>
+                      {stampReward
+                        ? (locale === 'en'
+                            ? `${requiredStamps} stamps = 1 voucher`
+                            : `${requiredStamps} setem = 1 baucar`)
+                        : (locale === 'en'
+                            ? 'Choose the prize your stamp card pays out'
+                            : 'Pilih hadiah yang diberi oleh kad setem anda')}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                    <Text style={{ fontSize: 9.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
+                      {locale === 'en' ? 'Card Design' : 'Rekaan Kad'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {/* Points engine: the cash-out rate is automatic, not a catalogue item. */}
+              {enablePoints && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: '#EFF6FF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="swap-horizontal" size={17} color="#2563EB" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#2563EB', letterSpacing: 0.6 }}>
+                      {locale === 'en' ? 'POINTS · CASH OUT' : 'MATA · TUNAI'}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#475569', marginTop: 1 }}>
+                      {locale === 'en'
+                        ? `${pointsPerRm} pts = RM 1.00 discount · converted in the customer's card`
+                        : `${pointsPerRm} mata = diskaun RM 1.00 · ditukar dalam kad pelanggan`}
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {/* Filter Pills Bar */}
               {totalCount > 0 && (
@@ -2053,7 +2183,7 @@ export default function UnifiedRewardsScreen() {
 
               {loadingRewards ? (
                 <ActivityIndicator size="large" color="#050505" style={{ marginVertical: 40 }} />
-              ) : totalCount === 0 ? (
+              ) : totalCount === 0 && !enableStamps ? (
                 <View style={styles.emptyContainer}>
                   <View style={styles.emptyIconBg}>
                     <Ionicons name="gift-outline" size={48} color="#94A3B8" />
@@ -2090,7 +2220,7 @@ export default function UnifiedRewardsScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              ) : filteredRewards.length === 0 && !showBirthdayCard ? (
+              ) : filteredRewards.length === 0 && !showBirthdayCard && totalCount > 0 ? (
                 <View style={[styles.emptyContainer, { paddingVertical: 40 }]}>
                   <Ionicons name="filter-outline" size={36} color="#94A3B8" style={{ marginBottom: 8 }} />
                   <Text style={[styles.emptyTitle, { fontSize: 16 }]}>{locale === 'en' ? 'No matching rewards' : 'Tiada ganjaran sepadan'}</Text>
@@ -3787,6 +3917,8 @@ export default function UnifiedRewardsScreen() {
           // -------------------------------------------------------------
           if (stampSubScreen === 'reward') {
             const filteredRewards = rewards.filter((r) => {
+              // Milestone shadows are internal voucher backing, not pickable prizes.
+              if (r.reward_scope === 'milestone') return false;
               if (rewardCategoryFilter === 'free_item' && r.type !== 'free_item') return false;
               if (rewardCategoryFilter === 'discount' && r.type !== 'discount') return false;
               if (rewardSearchQuery.trim()) {

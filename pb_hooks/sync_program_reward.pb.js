@@ -50,6 +50,7 @@ onRecordCreate((e) => {
     reward.set('stock', 1000000); // effectively unlimited
     reward.set('is_active', true);
     reward.set('type', 'free_item');
+    reward.set('reward_scope', 'stamp_goal');
     
     $app.save(reward);
     
@@ -102,6 +103,7 @@ onRecordUpdate((e) => {
       reward.set('stock', 1000000);
       reward.set('is_active', true);
       reward.set('type', 'free_item');
+      reward.set('reward_scope', 'stamp_goal');
       
       $app.save(reward);
       e.record.set('linked_reward', reward.id);
@@ -130,44 +132,6 @@ onRecordDelete((e) => {
   return e.next();
 }, 'loyalty_programs');
 
-onRecordDelete((e) => {
-  const rewardId = e.record.id;
-
-  // 1. Check if linked to an active loyalty program
-  try {
-    const activePrograms = $app.findRecordsByFilter('loyalty_programs', `linked_reward = "${rewardId}" && is_active = true`, '-created', 1, 0);
-    if (activePrograms.length > 0) {
-      throw new BadRequestError("Cannot delete this reward because it is linked to your active stamp card program.");
-    }
-    const activeVouchers = $app.findRecordsByFilter('vouchers', `reward = "${rewardId}" && status = "active"`, '-created', 1, 0);
-    if (activeVouchers.length > 0) {
-      throw new BadRequestError("Cannot delete this reward because customers currently hold active vouchers for it.");
-    }
-  } catch (err) {
-    if (err instanceof BadRequestError) throw err;
-  }
-
-  // 2. Unlink from any inactive loyalty programs
-  try {
-    const programs = $app.findRecordsByFilter('loyalty_programs', `linked_reward = "${rewardId}"`, '-created', 50, 0);
-    for (const prog of programs) {
-      prog.set('linked_reward', null);
-      $app.save(prog);
-    }
-  } catch (err) {
-    console.log("[REWARD DELETE] Error unlinking loyalty programs:", err.message || err);
-  }
-
-  // 3. Unlink from any campaigns
-  try {
-    const campaigns = $app.findRecordsByFilter('campaigns', `linked_reward = "${rewardId}"`, '-created', 100, 0);
-    for (const camp of campaigns) {
-      camp.set('linked_reward', null);
-      $app.save(camp);
-    }
-  } catch (err) {
-    console.log("[REWARD DELETE] Error unlinking campaigns:", err.message || err);
-  }
-
-  return e.next();
-}, 'rewards');
+// The rewards delete guard moved to pb_hooks/rewards_guard.pb.js. It has to be an
+// `onRecordDeleteRequest` hook so a superuser can still clean up, and a second
+// same-event registration inside this file is not reliable in this JSVM.
