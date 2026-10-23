@@ -2227,13 +2227,13 @@ export default function CustomerDashboard() {
 
       {/* The same appointment ticket used on the booking page. */}
       <Modal visible={appointmentPassModalVisible} transparent animationType="fade" onRequestClose={() => setAppointmentPassModalVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(10, 12, 16, 0.88)', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
+        <View style={{ flex: 1, backgroundColor: '#0B0D10', justifyContent: 'center', alignItems: 'center', padding: 18 }}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setAppointmentPassModalVisible(false)} />
           <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', maxWidth: 390, maxHeight: '92%' }} contentContainerStyle={{ paddingBottom: 10, paddingHorizontal: 12 }}>
-            <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" hitSlop={8} style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
               <Ionicons name="close" size={19} color="#FFFFFF" />
             </TouchableOpacity>
-            {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} surfaceColor="#0A0C10" /> : null}
+            {appointmentPassData ? <AppointmentTicket pass={appointmentPassData} surfaceColor="#0B0D10" /> : null}
             {!isBookingMissed && !hasMarkedArrived && bookingCountdown ? <Text style={{ color: '#FFFFFF', fontFamily: 'PlusJakartaSans_700Bold', textAlign: 'center', fontSize: 12, marginTop: 10 }}>{bookingCountdown}</Text> : null}
             {isBookingMissed ? (
               <View style={{ marginTop: 12, gap: 8 }}>

@@ -4301,13 +4301,14 @@ export default function CustomerBookingPwaScreen() {
 
       {/* Shared appointment ticket: the same booking details are used for PDF export. */}
       <Modal visible={showPassSheet} transparent animationType="fade" onRequestClose={() => setShowPassSheet(false)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: '#0B0D10' }]}>
           <TouchableOpacity style={styles.modalBackdropPress} onPress={() => setShowPassSheet(false)} />
           <View style={[styles.loyaltyCardModalContent, { backgroundColor: 'transparent', padding: 0, maxHeight: '92%' }]}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8, paddingHorizontal: 12 }}>
               <TouchableOpacity
                 onPress={() => setShowPassSheet(false)}
                 accessibilityLabel="Close appointment pass"
+                hitSlop={8}
                 style={{ alignSelf: 'flex-end', width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
               >
                 <Ionicons name="close" size={19} color="#FFFFFF" />
@@ -4359,10 +4360,10 @@ export default function CustomerBookingPwaScreen() {
 
                 <Text style={styles.passHint}>
                   {passInactive
-                    ? 'This pass is no longer active.'
+                    ? (locale === 'ms' ? 'Pas ini tidak lagi aktif.' : 'This pass is no longer active.')
                     : hasArrived
-                      ? 'You are checked in. Keep this pass for your visit.'
-                      : 'Check in when you arrive at the store.'}
+                      ? (locale === 'ms' ? 'Anda telah check-in. Simpan pas ini untuk lawatan anda.' : 'You are checked in. Keep this pass for your visit.')
+                      : (locale === 'ms' ? 'Check-in apabila anda tiba di kedai.' : 'Check in when you arrive at the store.')}
                 </Text>
               </View>
             </ScrollView>
@@ -4560,7 +4561,7 @@ const styles = StyleSheet.create({
   passSecondaryRow: { flexDirection: 'row', gap: 8 },
   passGhost: { flex: 1, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   passGhostText: { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' },
-  passHint: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 2 },
+  passHint: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.60)', textAlign: 'center', marginTop: 2 },
   passError: { fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#FCA5A5', textAlign: 'center' },
   passDisabled: { opacity: 0.4 },
   container: {
