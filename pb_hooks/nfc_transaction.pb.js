@@ -65,15 +65,11 @@ routerAdd("POST", "/api/risev/nfc/complete", (e) => {
       let priorReceiptId = "";
       let receiptError = "";
       try {
-        // Only when the claim carried a sale. The helper throws when no ledger
-        // row exists, and stamp-only claims (or claims whose transaction failed)
-        // have none — re-confirming one of those must not surface a recovery
-        // error for a receipt that never existed.
-        const priorBill = Number(claim.get("bill_amount")) || 0;
-        const priorHadVoucher = Boolean(claim.getString("voucher")) || (Number(body.discount_amount) || 0) > 0;
-        if (priorBill > 0 || priorHadVoucher) {
-          priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
-        }
+        // Always attempt recovery: the helper decides from the ledger whether a
+        // receipt is owed (a RM0 voucher sale is) and returns "" when the claim
+        // had no transaction. Gating on the claim's own voucher field missed
+        // vouchers that were only submitted with the checkout body.
+        priorReceiptId = receiptHelper.ensureNfcPaidReceipt(claim, null, null);
       } catch (err) {
         receiptError = "Receipt recovery failed. Please contact support with this claim ID.";
         console.log("[NFC COMPLETE] Receipt recovery failed for", claim.id, err.message || err);
