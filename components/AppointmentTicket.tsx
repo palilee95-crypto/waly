@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppointmentPassData, passCopy, passStatusLabel, passStatusTone } from '@/lib/appointmentPass';
+import { AppointmentPassData, PASS_CARD_RADIUS, passCopy, passStatusLabel, passStatusTone } from '@/lib/appointmentPass';
 
 type Props = {
   pass: AppointmentPassData;
@@ -20,7 +20,9 @@ const font = {
   medium: 'PlusJakartaSans_500Medium',
 } as const;
 
-const RADIUS = 22;
+const RADIUS = PASS_CARD_RADIUS;
+// The card splits around this band; the cut-outs are centred on it.
+const PERFORATION_HEIGHT = 18;
 
 export default function AppointmentTicket({ pass, demo = false, surfaceColor = '#0B0D10' }: Props) {
   const copy = passCopy(pass.locale);
@@ -146,11 +148,17 @@ const styles = StyleSheet.create({
   providerText: { fontFamily: font.bold, color: '#3A3F47', fontSize: 12 },
   customerText: { fontFamily: font.medium, color: '#7A8494', fontSize: 10.5, marginTop: 8 },
 
-  perforation: { height: 18, backgroundColor: '#FFFFFF', justifyContent: 'center', position: 'relative', zIndex: 1 },
+  perforation: { height: PERFORATION_HEIGHT, backgroundColor: '#FFFFFF', justifyContent: 'center', position: 'relative', zIndex: 1 },
   dash: { height: 1, marginHorizontal: 20, borderTopWidth: 1, borderStyle: 'dashed', borderColor: '#D9DDE4' },
-  cutout: { position: 'absolute', top: -2, width: 22, height: 22, borderRadius: 11 },
-  cutoutLeft: { left: -11 },
-  cutoutRight: { right: -11 },
+  cutout: {
+    position: 'absolute',
+    top: (PERFORATION_HEIGHT - RADIUS) / 2,
+    width: RADIUS,
+    height: RADIUS,
+    borderRadius: RADIUS / 2,
+  },
+  cutoutLeft: { left: -RADIUS / 2 },
+  cutoutRight: { right: -RADIUS / 2 },
 
   qrSection: { alignItems: 'center', paddingTop: 8, paddingBottom: 16 },
   qr: { width: 148, height: 148 },
