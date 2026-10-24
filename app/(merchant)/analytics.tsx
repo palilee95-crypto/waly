@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTr } from '@/lib/i18n';
 import {
   View,
   Text,
@@ -31,6 +32,7 @@ import { formatMoney } from '@/lib/customer-workspace';
 export default function AnalyticsScreen() {
   const { user, isOwner, staffPermissions } = useAuth();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -150,7 +152,7 @@ export default function AnalyticsScreen() {
   const handleSaveEditInfo = async () => {
     if (!selectedCustomerProfile?.id) return;
     if (!editName.trim()) {
-      Alert.alert('Validation Error', 'Customer name cannot be empty.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), tr('Customer name cannot be empty.', 'Nama pelanggan tidak boleh kosong.'));
       return;
     }
 
@@ -178,9 +180,9 @@ export default function AnalyticsScreen() {
       } : null);
 
       setEditInfoModalVisible(false);
-      Alert.alert('Success', res.message || 'Customer information updated successfully.');
+      Alert.alert(tr("Success", "Berjaya"), res.message || tr('Customer information updated successfully.', 'Maklumat pelanggan berjaya dikemas kini.'));
     } catch (err: any) {
-      Alert.alert('Error', err?.data?.message || err?.message || 'Failed to update customer info.');
+      Alert.alert(tr("Error", "Ralat"), err?.data?.message || err?.message || tr('Failed to update customer info.', 'Gagal mengemas kini maklumat pelanggan.'));
     } finally {
       setIsSavingEdit(false);
     }
@@ -249,9 +251,9 @@ export default function AnalyticsScreen() {
       }
 
       setAdjustStampsModalVisible(false);
-      Alert.alert('Success', `Stamp balance updated to ${newStamps}.`);
+      Alert.alert(tr("Success", "Berjaya"), tr(`Stamp balance updated to ${newStamps}.`, `Baki setem dikemas kini kepada ${newStamps}.`));
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to adjust stamps.');
+      Alert.alert(tr("Error", "Ralat"), err?.message || tr('Failed to adjust stamps.', 'Gagal melaraskan setem.'));
     } finally {
       setIsSavingAdjustment(false);
     }
@@ -300,9 +302,9 @@ export default function AnalyticsScreen() {
       }
 
       setAdjustSpendModalVisible(false);
-      Alert.alert('Success', `Total spend updated to RM ${newSpend.toFixed(0)}.`);
+      Alert.alert(tr("Success", "Berjaya"), tr(`Total spend updated to RM ${newSpend.toFixed(0)}.`, `Jumlah perbelanjaan dikemas kini kepada RM ${newSpend.toFixed(0)}.`));
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to adjust spend.');
+      Alert.alert(tr("Error", "Ralat"), err?.message || tr('Failed to adjust spend.', 'Gagal melaraskan perbelanjaan.'));
     } finally {
       setIsSavingSpendAdjustment(false);
     }
@@ -354,7 +356,7 @@ export default function AnalyticsScreen() {
       setDeleteTxModalVisible(false);
       setTxToDelete(null);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to delete transaction.');
+      Alert.alert(tr("Error", "Ralat"), err?.message || tr('Failed to delete transaction.', 'Gagal memadam transaksi.'));
     } finally {
       setIsDeletingTx(false);
     }
@@ -755,7 +757,7 @@ export default function AnalyticsScreen() {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#050505" />
-        <Text style={styles.loaderText}>Analysing merchant data...</Text>
+        <Text style={styles.loaderText}>{tr("Analysing merchant data...", "Menganalisis data peniaga...")}</Text>
       </View>
     );
   }
@@ -1022,7 +1024,7 @@ export default function AnalyticsScreen() {
                       style={styles.recomActionBtn}
                     >
                       <Ionicons name="chatbubble-ellipses" size={14} color="#050505" />
-                      <Text style={styles.recomActionBtnText}>Launch Win-Back WhatsApp Blast</Text>
+                      <Text style={styles.recomActionBtnText}>{tr("Launch Win-Back WhatsApp Blast", "Lancarkan Hebahan WhatsApp Panggil Balik")}</Text>
                       <Ionicons name="arrow-forward" size={12} color="#050505" />
                     </TouchableOpacity>
                   </View>
@@ -1056,7 +1058,7 @@ export default function AnalyticsScreen() {
                       style={styles.recomActionBtn}
                     >
                       <Ionicons name="paper-plane" size={14} color="#050505" />
-                      <Text style={styles.recomActionBtnText}>Send "Almost Free" Reminder</Text>
+                      <Text style={styles.recomActionBtnText}>{tr("Send \"Almost Free\" Reminder", "Hantar Peringatan \"Hampir Percuma\"")}</Text>
                       <Ionicons name="arrow-forward" size={12} color="#050505" />
                     </TouchableOpacity>
                   </View>
@@ -1076,7 +1078,7 @@ export default function AnalyticsScreen() {
                       Boost Slow Slot: {quietestSlot}
                     </Text>
                     <View style={[styles.statusBadge, { backgroundColor: '#FFFBEB' }]}>
-                      <Text style={[styles.statusBadgeText, { color: '#B45309' }]}>Slow Slot</Text>
+                      <Text style={[styles.statusBadgeText, { color: '#B45309' }]}>{tr("Slow Slot", "Slot Perlahan")}</Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4, lineHeight: 16 }}>
@@ -1089,7 +1091,7 @@ export default function AnalyticsScreen() {
                     style={styles.recomActionBtn}
                   >
                     <Ionicons name="flash" size={14} color="#050505" />
-                    <Text style={styles.recomActionBtnText}>Create Happy Hour Promo</Text>
+                    <Text style={styles.recomActionBtnText}>{tr("Create Happy Hour Promo", "Cipta Promo Happy Hour")}</Text>
                     <Ionicons name="arrow-forward" size={12} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -1116,7 +1118,7 @@ export default function AnalyticsScreen() {
                     style={styles.recomActionBtn}
                   >
                     <Ionicons name="link" size={14} color="#050505" />
-                    <Text style={styles.recomActionBtnText}>Setup Google Review Link</Text>
+                    <Text style={styles.recomActionBtnText}>{tr("Setup Google Review Link", "Sediakan Pautan Ulasan Google")}</Text>
                     <Ionicons name="arrow-forward" size={12} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -1155,7 +1157,7 @@ export default function AnalyticsScreen() {
                     style={styles.recomActionBtn}
                   >
                     <Ionicons name="people" size={14} color="#050505" />
-                    <Text style={styles.recomActionBtnText}>View Full Staff Leaderboard</Text>
+                    <Text style={styles.recomActionBtnText}>{tr("View Full Staff Leaderboard", "Lihat Papan Pendahulu Kakitangan Penuh")}</Text>
                     <Ionicons name="arrow-forward" size={12} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -1176,7 +1178,7 @@ export default function AnalyticsScreen() {
                   <View style={[styles.kpiIconSmall, { backgroundColor: '#ECFDF5' }]}>
                     <Ionicons name="cash" size={14} color="#10B981" />
                   </View>
-                  <Text style={styles.kpiBoxLabel}>Total Revenue</Text>
+                  <Text style={styles.kpiBoxLabel}>{tr("Total Revenue", "Jumlah Hasil")}</Text>
                 </View>
                 <Text style={styles.kpiBoxVal}>RM {merchantMetrics.totalSales.toLocaleString()}</Text>
                 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#10B981', marginTop: 4 }}>
@@ -1189,7 +1191,7 @@ export default function AnalyticsScreen() {
                   <View style={[styles.kpiIconSmall, { backgroundColor: '#EFF6FF' }]}>
                     <Ionicons name="wallet" size={14} color="#3B82F6" />
                   </View>
-                  <Text style={styles.kpiBoxLabel}>Avg Order (AOV)</Text>
+                  <Text style={styles.kpiBoxLabel}>{tr("Avg Order (AOV)", "Purata Pesanan (AOV)")}</Text>
                 </View>
                 <Text style={styles.kpiBoxVal}>RM {merchantMetrics.avgSpending.toLocaleString()}</Text>
                 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
@@ -1201,12 +1203,12 @@ export default function AnalyticsScreen() {
             {/* 6-Month Sales Trend Chart */}
             <View style={styles.chartCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.sectionTitle}>Sales Performance (RM)</Text>
+                <Text style={styles.sectionTitle}>{tr("Sales Performance (RM)", "Prestasi Jualan (RM)")}</Text>
                 <TouchableOpacity onPress={() => showHelp('Sales Performance', 'A 6-month historical overview of your total sales revenue to track growth trends.')}>
                   <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionSubtitle}>Monthly revenue trend for the last 6 months</Text>
+              <Text style={styles.sectionSubtitle}>{tr("Monthly revenue trend for the last 6 months", "Trend hasil bulanan 6 bulan lepas")}</Text>
 
               <View style={{ height: 160, width: '100%', marginTop: 16, marginBottom: 8 }}>
                 {/* Values (Top) */}
@@ -1283,17 +1285,17 @@ export default function AnalyticsScreen() {
             <View style={styles.chartCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.sectionTitle}>Branch Revenue Leaderboard</Text>
+                  <Text style={styles.sectionTitle}>{tr("Branch Revenue Leaderboard", "Papan Pendahulu Hasil Cawangan")}</Text>
                   <TouchableOpacity onPress={() => showHelp('Branch Performance', 'Compares revenue and stamp distribution across all your active store outlets.')}>
                     <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity onPress={() => router.push('/(merchant)/branches' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Manage</Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>{tr("Manage", "Urus")}</Text>
                   <Ionicons name="chevron-forward" size={12} color="#B45309" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionSubtitle}>Compare sales contribution per outlet</Text>
+              <Text style={styles.sectionSubtitle}>{tr("Compare sales contribution per outlet", "Bandingkan sumbangan jualan setiap outlet")}</Text>
 
               <View style={{ gap: 10, marginTop: 16 }}>
                 {branchComparisonMetrics.length === 0 ? (
@@ -1380,7 +1382,7 @@ export default function AnalyticsScreen() {
                   <View style={[styles.kpiIconSmall, { backgroundColor: '#FFFBEB' }]}>
                     <Ionicons name="ribbon" size={14} color="#F59E0B" />
                   </View>
-                  <Text style={styles.kpiBoxLabel}>Stamps Issued</Text>
+                  <Text style={styles.kpiBoxLabel}>{tr("Stamps Issued", "Setem Diberikan")}</Text>
                 </View>
                 <Text style={styles.kpiBoxVal}>{merchantMetrics.totalStamps.toLocaleString()}</Text>
                 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
@@ -1393,7 +1395,7 @@ export default function AnalyticsScreen() {
                   <View style={[styles.kpiIconSmall, { backgroundColor: '#F5F3FF' }]}>
                     <Ionicons name="star" size={14} color="#8B5CF6" />
                   </View>
-                  <Text style={styles.kpiBoxLabel}>Points Issued</Text>
+                  <Text style={styles.kpiBoxLabel}>{tr("Points Issued", "Mata Diberikan")}</Text>
                 </View>
                 <Text style={styles.kpiBoxVal}>{merchantMetrics.totalPoints.toLocaleString()}</Text>
                 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
@@ -1405,12 +1407,12 @@ export default function AnalyticsScreen() {
             {/* Stamp Funnel Donut Chart */}
             <View style={styles.chartCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.sectionTitle}>Stamp Funnel & Stalling</Text>
+                <Text style={styles.sectionTitle}>{tr("Stamp Funnel & Stalling", "Corong Setem & Kesesakan")}</Text>
                 <TouchableOpacity onPress={() => showHelp('Stamp Funnel Drop-off', 'Tracks how many stamps active members collect before stopping, showing where drop-offs happen so you can target them.')}>
                   <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionSubtitle}>Where are your customers getting stuck?</Text>
+              <Text style={styles.sectionSubtitle}>{tr("Where are your customers getting stuck?", "Di mana pelanggan anda terhenti?")}</Text>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginTop: 24, gap: 16 }}>
                 <View style={{ width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
@@ -1494,7 +1496,7 @@ export default function AnalyticsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                    <Text style={[styles.statsLabel, { marginBottom: 0 }]}>Customer Retention Rate</Text>
+                    <Text style={[styles.statsLabel, { marginBottom: 0 }]}>{tr("Customer Retention Rate", "Kadar Pengekalan Pelanggan")}</Text>
                     <TouchableOpacity onPress={() => showHelp('Customer Retention Rate', 'The percentage of customers who visited more than once in the selected timeframe. High retention means loyal repeat business.')}>
                       <Ionicons name="help-circle-outline" size={12} color="#64748B" />
                     </TouchableOpacity>
@@ -1516,7 +1518,7 @@ export default function AnalyticsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                    <Text style={[styles.statsLabel, { marginBottom: 0 }]}>One-and-Done Churn Gap</Text>
+                    <Text style={[styles.statsLabel, { marginBottom: 0 }]}>{tr("One-and-Done Churn Gap", "Jurang Churn Sekali Sahaja")}</Text>
                     <TouchableOpacity onPress={() => showHelp('One-and-Done Churn Gap', 'The percentage of customers who visited exactly once in this timeframe and never came back. Higher churn indicates a need for better follow-up deals.')}>
                       <Ionicons name="help-circle-outline" size={12} color="#64748B" />
                     </TouchableOpacity>
@@ -1530,12 +1532,12 @@ export default function AnalyticsScreen() {
             {/* Visual Retention Health Bar */}
             <View style={styles.chartCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.sectionTitle}>Customer Database Health</Text>
+                <Text style={styles.sectionTitle}>{tr("Customer Database Health", "Kesihatan Pangkalan Data Pelanggan")}</Text>
                 <TouchableOpacity onPress={() => showHelp('Customer Retention Health', 'Displays the visual ratio of loyal repeat members vs. one-time visitors to track merchant database health.')}>
                   <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionSubtitle}>Ratio of repeat customers vs. one-time visitors</Text>
+              <Text style={styles.sectionSubtitle}>{tr("Ratio of repeat customers vs. one-time visitors", "Nisbah pelanggan berulang berbanding pelawat sekali")}</Text>
               
               <View style={{ height: 24, backgroundColor: '#F1F5F9', borderRadius: 12, overflow: 'hidden', flexDirection: 'row', marginTop: 16 }}>
                 <View style={{ width: `${100 - churnMetrics.rate}%`, height: '100%', backgroundColor: '#FFC700', justifyContent: 'center', paddingLeft: 12 }}>
@@ -1573,12 +1575,12 @@ export default function AnalyticsScreen() {
             {/* Busiest Hours vs. Slow Hours Traffic Analysis */}
             <View style={styles.chartCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.sectionTitle}>Peak Rush vs. Slow Hours</Text>
+                <Text style={styles.sectionTitle}>{tr("Peak Rush vs. Slow Hours", "Waktu Puncak vs. Waktu Perlahan")}</Text>
                 <TouchableOpacity onPress={() => showHelp('Hour Analysis', 'Identifies busy checkout periods vs quiet slots to help you run happy-hour discounts or targeted promos.')}>
                   <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionSubtitle}>Find empty time slots to fill with promos</Text>
+              <Text style={styles.sectionSubtitle}>{tr("Find empty time slots to fill with promos", "Cari slot masa kosong untuk diisi dengan promosi")}</Text>
 
               <View style={{ gap: 12, marginTop: 16 }}>
                 {slowHoursMetrics.map((item, idx) => (
@@ -1601,7 +1603,7 @@ export default function AnalyticsScreen() {
             <View style={[styles.chartCard, { paddingHorizontal: 0, paddingVertical: 20 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.sectionTitle}>Customer Database</Text>
+                  <Text style={styles.sectionTitle}>{tr("Customer Database", "Pangkalan Data Pelanggan")}</Text>
                   <TouchableOpacity onPress={() => showHelp('Customer DB', 'Every customer of this store, straight from the customer directory. VIPs are sorted by spend, At-Risk have not visited for 30 days.')}>
                     <Ionicons name="help-circle-outline" size={13} color="#64748B" />
                   </TouchableOpacity>
@@ -1621,7 +1623,7 @@ export default function AnalyticsScreen() {
                     style={{ flex: 1, fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#050505', paddingVertical: 0 }}
                   />
                   {dirQuery ? (
-                    <TouchableOpacity onPress={() => { setDirQuery(''); setDirPage(1); }} accessibilityRole="button" accessibilityLabel="Clear search">
+                    <TouchableOpacity onPress={() => { setDirQuery(''); setDirPage(1); }} accessibilityRole="button" accessibilityLabel={tr("Clear search", "Kosongkan carian")}>
                       <Ionicons name="close-circle" size={16} color="#94A3B8" />
                     </TouchableOpacity>
                   ) : null}
@@ -1695,7 +1697,7 @@ export default function AnalyticsScreen() {
                       onPress={() => setDirPage(prev => Math.max(1, prev - 1))}
                       style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: dirPage === 1 ? '#F8FAFC' : '#050505', borderRadius: 12 }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: dirPage === 1 ? '#94A3B8' : '#FFFFFF' }}>Previous</Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: dirPage === 1 ? '#94A3B8' : '#FFFFFF' }}>{tr("Previous", "Sebelum")}</Text>
                     </TouchableOpacity>
 
                     <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
@@ -1707,7 +1709,7 @@ export default function AnalyticsScreen() {
                       onPress={() => setDirPage(prev => prev + 1)}
                       style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: dirPage * 25 >= dirTotal ? '#F8FAFC' : '#050505', borderRadius: 12 }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: dirPage * 25 >= dirTotal ? '#94A3B8' : '#FFFFFF' }}>Next</Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: dirPage * 25 >= dirTotal ? '#94A3B8' : '#FFFFFF' }}>{tr("Next", "Seterusnya")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1716,10 +1718,10 @@ export default function AnalyticsScreen() {
                   <TouchableOpacity
                     onPress={() => router.push('/(merchant)/manage-customers' as any)}
                     accessibilityRole="button"
-                    accessibilityLabel="Open full customer management"
+                    accessibilityLabel={tr("Open full customer management", "Buka pengurusan pelanggan penuh")}
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, minHeight: 44, borderRadius: 12, backgroundColor: '#F1F5F9' }}
                   >
-                    <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Manage customers</Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Manage customers", "Urus pelanggan")}</Text>
                     <Ionicons name="arrow-forward" size={14} color="#050505" />
                   </TouchableOpacity>
                 ) : null}
@@ -1769,7 +1771,7 @@ export default function AnalyticsScreen() {
                   style={{ borderRadius: 16, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
                 >
                   <View>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', marginBottom: 6, letterSpacing: 1 }}>AVERAGE SCORE</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', marginBottom: 6, letterSpacing: 1 }}>{tr("AVERAGE SCORE", "SKOR PURATA")}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
                       <Text style={{ fontSize: 36, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>
                         {reviewStats.avgRating}
@@ -1811,7 +1813,7 @@ export default function AnalyticsScreen() {
                       <View style={{ backgroundColor: '#FEF3C7', padding: 4, borderRadius: 6 }}>
                         <Ionicons name="chatbubble-ellipses" size={14} color="#D97706" />
                       </View>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706', letterSpacing: 0.5 }}>PRIVATE</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706', letterSpacing: 0.5 }}>{tr("PRIVATE", "PERIBADI")}</Text>
                     </View>
                     <Text style={{ fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>
                       {reviewStats.privateFeedbacks}
@@ -1846,7 +1848,7 @@ export default function AnalyticsScreen() {
                       activeOpacity={0.8}
                     >
                       <Ionicons name="link" size={16} color="#FFF" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFF' }}>Connect Google Business</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFF' }}>{tr("Connect Google Business", "Sambungkan Google Business")}</Text>
                     </TouchableOpacity>
                   </ExpoLinearGradient>
                 ) : (
@@ -1877,7 +1879,7 @@ export default function AnalyticsScreen() {
                               </View>
                             ) : (
                               <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Private</Text>
+                                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>{tr("Private", "Peribadi")}</Text>
                               </View>
                             )}
                           </View>
@@ -2173,7 +2175,7 @@ export default function AnalyticsScreen() {
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0' }}
                   >
                     <Ionicons name="create-outline" size={14} color="#050505" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Edit Info</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Edit Info", "Edit Maklumat")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     onPress={() => {
@@ -2184,14 +2186,14 @@ export default function AnalyticsScreen() {
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#050505', borderRadius: 20 }}
                   >
                     <Ionicons name="flash" size={14} color="#FFC700" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Adjust Stamps</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>{tr("Adjust Stamps", "Laraskan Setem")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     onPress={openAdjustSpendModal}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FEF3C7', borderRadius: 20, borderWidth: 1, borderColor: '#FDE68A' }}
                   >
                     <Ionicons name="cash" size={14} color="#B45309" />
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Spend</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>{tr("Adjust Spend", "Laraskan Perbelanjaan")}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -2200,7 +2202,7 @@ export default function AnalyticsScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="wallet-outline" size={16} color="#B45309" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>Total Spend</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>{tr("Total Spend", "Jumlah Perbelanjaan")}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
@@ -2213,7 +2215,7 @@ export default function AnalyticsScreen() {
                         style={{ paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#FDE68A', borderRadius: 6 }}
                         activeOpacity={0.7}
                       >
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}>Adjust</Text>
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#92400E' }}>{tr("Adjust", "Laraskan")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2221,7 +2223,7 @@ export default function AnalyticsScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="cart-outline" size={16} color="#B45309" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>Total Visits</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>{tr("Total Visits", "Jumlah Lawatan")}</Text>
                     </View>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{selectedCustomerProfile.totalVisits}</Text>
                   </View>
@@ -2229,7 +2231,7 @@ export default function AnalyticsScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7', marginBottom: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="time-outline" size={16} color="#B45309" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>Last Visit</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>{tr("Last Visit", "Lawatan Terakhir")}</Text>
                     </View>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                       {new Date(selectedCustomerProfile.lastVisit).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -2239,7 +2241,7 @@ export default function AnalyticsScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FEF3C7', marginBottom: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="call-outline" size={16} color="#B45309" />
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>Phone Number</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B45309' }}>{tr("Phone Number", "Nombor Telefon")}</Text>
                     </View>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                       {selectedCustomerProfile.phone ? (selectedCustomerProfile.phone.startsWith('+') ? selectedCustomerProfile.phone : `+60${selectedCustomerProfile.phone.replace(/^0/, '')}`) : 'No Phone'}
@@ -2309,7 +2311,7 @@ export default function AnalyticsScreen() {
                   return (
                     <View style={{ width: '100%', marginBottom: 24, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 24 }}>
                       <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1 }}>STAMP CARD PROGRESS</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1 }}>{tr("STAMP CARD PROGRESS", "PROGRES KAD SETEM")}</Text>
                         <TouchableOpacity 
                           onPress={() => {
                             setAdjustStampsCount(customerCard?.stamps_collected ?? selectedCustomerProfile.stamps ?? 0);
@@ -2319,7 +2321,7 @@ export default function AnalyticsScreen() {
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFFBEB', borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}
                         >
                           <Ionicons name="create-outline" size={14} color="#B45309" />
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>Adjust Stamps</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>{tr("Adjust Stamps", "Laraskan Setem")}</Text>
                         </TouchableOpacity>
                       </View>
 
@@ -2347,7 +2349,7 @@ export default function AnalyticsScreen() {
                           {/* Progress Summary Card */}
                           <View style={{ width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Current Stamps</Text>
+                              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{tr("Current Stamps", "Setem Semasa")}</Text>
                               <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>
                                 {mappedLoyaltyCard.collectedStamps} / {mappedLoyaltyCard.totalStamps}
                               </Text>
@@ -2356,7 +2358,7 @@ export default function AnalyticsScreen() {
                               <View style={{ width: `${Math.min((mappedLoyaltyCard.collectedStamps / mappedLoyaltyCard.totalStamps) * 100, 100)}%`, height: '100%', backgroundColor: '#F59E0B', borderRadius: 4 }} />
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Total Completions</Text>
+                              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Total Completions", "Jumlah Selesai")}</Text>
                               <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
                                 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#059669' }}>
                                   {customerCard?.completions || 0} Completed
@@ -2367,7 +2369,7 @@ export default function AnalyticsScreen() {
                         </View>
                       ) : (
                         <View style={{ width: '100%', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>No active loyalty card found.</Text>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>{tr("No active loyalty card found.", "Tiada kad kesetiaan aktif ditemui.")}</Text>
                         </View>
                       )}
                     </View>
@@ -2376,7 +2378,7 @@ export default function AnalyticsScreen() {
 
                 {/* 3. Rewards & Vouchers */}
                 <View style={{ width: '100%', marginBottom: 32 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>REWARDS & VOUCHERS</Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>{tr("REWARDS & VOUCHERS", "GANJARAN & BAUCAR")}</Text>
                   {customerVouchers.length > 0 ? (
                     <View style={{ gap: 12, width: '100%' }}>
                       {customerVouchers.map((voucher) => (
@@ -2415,14 +2417,14 @@ export default function AnalyticsScreen() {
                     </View>
                   ) : (
                     <View style={{ width: '100%', backgroundColor: '#F8FAFC', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>No vouchers issued for this customer.</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>{tr("No vouchers issued for this customer.", "Tiada baucar dikeluarkan untuk pelanggan ini.")}</Text>
                     </View>
                   )}
                 </View>
 
                 {/* 4. Visit History */}
                 <View style={{ width: '100%', marginBottom: 16 }}>
-                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>VISIT HISTORY</Text>
+                  <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#94A3B8', letterSpacing: 1, marginBottom: 16 }}>{tr("VISIT HISTORY", "SEJARAH LAWATAN")}</Text>
                   {customerTransactions.length > 0 ? (
                     customerTransactions.map((tx, idx) => {
                       const isSpendAdj = tx.metadata?.type === 'spend_adjustment' || (tx.type === 'ADJUSTMENT' && tx.bill_amount && !tx.stamps && !tx.stamps_earned);
@@ -2464,7 +2466,7 @@ export default function AnalyticsScreen() {
                       );
                     })
                   ) : (
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 12 }}>No visits recorded yet.</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', textAlign: 'center', marginTop: 12 }}>{tr("No visits recorded yet.", "Belum ada lawatan direkodkan.")}</Text>
                   )}
                 </View>
               </ScrollView>
@@ -2483,7 +2485,7 @@ export default function AnalyticsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Customer Info</Text>
+              <Text style={styles.modalTitle}>{tr("Edit Customer Info", "Edit Maklumat Pelanggan")}</Text>
               <TouchableOpacity onPress={() => setEditInfoModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
@@ -2491,18 +2493,18 @@ export default function AnalyticsScreen() {
 
             <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 14 }}>
               <View>
-                <Text style={styles.inputFieldLabel}>CUSTOMER NAME</Text>
+                <Text style={styles.inputFieldLabel}>{tr("CUSTOMER NAME", "NAMA PELANGGAN")}</Text>
                 <TextInput
                   style={styles.customTextInput}
                   value={editName}
                   onChangeText={setEditName}
-                  placeholder="e.g. Fizah"
+                  placeholder={tr("e.g. Fizah", "cth. Fizah")}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
 
               <View>
-                <Text style={styles.inputFieldLabel}>PHONE NUMBER</Text>
+                <Text style={styles.inputFieldLabel}>{tr("PHONE NUMBER", "NOMBOR TELEFON")}</Text>
                 <TextInput
                   style={styles.customTextInput}
                   value={editPhone}
@@ -2522,7 +2524,7 @@ export default function AnalyticsScreen() {
                 {isSavingEdit ? (
                   <ActivityIndicator size="small" color="#050505" />
                 ) : (
-                  <Text style={styles.saveActionBtnText}>Save Changes</Text>
+                  <Text style={styles.saveActionBtnText}>{tr("Save Changes", "Simpan Perubahan")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2540,7 +2542,7 @@ export default function AnalyticsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: 'auto', paddingBottom: 24, maxWidth: 440 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Adjust Stamp Balance</Text>
+              <Text style={styles.modalTitle}>{tr("Adjust Stamp Balance", "Laraskan Baki Setem")}</Text>
               <TouchableOpacity onPress={() => setAdjustStampsModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#050505" />
               </TouchableOpacity>
@@ -2593,12 +2595,12 @@ export default function AnalyticsScreen() {
 
               {/* Reason Input (Optional) */}
               <View style={{ width: '100%' }}>
-                <Text style={styles.inputFieldLabel}>REASON / NOTE (OPTIONAL)</Text>
+                <Text style={styles.inputFieldLabel}>{tr("REASON / NOTE (OPTIONAL)", "SEBAB / NOTA (PILIHAN)")}</Text>
                 <TextInput
                   style={styles.customTextInput}
                   value={adjustReason}
                   onChangeText={setAdjustReason}
-                  placeholder="e.g. Customer forgot phone, refund correction"
+                  placeholder={tr("e.g. Customer forgot phone, refund correction", "cth. Pelanggan tertinggal telefon, pembetulan bayaran balik")}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
@@ -2612,7 +2614,7 @@ export default function AnalyticsScreen() {
                 {isSavingAdjustment ? (
                   <ActivityIndicator size="small" color="#050505" />
                 ) : (
-                  <Text style={styles.saveActionBtnText}>Update Stamp Balance</Text>
+                  <Text style={styles.saveActionBtnText}>{tr("Update Stamp Balance", "Kemas Kini Baki Setem")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2633,7 +2635,7 @@ export default function AnalyticsScreen() {
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="cash" size={18} color="#B45309" />
                 </View>
-                <Text style={styles.modalTitle}>Adjust Total Spend</Text>
+                <Text style={styles.modalTitle}>{tr("Adjust Total Spend", "Laraskan Jumlah Perbelanjaan")}</Text>
               </View>
               <TouchableOpacity onPress={() => setAdjustSpendModalVisible(false)} style={styles.closeBtn}>
                 <Feather name="x" size={20} color="#050505" />
@@ -2732,12 +2734,12 @@ export default function AnalyticsScreen() {
 
               {/* Reason Input (Optional) */}
               <View style={{ width: '100%' }}>
-                <Text style={styles.inputFieldLabel}>REASON / NOTE (OPTIONAL)</Text>
+                <Text style={styles.inputFieldLabel}>{tr("REASON / NOTE (OPTIONAL)", "SEBAB / NOTA (PILIHAN)")}</Text>
                 <TextInput
                   style={styles.customTextInput}
                   value={adjustSpendReason}
                   onChangeText={setAdjustSpendReason}
-                  placeholder="e.g. Backfilled past orders, discount correction"
+                  placeholder={tr("e.g. Backfilled past orders, discount correction", "cth. Pesanan lalu diisi semula, pembetulan diskaun")}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
@@ -2751,7 +2753,7 @@ export default function AnalyticsScreen() {
                 {isSavingSpendAdjustment ? (
                   <ActivityIndicator size="small" color="#050505" />
                 ) : (
-                  <Text style={styles.saveActionBtnText}>Update Spend Balance</Text>
+                  <Text style={styles.saveActionBtnText}>{tr("Update Spend Balance", "Kemas Kini Baki Perbelanjaan")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2782,13 +2784,13 @@ export default function AnalyticsScreen() {
             {txToDelete && (
               <View style={{ backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 8, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Customer</Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Customer", "Pelanggan")}</Text>
                   <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>
                     {txToDelete.name || selectedCustomerProfile?.name || 'Customer'}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Date</Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Date", "Tarikh")}</Text>
                   <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B' }}>
                     {new Date(txToDelete.created).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} at {new Date(txToDelete.created).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                   </Text>
@@ -2798,7 +2800,7 @@ export default function AnalyticsScreen() {
                 {/* Reversal summary */}
                 {Number(txToDelete.stamps_earned || txToDelete.stamps || 0) > 0 && (
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626' }}>Stamp Reversal</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626' }}>{tr("Stamp Reversal", "Pembalikan Setem")}</Text>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#DC2626' }}>
                       -{Number(txToDelete.stamps_earned || txToDelete.stamps || 0)} stamps
                     </Text>
@@ -2806,7 +2808,7 @@ export default function AnalyticsScreen() {
                 )}
                 {Number(txToDelete.bill_amount || txToDelete.metadata?.bill_amount || 0) !== 0 && (
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626' }}>Spend Reversal</Text>
+                    <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#DC2626' }}>{tr("Spend Reversal", "Pembalikan Perbelanjaan")}</Text>
                     <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#DC2626' }}>
                       -RM {Math.abs(Number(txToDelete.bill_amount || txToDelete.metadata?.bill_amount || 0)).toFixed(2)}
                     </Text>
@@ -2822,7 +2824,7 @@ export default function AnalyticsScreen() {
                 disabled={isDeletingTx}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>Cancel</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>{tr("Cancel", "Batal")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -2834,7 +2836,7 @@ export default function AnalyticsScreen() {
                 {isDeletingTx ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Delete Record</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{tr("Delete Record", "Padam Rekod")}</Text>
                 )}
               </TouchableOpacity>
             </View>
