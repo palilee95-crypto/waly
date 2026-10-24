@@ -20,6 +20,32 @@ onRecordCreate((e) => {
   const reward = $app.findRecordById('rewards', rewardId);
   const merchantId = reward.get('merchant');
 
+  // Per-customer cap: 0 / unset means unlimited. Each `redemptions` row is one
+  // act of redeeming, so counting them is the number of times this customer has
+  // already taken this reward. Stamps and campaign drops are separate paths.
+  const maxPerCustomer = Number(reward.get('max_per_customer')) || 0;
+  if (maxPerCustomer > 0) {
+    let priorCount = 0;
+    try {
+      priorCount = $app.findRecordsByFilter(
+        'redemptions',
+        "customer = '" + customerId + "' && reward = '" + rewardId + "'",
+        '-created',
+        100,
+        0
+      ).length;
+    } catch (countErr) {
+      priorCount = 0;
+    }
+    if (priorCount >= maxPerCustomer) {
+      throw new BadRequestError(
+        maxPerCustomer === 1
+          ? 'You have already redeemed this reward.'
+          : 'This reward can be redeemed ' + maxPerCustomer + ' times per customer.'
+      );
+    }
+  }
+
   // Fetch the specific loyalty card for the merchant
   let card;
   try {

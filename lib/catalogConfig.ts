@@ -55,6 +55,7 @@ export const MERCHANT_CATALOG_CONFIG: Record<string, MerchantCatalogConfig> = {
   pet: { suggestedItemTypes: ['service', 'product', 'addon'], suggestedCategories: ['Grooming', 'Consultations', 'Pet food', 'Accessories'] },
   repair: { suggestedItemTypes: ['service', 'product', 'addon'], suggestedCategories: ['Repairs', 'Spare parts', 'Accessories', 'Devices'] },
   studio: { suggestedItemTypes: ['service', 'facility', 'product', 'addon'], suggestedCategories: ['Photography', 'Session packages', 'Studio rental', 'Prints'] },
+  interior_design: { suggestedItemTypes: ['service', 'product', 'addon'], suggestedCategories: ['Design consultation', 'Space planning', 'Renovation', 'Custom furniture'] },
   // Existing booking models remain available without adding or locking merchant categories.
   catering: { suggestedItemTypes: ['catering', 'product', 'addon'], suggestedCategories: ['Packages', 'Food stations', 'Event setup', 'Extra pax'] },
   lodging: { suggestedItemTypes: ['lodging', 'addon', 'product'], suggestedCategories: ['Rooms', 'Homestays', 'Chalets', 'Extras'] },

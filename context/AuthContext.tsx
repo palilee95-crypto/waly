@@ -346,7 +346,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Asynchronously refresh user session & profile in the background
         try {
-          const refreshResult = await pb.collection('users').authRefresh().catch(() => null);
+          let sessionRejected = false;
+          const refreshResult = await pb.collection('users').authRefresh().catch((err: any) => {
+            // 401/403 means the server rejects this token (expired, signing secret
+            // rotated by a database swap, or password change); 404 means the record
+            // is gone. Keeping it would leave every screen firing 401s behind a
+            // zeroed dashboard, so drop the session and let the router show login.
+            const status = err?.status;
+            if (status === 401 || status === 403 || status === 404) sessionRejected = true;
+            return null;
+          });
+          if (sessionRejected) {
+            console.warn('[AuthContext] Session rejected by the server; signing out');
+            pb.authStore.clear();
+            await storage.deleteItem('risev_token');
+            await storage.deleteItem('risev_record');
+            await storage.deleteItem('risev_active_role');
+            setUser(null);
+            setActiveRole(null);
+            setIsLoading(false);
+            return;
+          }
           const freshRecord = refreshResult?.record || pb.authStore.record;
           const merchantData = await ensureMerchantProfile(freshRecord);
           

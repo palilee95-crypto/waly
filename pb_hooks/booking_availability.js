@@ -63,6 +63,130 @@ function durationMinutes(booking) {
 // plus this buffer, and callers pass the requested slot's buffered end.
 var TURNAROUND_MINUTES = 10;
 
+// "08:00", "8:00 AM", "22:00", "11.00" -> minutes since midnight. -1 when unparseable.
+function parseClockMinutes(value) {
+  var text = String(value === undefined || value === null ? "" : value).trim();
+  if (!text) return -1;
+  var ampm = /^(\d{1,2})[.:](\d{2})\s*(AM|PM)$/i.exec(text);
+  if (ampm) {
+    var h12 = parseInt(ampm[1], 10);
+    var m12 = parseInt(ampm[2], 10);
+    if (h12 < 1 || h12 > 12 || m12 < 0 || m12 > 59) return -1;
+    if (ampm[3].toUpperCase() === "PM" && h12 < 12) h12 += 12;
+    if (ampm[3].toUpperCase() === "AM" && h12 === 12) h12 = 0;
+    return h12 * 60 + m12;
+  }
+  var plain = /^(\d{1,2})[.:](\d{2})$/.exec(text);
+  if (plain) {
+    var h24 = parseInt(plain[1], 10);
+    var m24 = parseInt(plain[2], 10);
+    if (h24 < 0 || h24 > 23 || m24 < 0 || m24 > 59) return -1;
+    return h24 * 60 + m24;
+  }
+  return -1;
+}
+
+// Opening window for one calendar day.
+//
+// `store_locations.hours` is stored in two shapes, both accepted here:
+//   { "Monday": "08:00 - 22:00", ... }                      (text)
+//   { "mon": { open: "08:00", close: "22:00", closed: false } } (object)
+//
+// Returns { unset, closed, openMinutes, closeMinutes }. `unset` means the
+// merchant never configured hours, so callers must not block anything; a day
+// missing from a configured week counts as closed. Overnight windows come back
+// with closeMinutes > 1440.
+function hoursForDate(hours, dateIso) {
+  var result = { unset: false, closed: false, openMinutes: 0, closeMinutes: 0 };
+  if (!hours || typeof hours !== "object" || Array.isArray(hours)) {
+    result.unset = true;
+    return result;
+  }
+  var date = new Date(String(dateIso || "").trim() + "T00:00:00Z");
+  if (isNaN(date.getTime())) {
+    result.unset = true;
+    return result;
+  }
+
+  var keys = Object.keys(hours);
+  var lowered = {};
+  var anyValue = false;
+  for (var i = 0; i < keys.length; i++) {
+    var value = hours[keys[i]];
+    lowered[String(keys[i]).trim().toLowerCase()] = value;
+    if (value !== undefined && value !== null && String(value).trim() !== "") anyValue = true;
+  }
+  if (!anyValue) {
+    result.unset = true;
+    return result;
+  }
+
+  var fullNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  var shortNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  var dayIndex = date.getUTCDay();
+  var raw = lowered[fullNames[dayIndex]];
+  if (raw === undefined) raw = lowered[shortNames[dayIndex]];
+  if (raw === undefined) {
+    result.closed = true;
+    return result;
+  }
+
+  var openText = "";
+  var closeText = "";
+  var explicitlyClosed = false;
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    explicitlyClosed = raw.closed === true;
+    openText = String(raw.open || "");
+    closeText = String(raw.close || "");
+  } else {
+    var text = String(raw).trim();
+    if (!text || /^(closed|tutup)$/i.test(text)) {
+      explicitlyClosed = true;
+    } else {
+      var parts = text.split(/\s*(?:-|–|—|\bto\b)\s*/i);
+      if (parts.length >= 2) {
+        openText = parts[0];
+        closeText = parts[1];
+      }
+    }
+  }
+  if (explicitlyClosed) {
+    result.closed = true;
+    return result;
+  }
+
+  var openMinutes = parseClockMinutes(openText);
+  var closeMinutes = parseClockMinutes(closeText);
+  // Malformed hours are treated as closed: never let a typo open the shop.
+  if (openMinutes < 0 || closeMinutes < 0) {
+    result.closed = true;
+    return result;
+  }
+  // Some merchants type "11.00-9.00" with no AM/PM. When both ends sit inside
+  // 1-12 and the close reads earlier than the open, the close is the evening
+  // (11:00-21:00). Explicit 24-hour windows (22:00-02:00) skip this and fall
+  // through to the overnight rule below.
+  if (closeMinutes <= openMinutes && openMinutes <= 12 * 60 && closeMinutes <= 12 * 60) {
+    closeMinutes += 12 * 60;
+  }
+  if (closeMinutes <= openMinutes) closeMinutes += 1440;
+
+  result.openMinutes = openMinutes;
+  result.closeMinutes = closeMinutes;
+  return result;
+}
+
+// Whether a service starting at startMinutes and lasting durationMinutes fits
+// inside the day's window. Overnight windows shift a post-midnight start.
+function fitsOpeningHours(day, startMinutes, durationMinutes) {
+  if (!day || day.unset) return true;
+  if (day.closed) return false;
+  var start = startMinutes;
+  if (day.closeMinutes > 1440 && start < day.openMinutes) start += 1440;
+  if (start < day.openMinutes) return false;
+  return start + Math.max(0, durationMinutes) <= day.closeMinutes;
+}
+
 // The first active booking whose buffered window overlaps the requested
 // buffered window for this staff member. A `null` result means the query ran
 // and found no overlap; a failed query throws, so callers cannot mistake an
@@ -93,4 +217,7 @@ module.exports = {
   formatMinutes: formatMinutes,
   durationMinutes: durationMinutes,
   findStaffConflict: findStaffConflict,
+  parseClockMinutes: parseClockMinutes,
+  hoursForDate: hoursForDate,
+  fitsOpeningHours: fitsOpeningHours,
 };

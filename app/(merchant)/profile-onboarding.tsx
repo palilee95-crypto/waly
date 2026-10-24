@@ -52,11 +52,11 @@ const POPULAR_CITIES = [
 ];
 
 const CATEGORY_GROUPS = [
-  { id: 'all', label: 'All (20)' },
+  { id: 'all', label: 'All (25)' },
   { id: 'fnb', label: 'F&B & Cafe', ids: ['cafe', 'restaurant', 'dessert', 'beverage'] },
   { id: 'beauty', label: 'Beauty & Spa', ids: ['barber', 'beauty', 'spa', 'muslimah_spa'] },
   { id: 'auto_tech', label: 'Auto & Tech', ids: ['carwash', 'workshop', 'repair'] },
-  { id: 'retail_services', label: 'Services & Retail', ids: ['groceries', 'boutique', 'laundry', 'optician', 'florist', 'pet', 'gym', 'sports', 'studio', 'other'] },
+  { id: 'retail_services', label: 'Services & Retail', ids: ['groceries', 'boutique', 'laundry', 'optician', 'florist', 'pet', 'gym', 'sports', 'studio', 'interior_design', 'other'] },
 ];
 
 type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';

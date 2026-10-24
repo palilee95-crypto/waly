@@ -256,6 +256,17 @@ export const ALL_CATEGORIES_LIST: CategoryItemType[] = [
     descEn: "Photo studio, creative media & events",
     descMs: "Studio fotografi, media kreatif & acara",
   },
+  { 
+    id: 'interior_design', 
+    name: 'Interior Design', 
+    group: 'Specialty Services', 
+    icon: 'home-outline', 
+    bg: '#F4F4F5', 
+    color: '#18181B', 
+    merchantCount: 0,
+    descEn: "Space planning, renovation & custom furniture",
+    descMs: "Perancangan ruang, ubah suai & perabot tersuai",
+  },
 
   // ✈️ Travel & Tours
   { 
