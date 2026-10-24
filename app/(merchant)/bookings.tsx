@@ -1852,12 +1852,12 @@ export default function BookingsScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle}>Smart Booking Management</Text>
-          <Text style={styles.headerSubtitle}>Manage appointments, services & booking page</Text>
+          <Text style={styles.headerTitle}>{tr("Smart Booking Management", "Pengurusan Tempahan Pintar")}</Text>
+          <Text style={styles.headerSubtitle}>{tr("Manage appointments, services & booking page", "Urus temujanji, perkhidmatan & halaman tempahan")}</Text>
         </View>
 
         <View style={styles.addonTag}>
-          <Text style={styles.addonTagText}>ADD-ON ⚡</Text>
+          <Text style={styles.addonTagText}>{tr("ADD-ON ⚡", "TAMBAHAN ⚡")}</Text>
         </View>
       </View>
 
@@ -1872,10 +1872,10 @@ export default function BookingsScreen() {
             </View>
 
             <View style={styles.lockedBadgePro}>
-              <Text style={styles.lockedBadgeProText}>PRO PLAN EXCLUSIVE ⚡</Text>
+              <Text style={styles.lockedBadgeProText}>{tr("PRO PLAN EXCLUSIVE ⚡", "EKSKLUSIF PELAN PRO ⚡")}</Text>
             </View>
 
-            <Text style={styles.lockedTitle}>Smart Booking Suite is Locked</Text>
+            <Text style={styles.lockedTitle}>{tr("Smart Booking Suite is Locked", "Suite Tempahan Pintar Dikunci")}</Text>
             <Text style={styles.lockedSubtitle}>
               Smart Booking Management and your Dedicated Customer Storefront PWA are exclusively included with the Risev PRO Plan (RM97/mo).
             </Text>
@@ -1891,7 +1891,7 @@ export default function BookingsScreen() {
               </View>
               <View style={styles.lockedFeatureRow}>
                 <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                <Text style={styles.lockedFeatureText}>Staff Scheduling & Service Catalog Management</Text>
+                <Text style={styles.lockedFeatureText}>{tr("Staff Scheduling & Service Catalog Management", "Penjadualan Kakitangan & Pengurusan Katalog Perkhidmatan")}</Text>
               </View>
             </View>
 
@@ -1901,7 +1901,7 @@ export default function BookingsScreen() {
               activeOpacity={0.88}
             >
               <Ionicons name="flash" size={18} color="#FFC700" style={{ marginRight: 8 }} />
-              <Text style={styles.lockedUpgradeBtnText}>Upgrade to PRO Plan</Text>
+              <Text style={styles.lockedUpgradeBtnText}>{tr("Upgrade to PRO Plan", "Naik Taraf ke Pelan PRO")}</Text>
               <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
             </TouchableOpacity>
 
@@ -1910,7 +1910,7 @@ export default function BookingsScreen() {
               onPress={() => handleSmartBack(router, '/(merchant)/profile')}
               activeOpacity={0.7}
             >
-              <Text style={styles.lockedBackBtnText}>Back to Business Console</Text>
+              <Text style={styles.lockedBackBtnText}>{tr("Back to Business Console", "Kembali ke Konsol Perniagaan")}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -2001,7 +2001,7 @@ export default function BookingsScreen() {
                     activeOpacity={0.85}
                   >
                     <Ionicons name="calendar-outline" size={14} color="#0F172A" />
-                    <Text style={styles.btnCalendarViewTextLight}>View Calendar ›</Text>
+                    <Text style={styles.btnCalendarViewTextLight}>{tr("View Calendar ›", "Lihat Kalendar ›")}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -2074,7 +2074,7 @@ export default function BookingsScreen() {
                 </Text>
                 <TouchableOpacity style={styles.btnDateSelect} onPress={() => setShowCalendarModal(true)} accessibilityRole="button">
                   <Ionicons name="calendar-outline" size={14} color="#000" />
-                  <Text style={styles.btnDateSelectText}>Calendar</Text>
+                  <Text style={styles.btnDateSelectText}>{tr("Calendar", "Kalendar")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2156,7 +2156,7 @@ export default function BookingsScreen() {
                               ) : (
                                 <>
                                   <Ionicons name="checkmark-done" size={16} color="#000" />
-                                  <Text style={styles.btnPrimaryActionText} numberOfLines={1}>Complete Booking</Text>
+                                  <Text style={styles.btnPrimaryActionText} numberOfLines={1}>{tr("Complete Booking", "Selesaikan Tempahan")}</Text>
                                 </>
                               )}
                             </TouchableOpacity>
@@ -2176,7 +2176,7 @@ export default function BookingsScreen() {
                                   ) : (
                                     <>
                                       <Ionicons name="location" size={16} color="#000" />
-                                      <Text style={styles.btnPrimaryActionText} numberOfLines={1}>Mark Arrived</Text>
+                                      <Text style={styles.btnPrimaryActionText} numberOfLines={1}>{tr("Mark Arrived", "Tanda Tiba")}</Text>
                                     </>
                                   )}
                                 </TouchableOpacity>
@@ -2189,7 +2189,7 @@ export default function BookingsScreen() {
                                 activeOpacity={0.85}
                               >
                                 <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
-                                <Text style={styles.btnDangerActionText} numberOfLines={1}>No Show</Text>
+                                <Text style={styles.btnDangerActionText} numberOfLines={1}>{tr("No Show", "Tidak Hadir")}</Text>
                               </TouchableOpacity>
                             </>
                           )}
@@ -2202,7 +2202,7 @@ export default function BookingsScreen() {
                                 activeOpacity={0.85}
                               >
                                 <Ionicons name="logo-whatsapp" size={16} color="#16A34A" />
-                                <Text style={[styles.btnSecondaryActionText, { color: '#16A34A' }]} numberOfLines={1}>Reschedule WA</Text>
+                                <Text style={[styles.btnSecondaryActionText, { color: '#16A34A' }]} numberOfLines={1}>{tr("Reschedule WA", "Jadual Semula WA")}</Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
@@ -2212,7 +2212,7 @@ export default function BookingsScreen() {
                                 activeOpacity={0.85}
                               >
                                 <Ionicons name="refresh-outline" size={15} color="#050505" />
-                                <Text style={styles.btnSecondaryActionText} numberOfLines={1}>Reopen</Text>
+                                <Text style={styles.btnSecondaryActionText} numberOfLines={1}>{tr("Reopen", "Buka Semula")}</Text>
                               </TouchableOpacity>
                             </>
                           )}
@@ -2235,7 +2235,7 @@ export default function BookingsScreen() {
                               activeOpacity={0.85}
                             >
                               <Ionicons name="calendar-outline" size={16} color="#000" />
-                              <Text style={styles.btnSecondaryActionText} numberOfLines={1}>Edit</Text>
+                              <Text style={styles.btnSecondaryActionText} numberOfLines={1}>{tr("Edit", "Edit")}</Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -2249,7 +2249,7 @@ export default function BookingsScreen() {
                   <View style={styles.emptyIconCircle}>
                     <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
                   </View>
-                  <Text style={styles.emptyText}>No appointments booked yet</Text>
+                  <Text style={styles.emptyText}>{tr("No appointments booked yet", "Belum ada temujanji ditempah")}</Text>
                   <Text style={styles.emptySubtext}>
                     Share your online booking link with customers to start receiving appointments.
                   </Text>
@@ -2271,7 +2271,7 @@ export default function BookingsScreen() {
                       activeOpacity={0.85}
                     >
                       <Ionicons name="open-outline" size={16} color="#000" />
-                      <Text style={styles.btnEmptyPrimaryText}>Preview Page</Text>
+                      <Text style={styles.btnEmptyPrimaryText}>{tr("Preview Page", "Pratonton Halaman")}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2280,13 +2280,13 @@ export default function BookingsScreen() {
               {/* Next Appointments (when appointments exist) */}
               {filteredBookings.length > 0 && (
                 <View style={{ marginTop: 24 }}>
-                  <Text style={styles.nextTitle}>Next Appointments</Text>
+                  <Text style={styles.nextTitle}>{tr("Next Appointments", "Temujanji Seterusnya")}</Text>
                   <View style={styles.emptyNextCard}>
                     <View style={styles.emptyIconCircle}>
                       <Ionicons name="calendar-outline" size={24} color="#94A3B8" />
                     </View>
-                    <Text style={styles.emptyText}>All caught up</Text>
-                    <Text style={styles.emptySubtext}>You have handled all scheduled appointments for today</Text>
+                    <Text style={styles.emptyText}>{tr("All caught up", "Semua selesai")}</Text>
+                    <Text style={styles.emptySubtext}>{tr("You have handled all scheduled appointments for today", "Anda telah mengendalikan semua temujanji yang dijadualkan hari ini")}</Text>
                   </View>
                 </View>
               )}
@@ -2302,7 +2302,7 @@ export default function BookingsScreen() {
               {/* Section Header */}
               <View style={styles.catalogHeaderRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.catalogSectionTitle}>Services & Products</Text>
+                  <Text style={styles.catalogSectionTitle}>{tr("Services & Products", "Perkhidmatan & Produk")}</Text>
                   <Text style={styles.catalogSectionSubtitle}>
                     Items available for booking on your page
                   </Text>
@@ -2313,7 +2313,7 @@ export default function BookingsScreen() {
                   activeOpacity={0.85}
                 >
                   <Ionicons name="add" size={16} color="#000" />
-                  <Text style={styles.btnAddItemText}>Add Item</Text>
+                  <Text style={styles.btnAddItemText}>{tr("Add Item", "Tambah Item")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2405,7 +2405,7 @@ export default function BookingsScreen() {
                   <View style={styles.emptyIconCircle}>
                     <Ionicons name="cut-outline" size={24} color="#94A3B8" />
                   </View>
-                  <Text style={styles.emptyText}>Your service catalog is empty</Text>
+                  <Text style={styles.emptyText}>{tr("Your service catalog is empty", "Katalog perkhidmatan anda kosong")}</Text>
                   <Text style={styles.emptySubtext}>
                     Add your haircuts, treatments, services, or products so customers can book them online.
                   </Text>
@@ -2426,7 +2426,7 @@ export default function BookingsScreen() {
                   <Ionicons name="bulb" size={20} color="#D97706" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.tipsTitle}>Tips</Text>
+                  <Text style={styles.tipsTitle}>{tr("Tips", "Petua")}</Text>
                   <Text style={styles.tipsText}>
                     Services you add will be displayed on your booking page for customers to book directly.
                   </Text>
@@ -2446,7 +2446,7 @@ export default function BookingsScreen() {
               <View style={styles.pwaSectionHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="sparkles" size={18} color="#D97706" />
-                  <Text style={styles.pwaSectionTitle}>Online Booking Page</Text>
+                  <Text style={styles.pwaSectionTitle}>{tr("Online Booking Page", "Halaman Tempahan Dalam Talian")}</Text>
                   <View style={styles.liveBadge}>
                     <Text style={styles.liveBadgeText}>● LIVE</Text>
                   </View>
@@ -2474,7 +2474,7 @@ export default function BookingsScreen() {
                       activeOpacity={0.7}
                     >
                       <Ionicons name="reload" size={13} color="#0F172A" />
-                      <Text style={styles.btnToolbarActionText}>Reload</Text>
+                      <Text style={styles.btnToolbarActionText}>{tr("Reload", "Muat Semula")}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -2490,7 +2490,7 @@ export default function BookingsScreen() {
                       activeOpacity={0.8}
                     >
                       <Ionicons name="open-outline" size={13} color="#000" />
-                      <Text style={styles.btnToolbarActionPrimaryText}>Open ↗</Text>
+                      <Text style={styles.btnToolbarActionPrimaryText}>{tr("Open ↗", "Buka ↗")}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2518,7 +2518,7 @@ export default function BookingsScreen() {
                   ) : (
                     <View style={styles.mobileFallbackPreview}>
                       <Ionicons name="phone-portrait-outline" size={44} color="#FFC700" />
-                      <Text style={styles.mobileFallbackTitle}>Live Customer PWA</Text>
+                      <Text style={styles.mobileFallbackTitle}>{tr("Live Customer PWA", "PWA Pelanggan Langsung")}</Text>
                       <Text style={styles.mobileFallbackSub}>
                         Tap below to test your full booking portal as customers see it.
                       </Text>
@@ -2528,7 +2528,7 @@ export default function BookingsScreen() {
                         activeOpacity={0.85}
                       >
                         <Ionicons name="open-outline" size={15} color="#000" />
-                        <Text style={styles.btnOpenFallbackText}>Launch Booking Flow ➔</Text>
+                        <Text style={styles.btnOpenFallbackText}>{tr("Launch Booking Flow ➔", "Lancarkan Aliran Tempahan ➔")}</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2539,7 +2539,7 @@ export default function BookingsScreen() {
               <View style={styles.brandingCustomizerCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <Ionicons name="storefront-outline" size={20} color="#000" />
-                  <Text style={styles.brandingSectionTitle}>Storefront Media & Profile</Text>
+                  <Text style={styles.brandingSectionTitle}>{tr("Storefront Media & Profile", "Media & Profil Kedai")}</Text>
                 </View>
 
                 {/* ✨ Standardized Fresha x Apple iOS Layout Badge */}
@@ -2575,7 +2575,7 @@ export default function BookingsScreen() {
                 </View>
 
                 {/* Real Store Hero Banner Photo Uploader */}
-                <Text style={styles.brandingFieldLabel}>Store Hero Banner Photo</Text>
+                <Text style={styles.brandingFieldLabel}>{tr("Store Hero Banner Photo", "Foto Sepanduk Utama Kedai")}</Text>
                 <Text style={styles.brandingFieldSub}>
                   Upload a high-quality photo of your storefront, kiosk, or workspace (16:9 recommended).
                 </Text>
@@ -2591,7 +2591,7 @@ export default function BookingsScreen() {
                           activeOpacity={0.8}
                         >
                           <Ionicons name="camera-outline" size={14} color="#FFF" />
-                          <Text style={styles.btnChangeBannerPillText}>Change Photo</Text>
+                          <Text style={styles.btnChangeBannerPillText}>{tr("Change Photo", "Tukar Foto")}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -2617,8 +2617,8 @@ export default function BookingsScreen() {
                       <View style={styles.bannerPlaceholderIconCircle}>
                         <Ionicons name="cloud-upload-outline" size={26} color="#D97706" />
                       </View>
-                      <Text style={styles.bannerPlaceholderTitle}>Tap to Upload Store Banner</Text>
-                      <Text style={styles.bannerPlaceholderSubtitle}>PNG, JPG, or WEBP up to 5MB</Text>
+                      <Text style={styles.bannerPlaceholderTitle}>{tr("Tap to Upload Store Banner", "Ketik untuk Muat Naik Sepanduk Kedai")}</Text>
+                      <Text style={styles.bannerPlaceholderSubtitle}>{tr("PNG, JPG, or WEBP up to 5MB", "PNG, JPG, atau WEBP sehingga 5MB")}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -2650,7 +2650,7 @@ export default function BookingsScreen() {
                   ) : (
                     <>
                       <Ionicons name="checkmark-done" size={18} color="#000000" />
-                      <Text style={styles.btnSaveBrandingText}>Save & Update Live PWA</Text>
+                      <Text style={styles.btnSaveBrandingText}>{tr("Save & Update Live PWA", "Simpan & Kemas Kini PWA Langsung")}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2660,7 +2660,7 @@ export default function BookingsScreen() {
               <View style={styles.brandingCustomizerCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <Ionicons name="options-outline" size={20} color="#000" />
-                  <Text style={styles.brandingSectionTitle}>Booking Preferences</Text>
+                  <Text style={styles.brandingSectionTitle}>{tr("Booking Preferences", "Keutamaan Tempahan")}</Text>
                 </View>
 
                 {/* Staff Selection Toggle Row */}
@@ -2700,7 +2700,7 @@ export default function BookingsScreen() {
               <View style={styles.officialLinkBox}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <Ionicons name="link" size={16} color="#000" />
-                  <Text style={styles.officialLinkLabel}>OFFICIAL BOOKING LINK</Text>
+                  <Text style={styles.officialLinkLabel}>{tr("OFFICIAL BOOKING LINK", "PAUTAN TEMPAHAN RASMI")}</Text>
                 </View>
 
                 <View style={styles.urlDisplayRow}>
@@ -2730,14 +2730,14 @@ export default function BookingsScreen() {
                     activeOpacity={0.85}
                   >
                     <Ionicons name="open-outline" size={16} color="#000" />
-                    <Text style={styles.btnPreviewText}>Preview</Text>
+                    <Text style={styles.btnPreviewText}>{tr("Preview", "Pratonton")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Share Your Booking Page */}
               <View style={styles.shareSection}>
-                <Text style={styles.shareSectionTitle}>Share Your Booking Page</Text>
+                <Text style={styles.shareSectionTitle}>{tr("Share Your Booking Page", "Kongsi Halaman Tempahan Anda")}</Text>
 
                 <View style={styles.shareButtonsGrid}>
                   
@@ -2774,7 +2774,7 @@ export default function BookingsScreen() {
                     <View style={[styles.shareIconCircle, { backgroundColor: '#000000' }]}>
                       <Ionicons name="qr-code-outline" size={22} color="#FFF" />
                     </View>
-                    <Text style={styles.shareItemLabel}>QR Code</Text>
+                    <Text style={styles.shareItemLabel}>{tr("QR Code", "Kod QR")}</Text>
                   </TouchableOpacity>
 
                   {/* Others Share */}
@@ -2786,7 +2786,7 @@ export default function BookingsScreen() {
                     <View style={[styles.shareIconCircle, { backgroundColor: '#64748B' }]}>
                       <Ionicons name="share-social-outline" size={22} color="#FFF" />
                     </View>
-                    <Text style={styles.shareItemLabel}>More</Text>
+                    <Text style={styles.shareItemLabel}>{tr("More", "Lagi")}</Text>
                   </TouchableOpacity>
 
                 </View>
@@ -2818,7 +2818,7 @@ export default function BookingsScreen() {
                 <View style={styles.wizardHeaderRow}>
                   <View>
                     <Text style={styles.wizardMainTitle}>{editingService ? 'Edit Item' : 'Add Item'}</Text>
-                    <Text style={styles.wizardSubTitle}>What would you like to add?</Text>
+                    <Text style={styles.wizardSubTitle}>{tr("What would you like to add?", "Apa yang anda ingin tambah?")}</Text>
                   </View>
                   <TouchableOpacity
                     onPress={handleCloseAddService}
@@ -2844,8 +2844,8 @@ export default function BookingsScreen() {
                       <Ionicons name="cut-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Staff Appointment 💇</Text>
-                      <Text style={styles.typeCardSub}>Service assigned to specialist/staff (Barber, Spa, Clinic)</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Staff Appointment 💇", "Temujanji Kakitangan 💇")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Service assigned to specialist/staff (Barber, Spa, Clinic)", "Perkhidmatan diberikan kepada pakar/kakitangan (Barber, Spa, Klinik)")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2866,8 +2866,8 @@ export default function BookingsScreen() {
                       <Ionicons name="car-sport-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Auto & Workshop Service 🚗</Text>
-                      <Text style={styles.typeCardSub}>Vehicle bay & slot booking (Car Wash, Detailing, Mechanic, Service Center)</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Auto & Workshop Service 🚗", "Perkhidmatan Auto & Bengkel 🚗")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Vehicle bay & slot booking (Car Wash, Detailing, Mechanic, Service Center)", "Tempahan bay & slot kenderaan (Cuci Kereta, Detailing, Mekanik, Pusat Servis)")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2887,8 +2887,8 @@ export default function BookingsScreen() {
                       <Ionicons name="football-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Court / Bay / Facility ⚽</Text>
-                      <Text style={styles.typeCardSub}>Hourly slot rental with unit counts (Futsal, Badminton, Studio)</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Court / Bay / Facility ⚽", "Gelanggang / Bay / Fasiliti ⚽")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Hourly slot rental with unit counts (Futsal, Badminton, Studio)", "Sewaan slot setiap jam dengan kiraan unit (Futsal, Badminton, Studio)")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2909,8 +2909,8 @@ export default function BookingsScreen() {
                       <Ionicons name="home-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Homestay & Lodging 🏡</Text>
-                      <Text style={styles.typeCardSub}>Per night stay with deposit & max pax (Homestay, Chalet)</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Homestay & Lodging 🏡", "Homestay & Penginapan 🏡")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Per night stay with deposit & max pax (Homestay, Chalet)", "Menginap setiap malam dengan deposit & pax maksimum (Homestay, Chalet)")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2930,8 +2930,8 @@ export default function BookingsScreen() {
                       <Ionicons name="restaurant-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Restaurant Table & Dining 🍽️</Text>
-                      <Text style={styles.typeCardSub}>Table booking with pax capacity (Dine-in, VIP Room)</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Restaurant Table & Dining 🍽️", "Meja Restoran & Makan 🍽️")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Table booking with pax capacity (Dine-in, VIP Room)", "Tempahan meja dengan kapasiti pax (Makan di tempat, Bilik VIP)")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2952,8 +2952,8 @@ export default function BookingsScreen() {
                       <Ionicons name="fast-food-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Event & Food Catering 🎪</Text>
-                      <Text style={styles.typeCardSub}>Catering packages, live booths & event pax (Ice cream, Buffet)</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Event & Food Catering 🎪", "Acara & Katering Makanan 🎪")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Catering packages, live booths & event pax (Ice cream, Buffet)", "Pakej katering, booth langsung & pax acara (Ais krim, Bufet)")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -2973,8 +2973,8 @@ export default function BookingsScreen() {
                       <Ionicons name="cube-outline" size={22} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.typeCardTitle}>Product & Add-on 📦</Text>
-                      <Text style={styles.typeCardSub}>Physical product or extra add-on service</Text>
+                      <Text style={styles.typeCardTitle}>{tr("Product & Add-on 📦", "Produk & Tambahan 📦")}</Text>
+                      <Text style={styles.typeCardSub}>{tr("Physical product or extra add-on service", "Produk fizikal atau perkhidmatan tambahan")}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -3061,7 +3061,7 @@ export default function BookingsScreen() {
                 </View>
 
                 <View style={styles.wizardFormGroup}>
-                  <Text style={styles.wizardInputLabel}>Category</Text>
+                  <Text style={styles.wizardInputLabel}>{tr("Category", "Kategori")}</Text>
                   <TouchableOpacity
                     style={styles.dropdownPickerBox}
                     onPress={() => setShowCategoryPicker(!showCategoryPicker)}
@@ -3140,7 +3140,7 @@ export default function BookingsScreen() {
                 {/* Requires Staff Toggle Card */}
                 <View style={styles.toggleRowCard}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.toggleRowTitle}>Requires Staff / Specialist?</Text>
+                    <Text style={styles.toggleRowTitle}>{tr("Requires Staff / Specialist?", "Perlukan Kakitangan / Pakar?")}</Text>
                     <Text style={styles.toggleRowSub}>
                       {requiresStaff 
                         ? 'Staff assigned to handle appointment' 
@@ -3193,7 +3193,7 @@ export default function BookingsScreen() {
                       <Ionicons name="cash-outline" size={18} color="#000000" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.commissionSectionTitle}>Staff Commission</Text>
+                      <Text style={styles.commissionSectionTitle}>{tr("Staff Commission", "Komisen Kakitangan")}</Text>
                       <Text style={styles.commissionSectionSub}>
                         {addItemType === 'product' || addItemType === 'addon'
                           ? 'Staff commission when selling this product'
@@ -3255,8 +3255,8 @@ export default function BookingsScreen() {
                 {/* Available for Online Booking Toggle */}
                 <View style={styles.toggleRowCard}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.toggleRowTitle}>Available for online booking</Text>
-                    <Text style={styles.toggleRowSub}>Show this service on your booking page.</Text>
+                    <Text style={styles.toggleRowTitle}>{tr("Available for online booking", "Tersedia untuk tempahan dalam talian")}</Text>
+                    <Text style={styles.toggleRowSub}>{tr("Show this service on your booking page.", "Tunjukkan perkhidmatan ini di halaman tempahan anda.")}</Text>
                   </View>
 
                   <TouchableOpacity
@@ -3295,7 +3295,7 @@ export default function BookingsScreen() {
                     onPress={() => setAddModalStep(3)}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.btnWizardPrimaryText}>More Settings ➔</Text>
+                    <Text style={styles.btnWizardPrimaryText}>{tr("More Settings ➔", "Tetapan Lanjut ➔")}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -3335,8 +3335,8 @@ export default function BookingsScreen() {
                     <View style={styles.settingHeaderRow}>
                       <Ionicons name="people-outline" size={20} color="#000" />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.settingTitle}>Staff Assignment</Text>
-                        <Text style={styles.settingSub}>Choose who can provide this service</Text>
+                        <Text style={styles.settingTitle}>{tr("Staff Assignment", "Tugasan Kakitangan")}</Text>
+                        <Text style={styles.settingSub}>{tr("Choose who can provide this service", "Pilih siapa yang boleh menyediakan perkhidmatan ini")}</Text>
                       </View>
                       {staffList.length > 0 && (
                         <TouchableOpacity
@@ -3450,7 +3450,7 @@ export default function BookingsScreen() {
                             activeOpacity={0.8}
                           >
                             <Ionicons name="checkmark" size={16} color="#000" />
-                            <Text style={styles.btnStaffInlineAddText}>Add</Text>
+                            <Text style={styles.btnStaffInlineAddText}>{tr("Add", "Tambah")}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.btnStaffInlineCancel}
@@ -3474,8 +3474,8 @@ export default function BookingsScreen() {
                     <View style={styles.settingHeaderRow}>
                       <Ionicons name="location-outline" size={20} color="#000" />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.settingTitle}>Event Setup & Customer Location</Text>
-                        <Text style={styles.settingSub}>On-site event booth delivery & preparation buffer</Text>
+                        <Text style={styles.settingTitle}>{tr("Event Setup & Customer Location", "Persediaan Acara & Lokasi Pelanggan")}</Text>
+                        <Text style={styles.settingSub}>{tr("On-site event booth delivery & preparation buffer", "Penghantaran booth acara di lokasi & masa persediaan")}</Text>
                       </View>
                     </View>
                     <View style={{ marginTop: 10, padding: 12, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
@@ -3494,14 +3494,14 @@ export default function BookingsScreen() {
                   <View style={styles.settingHeaderRow}>
                     <Ionicons name="sparkles-outline" size={20} color="#000" />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.settingTitle}>Peak Rates & Security Deposit</Text>
-                      <Text style={styles.settingSub}>Dynamic pricing for weekends/nights & security deposits</Text>
+                      <Text style={styles.settingTitle}>{tr("Peak Rates & Security Deposit", "Kadar Puncak & Deposit Keselamatan")}</Text>
+                      <Text style={styles.settingSub}>{tr("Dynamic pricing for weekends/nights & security deposits", "Harga dinamik untuk hujung minggu/malam & deposit keselamatan")}</Text>
                     </View>
                   </View>
 
                   <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.wizardInputLabel}>Peak / Weekend Rate (RM)</Text>
+                      <Text style={styles.wizardInputLabel}>{tr("Peak / Weekend Rate (RM)", "Kadar Puncak / Hujung Minggu (RM)")}</Text>
                       <TextInput
                         style={styles.wizardInputText}
                         placeholder="100.00"
@@ -3513,7 +3513,7 @@ export default function BookingsScreen() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.wizardInputLabel}>Refundable Security Deposit (RM)</Text>
+                      <Text style={styles.wizardInputLabel}>{tr("Refundable Security Deposit (RM)", "Deposit Keselamatan Boleh Dipulangkan (RM)")}</Text>
                       <TextInput
                         style={styles.wizardInputText}
                         placeholder="100.00"
@@ -3531,8 +3531,8 @@ export default function BookingsScreen() {
                   <View style={styles.settingHeaderRow}>
                     <Ionicons name="location-outline" size={20} color="#000" />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.settingTitle}>Location</Text>
-                      <Text style={styles.settingSub}>Where is this service provided?</Text>
+                      <Text style={styles.settingTitle}>{tr("Location", "Lokasi")}</Text>
+                      <Text style={styles.settingSub}>{tr("Where is this service provided?", "Di mana perkhidmatan ini disediakan?")}</Text>
                     </View>
                   </View>
 
@@ -3570,8 +3570,8 @@ export default function BookingsScreen() {
                   <View style={styles.settingHeaderRow}>
                     <Ionicons name="time-outline" size={20} color="#000" />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.settingTitle}>Buffer Time</Text>
-                      <Text style={styles.settingSub}>Add time before and after each booking</Text>
+                      <Text style={styles.settingTitle}>{tr("Buffer Time", "Masa Penampan")}</Text>
+                      <Text style={styles.settingSub}>{tr("Add time before and after each booking", "Tambah masa sebelum dan selepas setiap tempahan")}</Text>
                     </View>
                   </View>
 
@@ -3609,8 +3609,8 @@ export default function BookingsScreen() {
                   <View style={styles.settingHeaderRow}>
                     <Ionicons name="card-outline" size={20} color="#000" />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.settingTitle}>Deposit</Text>
-                      <Text style={styles.settingSub}>Require a deposit to confirm booking</Text>
+                      <Text style={styles.settingTitle}>{tr("Deposit", "Deposit")}</Text>
+                      <Text style={styles.settingSub}>{tr("Require a deposit to confirm booking", "Perlukan deposit untuk mengesahkan tempahan")}</Text>
                     </View>
                   </View>
 
@@ -3711,8 +3711,8 @@ export default function BookingsScreen() {
                     <Ionicons name="create-outline" size={20} color="#CA8A04" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.actionSheetItemTitle}>Edit Service</Text>
-                    <Text style={styles.actionSheetItemSub}>Modify title, pricing, category or duration</Text>
+                    <Text style={styles.actionSheetItemTitle}>{tr("Edit Service", "Edit Perkhidmatan")}</Text>
+                    <Text style={styles.actionSheetItemSub}>{tr("Modify title, pricing, category or duration", "Ubah tajuk, harga, kategori atau tempoh")}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </TouchableOpacity>
@@ -3763,7 +3763,7 @@ export default function BookingsScreen() {
                     <Text style={[styles.actionSheetItemTitle, { color: '#DC2626' }]}>
                       {isDeletingService ? 'Deleting...' : 'Delete Service'}
                     </Text>
-                    <Text style={styles.actionSheetItemSub}>Permanently delete this service from catalog</Text>
+                    <Text style={styles.actionSheetItemSub}>{tr("Permanently delete this service from catalog", "Padam perkhidmatan ini secara kekal daripada katalog")}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </TouchableOpacity>
@@ -3774,7 +3774,7 @@ export default function BookingsScreen() {
                   onPress={() => setShowServiceActionModal(false)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.actionSheetCancelText}>Cancel</Text>
+                  <Text style={styles.actionSheetCancelText}>{tr("Cancel", "Batal")}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -3807,7 +3807,7 @@ export default function BookingsScreen() {
                 <Ionicons name="person-remove" size={24} color="#EF4444" />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.noShowModalTitle}>Mark as No Show?</Text>
+                <Text style={styles.noShowModalTitle}>{tr("Mark as No Show?", "Tanda sebagai Tidak Hadir?")}</Text>
                 <Text style={styles.noShowModalSubtitle}>
                   Update appointment status & record attendance
                 </Text>
@@ -3839,7 +3839,7 @@ export default function BookingsScreen() {
                     </Text>
                   </View>
                   <View style={styles.noShowBadge}>
-                    <Text style={styles.noShowBadgeText}>SCHEDULED</Text>
+                    <Text style={styles.noShowBadgeText}>{tr("SCHEDULED", "DIJADUALKAN")}</Text>
                   </View>
                 </View>
 
@@ -3892,8 +3892,8 @@ export default function BookingsScreen() {
                   <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.btnNoShowWhatsAppText}>No Show & WhatsApp Follow-up</Text>
-                  <Text style={styles.btnNoShowWhatsAppSub}>Send friendly reschedule link</Text>
+                  <Text style={styles.btnNoShowWhatsAppText}>{tr("No Show & WhatsApp Follow-up", "Tidak Hadir & Susulan WhatsApp")}</Text>
+                  <Text style={styles.btnNoShowWhatsAppSub}>{tr("Send friendly reschedule link", "Hantar pautan jadual semula mesra")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
               </TouchableOpacity>
@@ -3910,7 +3910,7 @@ export default function BookingsScreen() {
                 }}
               >
                 <Ionicons name="person-remove-outline" size={18} color="#EF4444" />
-                <Text style={styles.btnNoShowOnlyText}>Mark No Show Only (No Message)</Text>
+                <Text style={styles.btnNoShowOnlyText}>{tr("Mark No Show Only (No Message)", "Tanda Tidak Hadir Sahaja (Tiada Mesej)")}</Text>
               </TouchableOpacity>
 
               {/* Option 3: Keep Booking */}
@@ -3919,7 +3919,7 @@ export default function BookingsScreen() {
                 activeOpacity={0.7}
                 onPress={() => setNoShowTargetBooking(null)}
               >
-                <Text style={styles.btnNoShowCancelText}>Keep Appointment</Text>
+                <Text style={styles.btnNoShowCancelText}>{tr("Keep Appointment", "Kekalkan Temujanji")}</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -3932,7 +3932,7 @@ export default function BookingsScreen() {
           <View style={[styles.calendarModalContainer, { maxHeight: '90%' }]}>
             <View style={styles.calendarModalHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.calendarModalTitle}>Reschedule appointment</Text>
+                <Text style={styles.calendarModalTitle}>{tr("Reschedule appointment", "Jadual semula temujanji")}</Text>
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }} numberOfLines={1}>
                   {rescheduleTarget?.customer_name || 'Customer'} · {rescheduleTarget?.service_name || 'Appointment'}
                 </Text>
@@ -3943,7 +3943,7 @@ export default function BookingsScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginBottom: 8 }}>DATE</Text>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginBottom: 8 }}>{tr("DATE", "TARIKH")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
                 {rescheduleDates.map(dt => {
                   const selected = rescheduleDate === dt.iso;
@@ -3974,7 +3974,7 @@ export default function BookingsScreen() {
                 })}
               </ScrollView>
 
-              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>TIME</Text>
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>{tr("TIME", "MASA")}</Text>
               {!rescheduleDay.unset && rescheduleDay.closed ? (
                 <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B91C1C', marginTop: -4, marginBottom: 8 }}>
                   The store is closed on this date.
@@ -4013,7 +4013,7 @@ export default function BookingsScreen() {
 
               {staffList.some((s: any) => s.merchant_staff_id) && (
                 <>
-                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>PROVIDER</Text>
+                  <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>{tr("PROVIDER", "PENYEDIA")}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                     <TouchableOpacity
                       onPress={() => setRescheduleStaffId('')}
@@ -4027,7 +4027,7 @@ export default function BookingsScreen() {
                         borderColor: rescheduleStaffId ? '#E2E8F0' : '#000000',
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: rescheduleStaffId ? '#111111' : '#FFFFFF' }}>Keep current</Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: rescheduleStaffId ? '#111111' : '#FFFFFF' }}>{tr("Keep current", "Kekalkan semasa")}</Text>
                     </TouchableOpacity>
                     {staffList.filter((s: any) => s.merchant_staff_id).map((s: any) => {
                       const selected = rescheduleStaffId === s.merchant_staff_id;
@@ -4077,7 +4077,7 @@ export default function BookingsScreen() {
                 {rescheduleBusy ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Save new slot</Text>
+                  <Text style={{ fontSize: 14.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{tr("Save new slot", "Simpan slot baharu")}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -4092,7 +4092,7 @@ export default function BookingsScreen() {
             
             {/* Modal Header */}
             <View style={styles.calendarModalHeader}>
-              <Text style={styles.calendarModalTitle}>Appointment Calendar</Text>
+              <Text style={styles.calendarModalTitle}>{tr("Appointment Calendar", "Kalendar Temujanji")}</Text>
               <TouchableOpacity onPress={() => setShowCalendarModal(false)} style={styles.btnCloseModal}>
                 <Ionicons name="close" size={20} color="#050505" />
               </TouchableOpacity>
@@ -4107,21 +4107,21 @@ export default function BookingsScreen() {
                   onPress={() => setCalViewMode('day')}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.calTabPillText, calViewMode === 'day' && styles.calTabPillTextActive]}>Day</Text>
+                  <Text style={[styles.calTabPillText, calViewMode === 'day' && styles.calTabPillTextActive]}>{tr("Day", "Hari")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.calTabPill, calViewMode === 'week' && styles.calTabPillActive]}
                   onPress={() => setCalViewMode('week')}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.calTabPillText, calViewMode === 'week' && styles.calTabPillTextActive]}>Week</Text>
+                  <Text style={[styles.calTabPillText, calViewMode === 'week' && styles.calTabPillTextActive]}>{tr("Week", "Minggu")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.calTabPill, calViewMode === 'month' && styles.calTabPillActive]}
                   onPress={() => setCalViewMode('month')}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.calTabPillText, calViewMode === 'month' && styles.calTabPillTextActive]}>Month</Text>
+                  <Text style={[styles.calTabPillText, calViewMode === 'month' && styles.calTabPillTextActive]}>{tr("Month", "Bulan")}</Text>
                 </TouchableOpacity>
               </View>
 
