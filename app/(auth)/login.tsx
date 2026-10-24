@@ -21,6 +21,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, storage } from '@/context/AuthContext';
+import { useTr } from '@/lib/i18n';
 import { pb } from '@/lib/pocketbase';
 import { colors, radii } from '@/theme';
 import { validateEmailWithTypoCheck, parseAndNormalizeBirthday, formatMalaysianPhone, getFullMalaysianPhone } from '@/lib/emailValidator';
@@ -32,6 +33,7 @@ const COUNTRY_CODE = '+60';
 export default function LoginScreen() {
   const router = useRouter();
   const { checkPhone, register, resendVerificationEmail, loginWithIdentifier, requestPasswordReset, isAuthenticated, isLoading: isAuthLoading, activeRole } = useAuth();
+  const tr = useTr();
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -322,7 +324,7 @@ export default function LoginScreen() {
         setStep('register-name');
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to check phone number. Please try again.');
+      Alert.alert(tr("Error", "Ralat"), e?.message || tr('Failed to check phone number. Please try again.', 'Gagal menyemak nombor telefon. Sila cuba lagi.'));
     } finally {
       setIsLoading(false);
     }
@@ -411,7 +413,7 @@ export default function LoginScreen() {
         });
       }, 1000);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to resend verification link.');
+      Alert.alert(tr("Error", "Ralat"), e?.message || tr('Failed to resend verification link.', 'Gagal menghantar semula pautan pengesahan.'));
     } finally {
       setIsLoading(false);
     }
@@ -517,7 +519,7 @@ export default function LoginScreen() {
   const handleForgotPassword = async () => {
     const targetIdentifier = email.trim() || getFullPhone() || phone;
     if (!targetIdentifier) {
-      Alert.alert('Info', 'Please enter your phone number or email address first.');
+      Alert.alert(tr("Info", "Maklumat"), tr('Please enter your phone number or email address first.', 'Sila masukkan nombor telefon atau alamat e-mel anda terlebih dahulu.'));
       setStep('phone');
       return;
     }
@@ -527,7 +529,7 @@ export default function LoginScreen() {
       setResetModalIdentifier(targetIdentifier);
       setResetModalVisible(true);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to send password reset email.');
+      Alert.alert(tr("Error", "Ralat"), e?.message || tr('Failed to send password reset email.', 'Gagal menghantar e-mel tetapan semula kata laluan.'));
     } finally {
       setIsLoading(false);
     }
@@ -787,7 +789,7 @@ export default function LoginScreen() {
 
                 {step === 'phone' && (
                   <View style={styles.phoneInputSection}>
-                    <Text style={styles.phoneInputLabel}>MOBILE NUMBER</Text>
+                    <Text style={styles.phoneInputLabel}>{tr("MOBILE NUMBER", "NOMBOR MUDAH ALIH")}</Text>
                     <View style={[
                       styles.phoneInputGroup,
                       isFocused && styles.phoneInputGroupFocused,
@@ -849,7 +851,7 @@ export default function LoginScreen() {
                         {resendSuccess && (
                           <View style={[styles.errorContainer, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', marginBottom: 12 }]}>
                             <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                            <Text style={[styles.errorText, { color: '#065F46' }]}>Verification link resent! Please check your inbox.</Text>
+                            <Text style={[styles.errorText, { color: '#065F46' }]}>{tr("Verification link resent! Please check your inbox.", "Pautan pengesahan dihantar semula! Sila semak peti masuk anda.")}</Text>
                           </View>
                         )}
 
@@ -881,7 +883,7 @@ export default function LoginScreen() {
 
                         {/* Secondary Action 1: Didn't receive it? Resend link */}
                         <View style={styles.verifySecondaryRow}>
-                          <Text style={styles.verifySecondaryText}>Didn’t receive it? </Text>
+                          <Text style={styles.verifySecondaryText}>{tr("Didn’t receive it?", "Tidak menerimanya?")}</Text>
                           <TouchableOpacity
                             disabled={resendCooldown > 0 || isLoading}
                             onPress={handleResendLink}
@@ -896,7 +898,7 @@ export default function LoginScreen() {
 
                         {/* Secondary Action 2: Wrong email? Change address */}
                         <View style={styles.verifySecondaryRow}>
-                          <Text style={styles.verifySecondaryText}>Wrong email? </Text>
+                          <Text style={styles.verifySecondaryText}>{tr("Wrong email?", "E-mel salah?")}</Text>
                           <TouchableOpacity
                             onPress={() => {
                               setErrorMsg('');
@@ -905,7 +907,7 @@ export default function LoginScreen() {
                             activeOpacity={0.7}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           >
-                            <Text style={styles.verifySecondaryLink}>Change address</Text>
+                            <Text style={styles.verifySecondaryLink}>{tr("Change address", "Tukar alamat")}</Text>
                           </TouchableOpacity>
                         </View>
 
@@ -956,7 +958,7 @@ export default function LoginScreen() {
                         <Ionicons name="shield" size={19} color="#FFCC00" />
                         <Ionicons name="checkmark" size={11} color="#000000" style={styles.shieldCheckmark} />
                       </View>
-                      <Text style={styles.trustBadgeText}>Instant, secure and password-free login</Text>
+                      <Text style={styles.trustBadgeText}>{tr("Instant, secure and password-free login", "Log masuk segera, selamat dan tanpa kata laluan")}</Text>
                     </View>
                   </View>
                 )}
@@ -985,23 +987,23 @@ export default function LoginScreen() {
                       <View style={styles.phoneVerifiedLeft}>
                         <Ionicons name="phone-portrait-outline" size={24} color="#000000" />
                         <View style={styles.phoneVerifiedTextCol}>
-                          <Text style={styles.phoneVerifiedTitle}>Phone verified</Text>
+                          <Text style={styles.phoneVerifiedTitle}>{tr("Phone verified", "Telefon disahkan")}</Text>
                           <Text style={styles.phoneVerifiedSub}>+60 •••• {getMaskedPhone()}</Text>
                         </View>
                       </View>
                       <View style={styles.phoneChangeBadge}>
-                        <Text style={styles.phoneChangeBadgeText}>Change</Text>
+                        <Text style={styles.phoneChangeBadgeText}>{tr("Change", "Tukar")}</Text>
                         <Ionicons name="chevron-forward" size={12} color="#000000" />
                       </View>
                     </TouchableOpacity>
 
                     {/* WHAT SHOULD WE CALL YOU? input */}
                     <View style={styles.nameFieldGroup}>
-                      <Text style={styles.nameFieldLabel}>WHAT SHOULD WE CALL YOU?</Text>
+                      <Text style={styles.nameFieldLabel}>{tr("WHAT SHOULD WE CALL YOU?", "APA NAMA PANGGILAN ANDA?")}</Text>
                       <View style={[styles.nameInputBox, nameFocused && styles.nameInputBoxFocused]}>
                         <TextInput
                           style={[styles.nameInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                          placeholder="e.g. Alex Tan"
+                          placeholder={tr("e.g. Alex Tan", "cth. Alex Tan")}
                           placeholderTextColor="rgba(0, 0, 0, 0.35)"
                           value={name}
                           onChangeText={(t) => {
@@ -1027,7 +1029,7 @@ export default function LoginScreen() {
                           <Ionicons name="gift" size={24} color="#000000" />
                         </View>
                         <View style={styles.birthdayCardTextCol}>
-                          <Text style={styles.birthdayCardTitle}>Your birthday deserves a little extra.</Text>
+                          <Text style={styles.birthdayCardTitle}>{tr("Your birthday deserves a little extra.", "Hari jadi anda layak mendapat sedikit tambahan.")}</Text>
                           <Text style={styles.birthdayCardDesc}>
                             Add your birthday to discover special treats from participating stores.
                           </Text>
@@ -1035,7 +1037,7 @@ export default function LoginScreen() {
                       </View>
 
                       <View style={styles.birthdayCardBottomRow}>
-                        <Text style={styles.birthdayCardRequiredText}>Required · Day and month only</Text>
+                        <Text style={styles.birthdayCardRequiredText}>{tr("Required · Day and month only", "Wajib · Hari dan bulan sahaja")}</Text>
                         {birthday ? (
                           <View style={styles.birthdayActiveGroup}>
                             <View style={styles.birthdayChipBtn}>
@@ -1054,7 +1056,7 @@ export default function LoginScreen() {
                           </View>
                         ) : (
                           <View style={styles.birthdayAddBtn}>
-                            <Text style={styles.birthdayAddBtnText}>Add birthday</Text>
+                            <Text style={styles.birthdayAddBtnText}>{tr("Add birthday", "Tambah hari jadi")}</Text>
                             <Ionicons name="chevron-forward" size={14} color="#000000" />
                           </View>
                         )}
@@ -1112,7 +1114,7 @@ export default function LoginScreen() {
 
                     {/* Email Card Container */}
                     <View style={styles.emailFormCard}>
-                      <Text style={styles.emailFieldLabel}>EMAIL ADDRESS</Text>
+                      <Text style={styles.emailFieldLabel}>{tr("EMAIL ADDRESS", "ALAMAT E-MEL")}</Text>
                       <View style={[styles.emailInputBox, emailFocused && styles.emailInputBoxFocused]}>
                         <TextInput
                           style={[styles.emailInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
@@ -1165,8 +1167,8 @@ export default function LoginScreen() {
                           <Ionicons name="document-text-outline" size={20} color="#000000" />
                         </View>
                         <View style={styles.benefitTextCol}>
-                          <Text style={styles.benefitTitle}>Receive booking receipts</Text>
-                          <Text style={styles.benefitDesc}>Get your appointment details by email.</Text>
+                          <Text style={styles.benefitTitle}>{tr("Receive booking receipts", "Terima resit tempahan")}</Text>
+                          <Text style={styles.benefitDesc}>{tr("Get your appointment details by email.", "Dapatkan butiran temujanji melalui e-mel.")}</Text>
                         </View>
                       </View>
 
@@ -1176,8 +1178,8 @@ export default function LoginScreen() {
                           <Ionicons name="gift-outline" size={20} color="#000000" />
                         </View>
                         <View style={styles.benefitTextCol}>
-                          <Text style={styles.benefitTitle}>Keep a copy of special offers</Text>
-                          <Text style={styles.benefitDesc}>We’ll email selected rewards, only with your consent.</Text>
+                          <Text style={styles.benefitTitle}>{tr("Keep a copy of special offers", "Simpan salinan tawaran istimewa")}</Text>
+                          <Text style={styles.benefitDesc}>{tr("We’ll email selected rewards, only with your consent.", "Kami akan e-mel ganjaran terpilih, hanya dengan persetujuan anda.")}</Text>
                         </View>
                       </View>
                     </View>
@@ -1239,23 +1241,23 @@ export default function LoginScreen() {
                       <View style={styles.passwordPhoneCardLeft}>
                         <Ionicons name="phone-portrait-outline" size={24} color="#000000" />
                         <View style={styles.passwordPhoneCardTextCol}>
-                          <Text style={styles.passwordPhoneCardLabel}>Your phone number</Text>
+                          <Text style={styles.passwordPhoneCardLabel}>{tr("Your phone number", "Nombor telefon anda")}</Text>
                           <Text style={styles.passwordPhoneCardNumber}>+60 {phone ? formatMalaysianPhone(phone) : '12 351 6724'}</Text>
                         </View>
                       </View>
                       <View style={styles.passwordPhoneCardVerifiedBadge}>
                         <Ionicons name="checkmark-circle" size={14} color="#15803D" />
-                        <Text style={styles.passwordPhoneCardVerifiedText}>Verified</Text>
+                        <Text style={styles.passwordPhoneCardVerifiedText}>{tr("Verified", "Disahkan")}</Text>
                       </View>
                     </View>
 
                     {/* Field 1: CREATE PASSWORD */}
                     <View style={styles.passwordFieldGroup}>
-                      <Text style={styles.passwordFieldLabel}>CREATE PASSWORD</Text>
+                      <Text style={styles.passwordFieldLabel}>{tr("CREATE PASSWORD", "CIPTA KATA LALUAN")}</Text>
                       <View style={[styles.passwordInputBox, passwordFocused && styles.passwordInputBoxFocused]}>
                         <TextInput
                           style={[styles.passwordInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                          placeholder="Min. 8 characters"
+                          placeholder={tr("Min. 8 characters", "Min. 8 aksara")}
                           placeholderTextColor="#94A3B8"
                           value={password}
                           onChangeText={(t) => {
@@ -1284,17 +1286,17 @@ export default function LoginScreen() {
                       {/* Helper info banner */}
                       <View style={styles.passwordHelperRow}>
                         <Ionicons name="information-circle-outline" size={15} color="#64748B" />
-                        <Text style={styles.passwordHelperText}>Use a unique password to keep your account safe.</Text>
+                        <Text style={styles.passwordHelperText}>{tr("Use a unique password to keep your account safe.", "Gunakan kata laluan unik untuk keselamatan akaun anda.")}</Text>
                       </View>
                     </View>
 
                     {/* Field 2: CONFIRM PASSWORD */}
                     <View style={styles.passwordFieldGroup}>
-                      <Text style={styles.passwordFieldLabel}>CONFIRM PASSWORD</Text>
+                      <Text style={styles.passwordFieldLabel}>{tr("CONFIRM PASSWORD", "SAHKAN KATA LALUAN")}</Text>
                       <View style={[styles.passwordInputBox, confirmPasswordFocused && styles.passwordInputBoxFocused]}>
                         <TextInput
                           style={[styles.passwordInput, Platform.OS === 'web' ? { outlineWidth: 0 } as any : null]}
-                          placeholder="Re-enter password"
+                          placeholder={tr("Re-enter password", "Masukkan semula kata laluan")}
                           placeholderTextColor="#94A3B8"
                           value={confirmPassword}
                           onChangeText={(t) => {
@@ -1383,7 +1385,7 @@ export default function LoginScreen() {
                       <View style={styles.passwordPhoneCardLeft}>
                         <Ionicons name="phone-portrait-outline" size={24} color="#000000" />
                         <View style={styles.passwordPhoneCardTextCol}>
-                          <Text style={styles.passwordPhoneCardLabel}>Your phone number</Text>
+                          <Text style={styles.passwordPhoneCardLabel}>{tr("Your phone number", "Nombor telefon anda")}</Text>
                           <Text style={styles.passwordPhoneCardNumber}>
                             +60 {phone ? formatMalaysianPhone(phone) : '12 345 6789'}
                           </Text>
@@ -1396,14 +1398,14 @@ export default function LoginScreen() {
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
                         <Ionicons name="checkmark-circle" size={14} color="#15803D" />
-                        <Text style={styles.passwordPhoneCardVerifiedText}>Verified</Text>
+                        <Text style={styles.passwordPhoneCardVerifiedText}>{tr("Verified", "Disahkan")}</Text>
                       </TouchableOpacity>
                     </View>
 
                     {/* Password Input Field with Forgot Password in Header Row */}
                     <View style={styles.passwordFieldGroup}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <Text style={styles.passwordFieldLabel}>PASSWORD</Text>
+                        <Text style={styles.passwordFieldLabel}>{tr("PASSWORD", "KATA LALUAN")}</Text>
                         <TouchableOpacity
                           onPress={handleForgotPassword}
                           activeOpacity={0.7}
@@ -1421,7 +1423,7 @@ export default function LoginScreen() {
                             styles.passwordInput,
                             Platform.OS === 'web' ? { outlineWidth: 0 } as any : null
                           ]}
-                          placeholder="Enter your password"
+                          placeholder={tr("Enter your password", "Masukkan kata laluan anda")}
                           placeholderTextColor="#94A3B8"
                           value={password}
                           onChangeText={(t) => {
@@ -1542,8 +1544,8 @@ export default function LoginScreen() {
                   <Ionicons name="gift" size={20} color="#000000" />
                 </View>
                 <View>
-                  <Text style={styles.birthdayModalTitle}>Select Your Birthday</Text>
-                  <Text style={styles.birthdayModalSub}>Required · Day and month only</Text>
+                  <Text style={styles.birthdayModalTitle}>{tr("Select Your Birthday", "Pilih Tarikh Lahir Anda")}</Text>
+                  <Text style={styles.birthdayModalSub}>{tr("Required · Day and month only", "Wajib · Hari dan bulan sahaja")}</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -1559,7 +1561,7 @@ export default function LoginScreen() {
             <View style={styles.birthdayPickerColumnsRow}>
               {/* Day Column */}
               <View style={styles.pickerCol}>
-                <Text style={styles.pickerColLabel}>DAY</Text>
+                <Text style={styles.pickerColLabel}>{tr("DAY", "HARI")}</Text>
                 <View style={styles.pickerSelectorBox}>
                   <TouchableOpacity
                     onPress={() => setPickerDay(prev => prev > 1 ? prev - 1 : 31)}
@@ -1579,7 +1581,7 @@ export default function LoginScreen() {
 
               {/* Month Column */}
               <View style={[styles.pickerCol, { flex: 1.4 }]}>
-                <Text style={styles.pickerColLabel}>MONTH</Text>
+                <Text style={styles.pickerColLabel}>{tr("MONTH", "BULAN")}</Text>
                 <View style={styles.pickerSelectorBox}>
                   <TouchableOpacity
                     onPress={() => setPickerMonth(prev => prev > 1 ? prev - 1 : 12)}
@@ -1601,7 +1603,7 @@ export default function LoginScreen() {
 
               {/* Year Column */}
               <View style={[styles.pickerCol, { flex: 1.2 }]}>
-                <Text style={styles.pickerColLabel}>YEAR</Text>
+                <Text style={styles.pickerColLabel}>{tr("YEAR", "TAHUN")}</Text>
                 <View style={styles.pickerSelectorBox}>
                   <TouchableOpacity
                     onPress={() => setPickerYear(prev => prev < new Date().getFullYear() ? prev + 1 : 1920)}
@@ -1680,7 +1682,7 @@ export default function LoginScreen() {
               <Ionicons name="mail-unread-outline" size={32} color="#FFC700" />
             </View>
 
-            <Text style={styles.modalTitle}>Check Your Email</Text>
+            <Text style={styles.modalTitle}>{tr("Check Your Email", "Semak E-mel Anda")}</Text>
             
             <Text style={styles.modalDescription}>
               If an account is associated with:
@@ -1711,7 +1713,7 @@ export default function LoginScreen() {
               onPress={() => setResetModalVisible(false)}
               activeOpacity={0.85}
             >
-              <Text style={styles.modalPrimaryBtnText}>GOT IT</Text>
+              <Text style={styles.modalPrimaryBtnText}>{tr("GOT IT", "FAHAM")}</Text>
             </TouchableOpacity>
           </View>
         </View>

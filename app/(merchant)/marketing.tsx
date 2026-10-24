@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, FontAwesome, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTr } from '@/lib/i18n';
 import { pb } from '@/lib/pocketbase';
 import { cachedFetch } from '@/lib/data-cache';
 import { cacheKeys, TTL } from '@/lib/cache-keys';
@@ -90,6 +91,7 @@ export default function MarketingScreen() {
   const { user, isOwner, staffPermissions } = useAuth();
   const router = useRouter();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const pathname = usePathname();
   const isFocused = pathname.includes('marketing');
   const { width: windowWidth } = useWindowDimensions();
@@ -605,7 +607,7 @@ export default function MarketingScreen() {
       fetchCampaigns();
     } catch (err: any) {
       console.warn(err);
-      Alert.alert('Error', err.message || 'Failed to create campaign.');
+      Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to create campaign.", "Gagal mencipta kempen."));
     } finally {
       setIsCreatingCampaign(false);
     }
@@ -618,7 +620,7 @@ export default function MarketingScreen() {
       });
       fetchCampaigns();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update campaign state.');
+      Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to update campaign state.", "Gagal mengemas kini status kempen."));
     }
   };
 
@@ -641,7 +643,7 @@ export default function MarketingScreen() {
               await pb.collection('campaigns').delete(campaign.id);
               fetchCampaigns();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete campaign.');
+              Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to delete campaign.", "Gagal memadam kempen."));
             }
           }
         }
@@ -695,13 +697,13 @@ export default function MarketingScreen() {
   const handleSaveAutomationRule = async () => {
     if (!user || !user.merchant_id) return;
     if (!arName.trim() || !arTitle.trim() || !arMessage.trim()) {
-      Alert.alert('Validation Error', 'Rule Name, Message Title and Body are required.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), tr("Rule Name, Message Title and Body are required.", "Nama Peraturan, Tajuk Mesej dan Kandungan diperlukan."));
       return;
     }
 
     const triggerDaysInt = parseInt(arTriggerDays, 10);
     if (isNaN(triggerDaysInt) || triggerDaysInt <= 0) {
-      Alert.alert('Validation Error', 'Please select or enter a valid number of inactive days (greater than 0).');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), tr("Please select or enter a valid number of inactive days (greater than 0).", "Sila pilih atau masukkan bilangan hari tidak aktif yang sah (lebih daripada 0)."));
       return;
     }
 
@@ -718,7 +720,7 @@ export default function MarketingScreen() {
           is_active: true
         };
         await pb.collection('automation_rules').update(selectedAutomation.id, payload);
-        Alert.alert('Success', 'Automation rule updated successfully!');
+        Alert.alert(tr("Success", "Berjaya"), tr("Automation rule updated successfully!", "Peraturan automasi berjaya dikemas kini!"));
       } else {
         // Generate a random 15-char lowercase alphanumeric ID to satisfy pocketbase validation
         const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -738,7 +740,7 @@ export default function MarketingScreen() {
           is_active: true
         };
         await pb.collection('automation_rules').create(payload);
-        Alert.alert('Success', 'Automation rule created successfully!');
+        Alert.alert(tr("Success", "Berjaya"), tr("Automation rule created successfully!", "Peraturan automasi berjaya dicipta!"));
       }
 
       // Reset form
@@ -751,7 +753,7 @@ export default function MarketingScreen() {
       
       fetchAutomationRules();
     } catch (err: any) {
-      Alert.alert('Save Error', err.message || 'Failed to save automation rule.');
+      Alert.alert(tr("Save Error", "Ralat Menyimpan"), err.message || tr("Failed to save automation rule.", "Gagal menyimpan peraturan automasi."));
     } finally {
       setIsSavingRule(false);
     }
@@ -764,25 +766,24 @@ export default function MarketingScreen() {
       });
       fetchAutomationRules();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to toggle automation state.');
+      Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to toggle automation state.", "Gagal menukar status automasi."));
     }
   };
 
   const handleDeleteAutomationRule = async (ruleId: string) => {
-    Alert.alert(
-      'Confirm Delete',
-      'Are you sure you want to delete this automation rule?',
+    Alert.alert(tr("Confirm Delete", "Sahkan Padam"),
+      tr("Are you sure you want to delete this automation rule?", "Adakah anda pasti mahu memadam peraturan automasi ini?"),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tr('Cancel', 'Batal'), style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: tr('Delete', 'Padam'), 
           style: 'destructive',
           onPress: async () => {
             try {
               await pb.collection('automation_rules').delete(ruleId);
               fetchAutomationRules();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete rule.');
+              Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to delete rule.", "Gagal memadam peraturan."));
             }
           }
         }
@@ -852,19 +853,19 @@ export default function MarketingScreen() {
 
   const handleSendBlast = async () => {
     if (!bTitle.trim() || !bMessage.trim()) {
-      Alert.alert('Validation Error', 'Please enter a Title and a Message.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), tr("Please enter a Title and a Message.", "Sila masukkan Tajuk dan Mesej."));
       return;
     }
     if (bSendWhatsApp && whatsappStatus !== 'connected') {
-      Alert.alert('WhatsApp Error', 'Please connect your WhatsApp account or disable WhatsApp delivery.');
+      Alert.alert(tr("WhatsApp Error", "Ralat WhatsApp"), tr("Please connect your WhatsApp account or disable WhatsApp delivery.", "Sila sambungkan akaun WhatsApp anda atau lumpuhkan penghantaran WhatsApp."));
       return;
     }
 
     Alert.alert(
-      'Confirm Send',
+      tr("Confirm Send", "Sahkan Hantar"),
       `Are you sure you want to send this broadcast message to approximately ${audienceEstimate} customers?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tr('Cancel', 'Batal'), style: 'cancel' },
         {
           text: 'Send Blast',
           onPress: async () => {
@@ -885,7 +886,7 @@ export default function MarketingScreen() {
                 }
               });
 
-              Alert.alert('Success', `Broadcast successfully sent to ${res.count || 0} customer(s).`);
+              Alert.alert(tr("Success", "Berjaya"), `Broadcast successfully sent to ${res.count || 0} customer(s).`);
               setBTitle('Exclusive Promotion! 🎁');
               setBMessage('Hi {{name}}! 👋\n\nWe have a special promotion just for you. You currently have {{stamps}} stamps on your loyalty card. Don\'t miss out on earning more rewards this week! ✨');
               setBCampaignId('');
@@ -894,7 +895,7 @@ export default function MarketingScreen() {
               fetchBroadcasts();
             } catch (err: any) {
               console.warn(err);
-              Alert.alert('Error', err.message || 'Failed to send broadcast.');
+              Alert.alert(tr("Error", "Ralat"), err.message || 'Failed to send broadcast.');
             } finally {
               setIsSendingBlast(false);
             }
@@ -990,12 +991,12 @@ export default function MarketingScreen() {
   const handleSave = async () => {
     if (!user || !user.merchant_id) return;
     if (!rewardDesc.trim()) {
-      Alert.alert('Validation Error', 'Please enter a Reward Description.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), 'Please enter a Reward Description.');
       return;
     }
     const days = parseInt(expiryDays, 10);
     if (isNaN(days) || days <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid number of days for card expiry.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), 'Please enter a valid number of days for card expiry.');
       return;
     }
 
@@ -1058,10 +1059,10 @@ export default function MarketingScreen() {
         setShowSuccessNotice(false);
       }, 4000);
 
-      Alert.alert('Configuration Saved', 'Your loyalty reward program card design and settings have been successfully synchronized.');
+      Alert.alert(tr("Configuration Saved", "Konfigurasi Disimpan"), 'Your loyalty reward program card design and settings have been successfully synchronized.');
     } catch (err: any) {
       console.warn(err);
-      Alert.alert('Error', err.message || 'Failed to save card configuration.');
+      Alert.alert(tr("Error", "Ralat"), err.message || 'Failed to save card configuration.');
     } finally {
       setIsSaving(false);
     }
@@ -1069,13 +1070,13 @@ export default function MarketingScreen() {
 
   const handleDelete = async () => {
     if (!programId) {
-      Alert.alert('Info', 'No active campaign to delete.');
+      Alert.alert(tr("Info", "Maklumat"), 'No active campaign to delete.');
       return;
     }
-    Alert.alert('Confirm Delete', 'Are you sure you want to permanently delete this loyalty program? This will also delete all active stamp cards currently held by your customers.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(tr("Confirm Delete", "Sahkan Padam"), 'Are you sure you want to permanently delete this loyalty program? This will also delete all active stamp cards currently held by your customers.', [
+      { text: tr('Cancel', 'Batal'), style: 'cancel' },
       { 
-        text: 'Delete', 
+        text: tr('Delete', 'Padam'), 
         style: 'destructive', 
         onPress: async () => {
           setIsSaving(true);
@@ -1090,9 +1091,9 @@ export default function MarketingScreen() {
             setBgImage('');
             setBgFile(null);
             setRemoveBgImage(false);
-            Alert.alert('Success', 'Campaign deleted successfully.');
+            Alert.alert(tr("Success", "Berjaya"), 'Campaign deleted successfully.');
           } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to delete campaign.');
+            Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to delete campaign.", "Gagal memadam kempen."));
           } finally {
             setIsSaving(false);
           }
@@ -1141,7 +1142,7 @@ export default function MarketingScreen() {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#050505" />
-        <Text style={styles.loaderText}>Loading card details...</Text>
+        <Text style={styles.loaderText}>{tr("Loading card details...", "Memuatkan butiran kad...")}</Text>
       </View>
     );
   }
@@ -1150,7 +1151,7 @@ export default function MarketingScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       {/* Restrict to Owner Modal Overlay */}
       <Modal
-        visible={isFocused && !isOwner && !staffPermissions?.can_view_marketing}
+        visible={isFocused && !isOwner}
         transparent={true}
         animationType="fade"
       >
@@ -1196,7 +1197,7 @@ export default function MarketingScreen() {
                 style={styles.merchantAvatar}
               />
               <View style={styles.profileTextWrap}>
-                <Text style={styles.welcomeSub}>Marketing Console</Text>
+                <Text style={styles.welcomeSub}>{tr("Marketing Console", "Konsol Pemasaran")}</Text>
                 {merchant?.name ? (
                   <Text style={styles.merchantName}>{merchant.name}</Text>
                 ) : (
@@ -1277,7 +1278,7 @@ export default function MarketingScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="add" size={16} color="#050505" />
-                <Text style={styles.createCampBtnText}>New</Text>
+                <Text style={styles.createCampBtnText}>{tr("New", "Baharu")}</Text>
               </TouchableOpacity>
             </View>
 
@@ -1542,7 +1543,7 @@ export default function MarketingScreen() {
                           flexShrink: 0
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>LINK WABA</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{tr("LINK WABA", "PAUTKAN WABA")}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1601,21 +1602,21 @@ export default function MarketingScreen() {
                         <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: blastStep >= 1 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: blastStep >= 1 ? '#050505' : '#94A3B8' }}>1</Text>
                         </View>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 1 ? '#050505' : '#94A3B8' }}>Audience</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 1 ? '#050505' : '#94A3B8' }}>{tr("Audience", "Sasaran")}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: blastStep >= 2 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: blastStep >= 2 ? '#050505' : '#94A3B8' }}>2</Text>
                         </View>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 2 ? '#050505' : '#94A3B8' }}>Compose</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 2 ? '#050505' : '#94A3B8' }}>{tr("Compose", "Gubal")}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: blastStep >= 3 ? '#FFC700' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: blastStep >= 3 ? '#050505' : '#94A3B8' }}>3</Text>
                         </View>
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 3 ? '#050505' : '#94A3B8' }}>Preview</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: blastStep >= 3 ? '#050505' : '#94A3B8' }}>{tr("Preview", "Pratonton")}</Text>
                       </View>
                     </View>
 
@@ -1626,7 +1627,7 @@ export default function MarketingScreen() {
                       <View style={{ marginBottom: 16, zIndex: 50, elevation: 50 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                           <Ionicons name="people-outline" size={13} color="#475569" />
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', letterSpacing: 0.2 }}>TARGET SEGMENT</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#475569', letterSpacing: 0.2 }}>{tr("TARGET SEGMENT", "SEGMEN SASARAN")}</Text>
                         </View>
                         
                         <View style={{ flexDirection: 'row', gap: 8, zIndex: 10 }}>
@@ -1753,15 +1754,15 @@ export default function MarketingScreen() {
                         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}
                       >
                         <Ionicons name="construct-outline" size={14} color="#050505" />
-                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Build Custom Audience</Text>
+                        <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Build Custom Audience", "Bina Sasaran Tersuai")}</Text>
                       </TouchableOpacity>
                     )}
 
                     <View style={{ backgroundColor: '#FFFFFF', padding: 24, borderRadius: 16, alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' }}>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8' }}>Targeting Approximately</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#94A3B8' }}>{tr("Targeting Approximately", "Menyasar Kira-kira")}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
                         <Text style={{ fontSize: 40, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{audienceEstimate}</Text>
-                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8' }}>Customers</Text>
+                        <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8' }}>{tr("Customers", "Pelanggan")}</Text>
                       </View>
                     </View>
 
@@ -1770,7 +1771,7 @@ export default function MarketingScreen() {
                       style={{ backgroundColor: '#FFC700', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
                       activeOpacity={0.8}
                     >
-                      <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Next: Compose Message</Text>
+                      <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{tr("Next: Compose Message", "Seterusnya: Gubal Mesej")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1781,7 +1782,7 @@ export default function MarketingScreen() {
                     <View style={{ marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                         <Ionicons name="bookmark-outline" size={14} color="#050505" />
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Campaign Title</Text>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Campaign Title", "Tajuk Kempen")}</Text>
                       </View>
                       <TextInput
                         style={{ 
@@ -1795,7 +1796,7 @@ export default function MarketingScreen() {
                           color: '#050505',
                           backgroundColor: '#FFFFFF',
                         }}
-                        placeholder="e.g. Special Weekend Voucher 🎁"
+                        placeholder={tr("e.g. Special Weekend Voucher 🎁", "cth. Baucar Hujung Minggu Istimewa 🎁")}
                         placeholderTextColor="#94A3B8"
                         value={bTitle}
                         onChangeText={setBTitle}
@@ -1806,7 +1807,7 @@ export default function MarketingScreen() {
                     <View style={{ marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                         <Ionicons name="chatbubble-ellipses-outline" size={14} color="#050505" />
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Message Body</Text>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Message Body", "Kandungan Mesej")}</Text>
                       </View>
                       <TextInput
                         style={{ 
@@ -1823,7 +1824,7 @@ export default function MarketingScreen() {
                         }}
                         multiline
                         numberOfLines={4}
-                        placeholder="Enter broadcast message body..."
+                        placeholder={tr("Enter broadcast message body...", "Masukkan kandungan mesej hebahan...")}
                         placeholderTextColor="#94A3B8"
                         value={bMessage}
                         onChangeText={setBMessage}
@@ -1847,7 +1848,7 @@ export default function MarketingScreen() {
                         }}
                       >
                         <Ionicons name="add" size={14} color="#050505" />
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Customer Name</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Customer Name", "Nama Pelanggan")}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         onPress={() => setBMessage(prev => prev + ' {{stamps}}')}
@@ -1864,13 +1865,13 @@ export default function MarketingScreen() {
                         }}
                       >
                         <Ionicons name="add" size={14} color="#050505" />
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Stamp Balance</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Stamp Balance", "Baki Setem")}</Text>
                       </TouchableOpacity>
                     </View>
 
                     {/* Media & Action Button Settings */}
                     <View style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Image Attachment (Optional)</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>{tr("Image Attachment (Optional)", "Lampiran Imej (Pilihan)")}</Text>
                       {bImageUrl ? (
                         <View style={{ position: 'relative' }}>
                           <Image source={{ uri: bImageUrl }} style={{ width: '100%', height: 160, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }} resizeMode="cover" />
@@ -1887,24 +1888,24 @@ export default function MarketingScreen() {
                           style={{ height: 64, borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed', borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}
                         >
                           <Ionicons name="cloud-upload-outline" size={20} color="#64748B" />
-                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Tap to upload image</Text>
+                          <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Tap to upload image", "Ketik untuk memuat naik imej")}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
 
                     <View style={{ marginBottom: 24 }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Call to Action Button (Optional)</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>{tr("Call to Action Button (Optional)", "Butang Seruan Tindakan (Pilihan)")}</Text>
                       <View style={{ gap: 12 }}>
                         <TextInput
                           style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
-                          placeholder="Button Text (e.g. Shop Now)"
+                          placeholder={tr("Button Text (e.g. Shop Now)", "Teks Butang (cth. Beli Sekarang)")}
                           placeholderTextColor="#94A3B8"
                           value={bBtnText}
                           onChangeText={setBBtnText}
                         />
                         <TextInput
                           style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
-                          placeholder="Button URL (https://...)"
+                          placeholder={tr("Button URL (https://...)", "URL Butang (https://...)")}
                           placeholderTextColor="#94A3B8"
                           value={bBtnUrl}
                           onChangeText={setBBtnUrl}
@@ -1925,7 +1926,7 @@ export default function MarketingScreen() {
                       marginBottom: 20 
                     }}>
                       <View style={{ gap: 2, flex: 1, marginRight: 16 }}>
-                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Send via WhatsApp</Text>
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Send via WhatsApp", "Hantar melalui WhatsApp")}</Text>
                         <Text style={{ fontSize: 11, color: '#64748B', fontFamily: 'PlusJakartaSans_500Medium', lineHeight: 15 }}>
                           Deliver message directly to customers' WhatsApp phones via official Meta WABA.
                         </Text>
@@ -1933,7 +1934,7 @@ export default function MarketingScreen() {
                       <TouchableOpacity 
                         onPress={() => {
                           if (whatsappStatus !== 'connected' && !bSendWhatsApp) {
-                            Alert.alert('WhatsApp Offline', 'Link your WhatsApp Business Account (WABA) in Settings to activate WhatsApp broadcasting.');
+                            Alert.alert(tr("WhatsApp Offline", "WhatsApp Luar Talian"), 'Link your WhatsApp Business Account (WABA) in Settings to activate WhatsApp broadcasting.');
                             return;
                           }
                           setBSendWhatsApp(prev => !prev);
@@ -1968,12 +1969,12 @@ export default function MarketingScreen() {
                         onPress={() => setBlastStep(1)}
                         style={{ flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>Back</Text>
+                        <Text style={{ color: '#475569', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>{tr("Back", "Kembali")}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         onPress={() => {
                           if (!bTitle.trim() || !bMessage.trim()) {
-                            Alert.alert('Validation', 'Please enter title and message.');
+                            Alert.alert(tr("Validation", "Pengesahan"), 'Please enter title and message.');
                             return;
                           }
                           setBlastStep(3);
@@ -1981,7 +1982,7 @@ export default function MarketingScreen() {
                         style={{ flex: 2, backgroundColor: '#FFC700', paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}
                         activeOpacity={0.8}
                       >
-                        <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Next: Review & Preview</Text>
+                        <Text style={{ color: '#050505', fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{tr("Next: Review & Preview", "Seterusnya: Semak & Pratonton")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1990,7 +1991,7 @@ export default function MarketingScreen() {
                 {blastStep === 3 && (
                   <View>
                     {/* High-Fidelity WhatsApp Device Mockup Container */}
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 10 }}>Live Message Preview</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', marginBottom: 10 }}>{tr("Live Message Preview", "Pratonton Mesej Langsung")}</Text>
                     <View style={{ 
                       backgroundColor: '#E5DDD5', 
                       borderRadius: 18, 
@@ -2094,7 +2095,7 @@ export default function MarketingScreen() {
                       <View style={{ alignItems: 'center', gap: 4 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <Ionicons name="people-outline" size={14} color="#64748B" />
-                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Audience</Text>
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>{tr("Audience", "Sasaran")}</Text>
                         </View>
                         <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{audienceEstimate}</Text>
                       </View>
@@ -2104,9 +2105,9 @@ export default function MarketingScreen() {
                       <View style={{ alignItems: 'center', gap: 4 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <Ionicons name="notifications-outline" size={14} color="#64748B" />
-                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>Push</Text>
+                          <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', textTransform: 'uppercase' }}>{tr("Push", "Tolak")}</Text>
                         </View>
-                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>Active</Text>
+                        <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#10B981' }}>{tr("Active", "Aktif")}</Text>
                       </View>
 
                       <View style={{ width: 1, height: 24, backgroundColor: '#E2E8F0' }} />
@@ -2173,7 +2174,7 @@ export default function MarketingScreen() {
                       onPress={() => setBlastStep(2)}
                       style={{ marginTop: 16, paddingVertical: 12, alignItems: 'center' }}
                     >
-                      <Text style={{ color: '#64748B', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>Go Back to Edit</Text>
+                      <Text style={{ color: '#64748B', fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold' }}>{tr("Go Back to Edit", "Kembali untuk Edit")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -2184,8 +2185,8 @@ export default function MarketingScreen() {
               {blastSubTab === 'running' && (
                 <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, padding: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 24 }}>
                   <Ionicons name="rocket-outline" size={48} color="#CBD5E1" />
-                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 16, textAlign: 'center' }}>No running broadcasts</Text>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 8, textAlign: 'center', maxWidth: 250 }}>Active blast campaigns will appear here.</Text>
+                  <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 16, textAlign: 'center' }}>{tr("No running broadcasts", "Tiada hebahan sedang berjalan")}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 8, textAlign: 'center', maxWidth: 250 }}>{tr("Active blast campaigns will appear here.", "Kempen hebahan aktif akan muncul di sini.")}</Text>
                 </View>
               )}
 
@@ -2311,7 +2312,7 @@ export default function MarketingScreen() {
                   </View>
 
                   <View style={styles.comingSoonBadgePill}>
-                    <Text style={styles.comingSoonBadgeText}>COMING SOON</Text>
+                    <Text style={styles.comingSoonBadgeText}>{tr("COMING SOON", "AKAN DATANG")}</Text>
                   </View>
 
                   <Text style={styles.whatsappComingSoonTitle}>
@@ -2324,15 +2325,15 @@ export default function MarketingScreen() {
                   <View style={styles.whatsappFeatureTagsRow}>
                     <View style={styles.whatsappFeatureTag}>
                       <Ionicons name="paper-plane-outline" size={13} color="#0F172A" />
-                      <Text style={styles.whatsappFeatureTagText}>Blast Broadcasts</Text>
+                      <Text style={styles.whatsappFeatureTagText}>{tr("Blast Broadcasts", "Hebahan Segera")}</Text>
                     </View>
                     <View style={styles.whatsappFeatureTag}>
                       <Ionicons name="repeat-outline" size={13} color="#0F172A" />
-                      <Text style={styles.whatsappFeatureTagText}>Smart Follow-Ups</Text>
+                      <Text style={styles.whatsappFeatureTagText}>{tr("Smart Follow-Ups", "Susulan Pintar")}</Text>
                     </View>
                     <View style={styles.whatsappFeatureTag}>
                       <Ionicons name="document-text-outline" size={13} color="#0F172A" />
-                      <Text style={styles.whatsappFeatureTagText}>WABA Templates</Text>
+                      <Text style={styles.whatsappFeatureTagText}>{tr("WABA Templates", "Templat WABA")}</Text>
                     </View>
                   </View>
                 </View>
@@ -2575,7 +2576,7 @@ export default function MarketingScreen() {
                             style={styles.modalTextInput}
                             value={cVoucherPrefix}
                             onChangeText={(v) => setCVoucherPrefix(v.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                            placeholder="e.g. MRDK, DISC, PROMO"
+                            placeholder={tr("e.g. MRDK, DISC, PROMO", "cth. MRDK, DISC, PROMO")}
                             placeholderTextColor="#BEC6E0"
                             autoCapitalize="characters"
                             maxLength={8}
@@ -2592,7 +2593,7 @@ export default function MarketingScreen() {
                           style={styles.modalTextInput}
                           value={cCMultiplier}
                           onChangeText={setCMultiplier}
-                          placeholder="e.g. 2 for 2x points"
+                          placeholder={tr("e.g. 2 for 2x points", "cth. 2 untuk 2x mata")}
                           placeholderTextColor="#BEC6E0"
                           keyboardType="numeric"
                           {...Platform.select({ web: { outlineStyle: 'none' } as any })}
@@ -2607,7 +2608,7 @@ export default function MarketingScreen() {
                           style={styles.modalTextInput}
                           value={cBonusValue}
                           onChangeText={setCBonusValue}
-                          placeholder="e.g. 50 bonus points"
+                          placeholder={tr("e.g. 50 bonus points", "cth. 50 mata bonus")}
                           placeholderTextColor="#BEC6E0"
                           keyboardType="number-pad"
                           {...Platform.select({ web: { outlineStyle: 'none' } as any })}
@@ -2622,7 +2623,7 @@ export default function MarketingScreen() {
                           style={styles.modalTextInput}
                           value={cBonusValue}
                           onChangeText={setCBonusValue}
-                          placeholder="e.g. 1 bonus stamp"
+                          placeholder={tr("e.g. 1 bonus stamp", "cth. 1 setem bonus")}
                           placeholderTextColor="#BEC6E0"
                           keyboardType="number-pad"
                           {...Platform.select({ web: { outlineStyle: 'none' } as any })}
@@ -2872,7 +2873,7 @@ export default function MarketingScreen() {
                       {/* Details list */}
                       <View style={{ gap: 10 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>PROMO TYPE</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>{tr("PROMO TYPE", "JENIS PROMO")}</Text>
                           <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }}>
                             {cType === 'voucher_discount' 
                               ? '🎟️ VOUCHER DISCOUNT' 
@@ -2887,14 +2888,14 @@ export default function MarketingScreen() {
                         {cType === 'voucher_discount' && (
                           <>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>DISCOUNT VALUE</Text>
+                              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>{tr("DISCOUNT VALUE", "NILAI DISKAUN")}</Text>
                               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
                                 {cVoucherDiscountType === 'percentage' ? `${cVoucherDiscountVal}%` : `RM ${cVoucherDiscountVal}`} OFF
                               </Text>
                             </View>
                             {cVoucherMinSpend ? (
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>MIN SPEND</Text>
+                                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>{tr("MIN SPEND", "PERBELANJAAN MIN")}</Text>
                                 <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
                                   RM {cVoucherMinSpend}
                                 </Text>
@@ -2904,14 +2905,14 @@ export default function MarketingScreen() {
                         )}
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>PERIOD</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>{tr("PERIOD", "TEMPOH")}</Text>
                           <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
                             {cStartDate} to {cEndDate}
                           </Text>
                         </View>
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>TARGET AUDIENCE</Text>
+                          <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#BEC6E0' }}>{tr("TARGET AUDIENCE", "SASARAN PELANGGAN")}</Text>
                           <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
                             {cVoucherAudience === 'all' ? 'All Customers' : cVoucherAudience === 'spenders' ? 'Top Spenders (VIP)' : cVoucherAudience === 'inactive' ? 'Inactive Customers' : 'Custom'}
                           </Text>
@@ -3082,7 +3083,7 @@ export default function MarketingScreen() {
         <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16, backgroundColor: '#FFFFFF' }}>
-            <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Build Custom Audience</Text>
+            <Text style={{ fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{tr("Build Custom Audience", "Bina Sasaran Tersuai")}</Text>
             <TouchableOpacity onPress={() => setShowCustomAudienceModal(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#050505', alignItems: 'center', justifyContent: 'center', shadowColor: '#050505', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 }}>
               <Ionicons name="close" size={16} color="#FFFFFF" />
             </TouchableOpacity>
@@ -3122,10 +3123,10 @@ export default function MarketingScreen() {
           <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} contentContainerStyle={{ paddingTop: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
             {caTab === 'manual' && (
               <View>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 16 }}>Select specific customers to target.</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 16 }}>{tr("Select specific customers to target.", "Pilih pelanggan tertentu untuk disasarkan.")}</Text>
                 
                 {dbCards.length === 0 ? (
-                  <Text style={{ fontSize: 12, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>No customers found in database.</Text>
+                  <Text style={{ fontSize: 12, color: '#94A3B8', fontFamily: 'PlusJakartaSans_500Medium' }}>{tr("No customers found in database.", "Tiada pelanggan ditemui dalam pangkalan data.")}</Text>
                 ) : (
                   dbCards.map((card, idx) => {
                     const isSelected = caManualSelection.has(card.customer);
@@ -3166,11 +3167,11 @@ export default function MarketingScreen() {
 
             {caTab === 'rules' && (
               <View>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 24 }}>Filter customers based on their activity.</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 24 }}>{tr("Filter customers based on their activity.", "Tapis pelanggan berdasarkan aktiviti mereka.")}</Text>
                 
                 {/* Stamp Balance */}
                 <View style={{ marginBottom: 24 }}>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Stamp Balance Range</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>{tr("Stamp Balance Range", "Julat Baki Setem")}</Text>
                   <TextInput
                     style={{ height: 52, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, backgroundColor: '#FFFFFF', color: '#050505' }}
                     placeholder="e.g. 5 or 1-9"
@@ -3185,10 +3186,10 @@ export default function MarketingScreen() {
 
                 {/* Date Visited */}
                 <View style={{ marginBottom: 24 }}>
-                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>Date Visited Range</Text>
+                  <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505', marginBottom: 8 }}>{tr("Date Visited Range", "Julat Tarikh Lawatan")}</Text>
                   <View style={{ flexDirection: 'row', gap: 12 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>Start Date</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>{tr("Start Date", "Tarikh Mula")}</Text>
                       {Platform.OS === 'web' ? (
                         <input 
                           type="date"
@@ -3206,7 +3207,7 @@ export default function MarketingScreen() {
                       )}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>End Date</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 6 }}>{tr("End Date", "Tarikh Tamat")}</Text>
                       {Platform.OS === 'web' ? (
                         <input 
                           type="date"
@@ -3232,8 +3233,8 @@ export default function MarketingScreen() {
                 {/* Rules Matching Tracker */}
                 <View style={{ marginTop: 8, padding: 20, backgroundColor: '#F8FAFC', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>Rules Matching</Text>
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>Targeted Customers</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#050505' }}>{tr("Rules Matching", "Peraturan Sepadan")}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 2 }}>{tr("Targeted Customers", "Pelanggan Disasarkan")}</Text>
                   </View>
                   <Text style={{ fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{rulesMatchCount}</Text>
                 </View>
@@ -3242,7 +3243,7 @@ export default function MarketingScreen() {
 
             {caTab === 'paste' && (
               <View>
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 16 }}>Paste a list of phone numbers (comma-separated or line-by-line).</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B', marginBottom: 16 }}>{tr("Paste a list of phone numbers (comma-separated or line-by-line).", "Tampal senarai nombor telefon (dipisahkan koma atau baris demi baris).")}</Text>
                 <TextInput
                   style={{ minHeight: 180, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: 16, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, backgroundColor: '#FFFFFF', color: '#0F172A', textAlignVertical: 'top' }}
                   multiline
@@ -3304,14 +3305,14 @@ export default function MarketingScreen() {
                 }
                 else if (caTab === 'paste') {
                   // Not fully implemented DB matching for pasted text in this scope, but structure is here
-                  Alert.alert("Coming Soon", "Matching pasted phone numbers to customer profiles requires backend resolution.");
+                  Alert.alert(tr("Coming Soon", "Akan Datang"), "Matching pasted phone numbers to customer profiles requires backend resolution.");
                 }
 
                 setCustomAudienceIds(Array.from(computedIds));
                 setShowCustomAudienceModal(false);
               }}
             >
-              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>Save & Apply Audience</Text>
+              <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#050505' }}>{tr("Save & Apply Audience", "Simpan & Guna Sasaran")}</Text>
             </TouchableOpacity>
           </View>
         </View>

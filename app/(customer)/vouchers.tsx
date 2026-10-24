@@ -71,7 +71,7 @@ export default function VouchersScreen() {
   const fetchVouchers = async (force = false) => {
     if (!user) return;
     try {
-      const [records, birthdayLogs] = await Promise.all([
+      const [allVouchers, birthdayLogs] = await Promise.all([
         cachedFetch(
           cacheKeys.vouchersMe(user.id),
           () => pb.collection('vouchers').getFullList({
@@ -89,6 +89,13 @@ export default function VouchersScreen() {
           requestKey: null,
         }),
       ]);
+
+      // Birthday passes have their own section below; keep them out of the
+      // general list so the same voucher is not shown twice.
+      const birthdayVoucherIds = new Set(
+        birthdayLogs.map((log: any) => log.expand?.voucher?.id).filter(Boolean)
+      );
+      const records = allVouchers.filter((rec: any) => !birthdayVoucherIds.has(rec.id));
 
       const mapped = records.map((rec: any) => {
         const reward = rec.expand?.reward;

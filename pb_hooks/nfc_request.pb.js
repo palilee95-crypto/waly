@@ -218,9 +218,14 @@ routerAdd("POST", "/api/risev/nfc/request", (e) => {
     }
 
     const appliedVoucherId = voucher ? voucher.id : "";
-    if (appliedVoucherId && !name.includes("[VOUCHER:")) {
-      name = `${name} [VOUCHER:${appliedVoucherId}#${voucherTitle}]`;
-    }
+    // Older clients still append "[VOUCHER:id#title]" to the name. Strip it: the
+    // claim stores voucher + voucher_title explicitly, and the tag leaked into
+    // the customer record ("Daadd [VOUCHER:…]").
+    name = String(name || "")
+      .replace(/\s*\[\s*VOUCHER:[^\]]*\]\s*/gi, " ")
+      .replace(/\s*[|·]\s*VOUCHER:.*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
     // Generate random 6-character uppercase session code
     const sessionCode = $security.randomString(6).toUpperCase();

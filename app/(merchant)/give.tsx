@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTr } from '@/lib/i18n';
 import {
   View,
   Text,
@@ -41,6 +42,7 @@ import { colors, radii, spacing, iconSizes, shadows } from '@/theme';
 export default function GiveStampsScreen() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
@@ -406,13 +408,13 @@ export default function GiveStampsScreen() {
     } catch (err: any) {
       const code = err?.response?.code || '';
       const message = code === 'BOOKING_FORBIDDEN'
-        ? 'That appointment belongs to another store.'
+        ? tr('That appointment belongs to another store.', 'Temujanji itu milik kedai lain.')
         : code === 'BOOKING_NOT_ACTIVE'
-        ? 'That appointment is already closed.'
+        ? tr('That appointment is already closed.', 'Temujanji itu sudah ditutup.')
         : code === 'BOOKING_NOT_FOUND'
-        ? 'Booking not found.'
-        : err?.message || 'Could not load that appointment pass.';
-      Alert.alert('Appointment Pass', message);
+        ? tr('Booking not found.', 'Tempahan tidak ditemui.')
+        : err?.message || tr('Could not load that appointment pass.', 'Tidak dapat memuatkan pas temujanji itu.');
+      Alert.alert(tr("Appointment Pass", "Pas Temujanji"), message);
     } finally {
       setTimeout(() => { isProcessingScan.current = false; }, 800);
     }
@@ -454,19 +456,19 @@ export default function GiveStampsScreen() {
   const handleManualIssue = async () => {
     const digits = phoneInput.replace(/\D/g, '');
     if (digits.length < 9 || (digits.startsWith('11') && digits.length !== 10)) {
-      Alert.alert('Customer phone', 'Enter a complete Malaysian mobile number.');
+      Alert.alert(tr("Customer phone", "Telefon pelanggan"), tr('Enter a complete Malaysian mobile number.', 'Masukkan nombor mudah alih Malaysia yang lengkap.'));
       return;
     }
     if (customerLookup === 'checking' || customerLookup === 'idle') {
-      Alert.alert('Checking customer', 'Wait for the phone number lookup to finish.');
+      Alert.alert(tr("Checking customer", "Menyemak pelanggan"), tr('Wait for the phone number lookup to finish.', 'Tunggu carian nombor telefon selesai.'));
       return;
     }
     if (customerLookup === 'error') {
-      Alert.alert('Customer lookup failed', 'Retry the phone number lookup before issuing rewards.');
+      Alert.alert(tr("Customer lookup failed", "Carian pelanggan gagal"), tr('Retry the phone number lookup before issuing rewards.', 'Cuba semula carian nombor telefon sebelum memberikan ganjaran.'));
       return;
     }
     if (lookupNameRequired && !customerName.trim()) {
-      Alert.alert('Customer name required', 'Enter a name for this phone number before issuing rewards.');
+      Alert.alert(tr("Customer name required", "Nama pelanggan diperlukan"), tr('Enter a name for this phone number before issuing rewards.', 'Masukkan nama untuk nombor telefon ini sebelum memberikan ganjaran.'));
       return;
     }
 
@@ -474,12 +476,12 @@ export default function GiveStampsScreen() {
     const stamps = isPointsOnly ? 0 : parseInt(stampAmount, 10);
 
     if (isPointsOnly && bill <= 0) {
-      Alert.alert('Validation Error', 'Please enter a bill amount to calculate points.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), tr('Please enter a bill amount to calculate points.', 'Sila masukkan jumlah bil untuk mengira mata.'));
       return;
     }
 
     if (!isPointsOnly && (!Number.isInteger(stamps) || stamps < 1 || stamps > 99)) {
-      Alert.alert('Validation Error', 'Stamps to issue must be between 1 and 99.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), tr('Stamps to issue must be between 1 and 99.', 'Setem untuk diberi mestilah antara 1 dan 99.'));
       return;
     }
 
@@ -558,7 +560,7 @@ export default function GiveStampsScreen() {
       fetchTransactions();
     } catch (err: any) {
       const msg = err?.message || (isPointsOnly ? 'Failed to award points manually.' : 'Failed to issue stamps manually.');
-      Alert.alert('Error', msg);
+      Alert.alert(tr("Error", "Ralat"), msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -625,20 +627,20 @@ export default function GiveStampsScreen() {
           <View style={[styles.headerRow, activeTab === 'manual' && styles.manualHeaderRow]}>
             <View style={styles.headerTitleGroup}>
               {activeTab === 'manual' ? (
-                <TouchableOpacity style={styles.headerIcon} onPress={() => setActiveTab('voucher')} accessibilityRole="button" accessibilityLabel="Back to Issue and Redeem">
+                <TouchableOpacity style={styles.headerIcon} onPress={() => setActiveTab('voucher')} accessibilityRole="button" accessibilityLabel={tr("Back to Issue and Redeem", "Kembali ke Beri & Tebus")}>
                   <Ionicons name="arrow-back" size={iconSizes.lg} color={colors.black} />
                 </TouchableOpacity>
               ) : null}
               <View style={{ flex: 1 }}>
                 <Text style={styles.headerTitle}>{activeTab === 'manual' ? (isPointsOnly ? 'Award Points' : 'Give Stamps') : 'Issue & Redeem'}</Text>
-                {activeTab === 'voucher' && <Text style={styles.headerSubtitle} numberOfLines={1}>Customer rewards made simple.</Text>}
+                {activeTab === 'voucher' && <Text style={styles.headerSubtitle} numberOfLines={1}>{tr("Customer rewards made simple.", "Ganjaran pelanggan dipermudahkan.")}</Text>}
               </View>
             </View>
             {activeTab === 'voucher' && <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerAction} onPress={openSupport} accessibilityRole="button" accessibilityLabel="Help">
+              <TouchableOpacity style={styles.headerAction} onPress={openSupport} accessibilityRole="button" accessibilityLabel={tr("Help", "Bantuan")}>
                 <Ionicons name="help-circle-outline" size={iconSizes.md} color={colors.accent[600]} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerAction} onPress={onRefresh} accessibilityRole="button" accessibilityLabel="Refresh">
+              <TouchableOpacity style={styles.headerAction} onPress={onRefresh} accessibilityRole="button" accessibilityLabel={tr("Refresh", "Muat Semula")}>
                 <Ionicons name="refresh" size={iconSizes.md} color={colors.accent[600]} />
               </TouchableOpacity>
             </View>}
@@ -658,7 +660,7 @@ export default function GiveStampsScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="qr-code-outline" size={iconSizes.md} color={activeTab === 'voucher' ? colors.white : colors.accent[500]} />
-              <Text style={[styles.tabBtnText, activeTab === 'voucher' && styles.tabBtnTextActive]}>Redeem Voucher</Text>
+              <Text style={[styles.tabBtnText, activeTab === 'voucher' && styles.tabBtnTextActive]}>{tr("Redeem Voucher", "Tebus Baucar")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -687,7 +689,7 @@ export default function GiveStampsScreen() {
             <View style={styles.redeemedHeader}>
               <View style={styles.redeemedBadge}>
                 <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                <Text style={styles.redeemedBadgeText}>VOUCHER REDEEMED</Text>
+                <Text style={styles.redeemedBadgeText}>{tr("VOUCHER REDEEMED", "BAUCAR DITEBUS")}</Text>
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -703,22 +705,22 @@ export default function GiveStampsScreen() {
             <Text style={styles.redeemedRewardTitle}>{redeemedDetails.reward_title}</Text>
             
             <View style={styles.redeemedCodeBox}>
-              <Text style={styles.redeemedCodeLabel}>CODE</Text>
+              <Text style={styles.redeemedCodeLabel}>{tr("CODE", "KOD")}</Text>
               <Text style={styles.redeemedCodeValue}>{redeemedDetails.code}</Text>
             </View>
 
             <View style={styles.redeemedInfoRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.redeemedMetaLabel}>CUSTOMER</Text>
+                <Text style={styles.redeemedMetaLabel}>{tr("CUSTOMER", "PELANGGAN")}</Text>
                 <Text style={styles.redeemedMetaValue}>{redeemedDetails.customer_name}</Text>
                 {redeemedDetails.customer_phone ? (
                   <Text style={styles.redeemedMetaSub}>{redeemedDetails.customer_phone}</Text>
                 ) : null}
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.redeemedMetaLabel}>STATUS</Text>
+                <Text style={styles.redeemedMetaLabel}>{tr("STATUS", "STATUS")}</Text>
                 <View style={styles.redeemedStatusPill}>
-                  <Text style={styles.redeemedStatusText}>USED / APPLIED</Text>
+                  <Text style={styles.redeemedStatusText}>{tr("USED / APPLIED", "DIGUNA / DITERAP")}</Text>
                 </View>
               </View>
             </View>
@@ -734,7 +736,7 @@ export default function GiveStampsScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="qr-code-outline" size={18} color="#050505" />
-              <Text style={styles.scanNextBtnText}>Scan Next Voucher</Text>
+              <Text style={styles.scanNextBtnText}>{tr("Scan Next Voucher", "Imbas Baucar Seterusnya")}</Text>
             </TouchableOpacity>
           </View>
         ) : successMsg ? (
@@ -753,7 +755,7 @@ export default function GiveStampsScreen() {
 
             <TouchableOpacity style={styles.actionRow} onPress={openCamera} activeOpacity={0.85} accessibilityRole="button">
               <View style={styles.actionIcon}><Ionicons name="camera-outline" size={20} color="#111111" /></View>
-              <Text style={styles.actionText}>Open Camera Scanner</Text>
+              <Text style={styles.actionText}>{tr("Open Camera Scanner", "Buka Pengimbas Kamera")}</Text>
               <Ionicons name="chevron-forward" size={18} color="#6B788B" />
             </TouchableOpacity>
 
@@ -766,7 +768,7 @@ export default function GiveStampsScreen() {
             {manualCodeOpen && (
               <View style={{ marginTop: 12 }}>
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>VOUCHER CODE</Text>
+                  <Text style={styles.label}>{tr("VOUCHER CODE", "KOD BAUCAR")}</Text>
                   <View style={styles.inputWrap}>
                     <Ionicons name="qr-code-outline" size={iconSizes.md} color={colors.accent[700]} style={{ marginLeft: 16, marginRight: 8 }} />
                     <TextInput
@@ -793,7 +795,7 @@ export default function GiveStampsScreen() {
                   ) : (
                     <>
                       <Ionicons name="gift-outline" size={iconSizes.md} color={colors.primary[400]} style={{ marginRight: 8 }} />
-                      <Text style={styles.primaryBtnText}>Review & redeem</Text>
+                      <Text style={styles.primaryBtnText}>{tr("Review & redeem", "Semak & tebus")}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -811,7 +813,7 @@ export default function GiveStampsScreen() {
 
         {activeTab === 'voucher' && transactions.length > 0 ? (
           <View style={styles.recentBlock}>
-            <Text style={styles.recentHeading}>Recent activity</Text>
+            <Text style={styles.recentHeading}>{tr("Recent activity", "Aktiviti terkini")}</Text>
             {transactions.slice(0, 2).map((txn) => {
               const redeemed = String(txn.type || '').toLowerCase().includes('redeem');
               const stampCount = Number(txn.stamps) || 0;
@@ -839,20 +841,20 @@ export default function GiveStampsScreen() {
             <View style={styles.cardHeaderRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardEyebrow}>01 / CUSTOMER</Text>
-                <Text style={styles.cardTitle}>Who visited today?</Text>
+                <Text style={styles.cardTitle}>{tr("Who visited today?", "Siapa melawat hari ini?")}</Text>
               </View>
               <TouchableOpacity
                 onPress={() => Alert.alert(
-                  isPointsOnly ? 'Award points' : isStampsOnly ? 'Issue stamps' : 'Issue stamps & points',
+                  isPointsOnly ? tr('Award points', 'Berikan mata') : isStampsOnly ? tr('Issue stamps', 'Berikan setem') : tr('Issue stamps & points', 'Berikan setem & mata'),
                   isPointsOnly
-                    ? 'Enter the customer phone and bill to award points directly.'
+                    ? tr('Enter the customer phone and bill to award points directly.', 'Masukkan telefon pelanggan dan bil untuk memberikan mata terus.')
                     : isStampsOnly
-                    ? 'Enter the customer phone to issue stamps when the NFC card is unavailable.'
-                    : 'Enter the customer phone and bill to issue stamps and points.'
+                    ? tr('Enter the customer phone to issue stamps when the NFC card is unavailable.', 'Masukkan telefon pelanggan untuk memberikan setem apabila kad NFC tidak tersedia.')
+                    : tr('Enter the customer phone and bill to issue stamps and points.', 'Masukkan telefon pelanggan dan bil untuk memberikan setem dan mata.')
                 )}
                 style={styles.cardHelpBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Manual issuance help"
+                accessibilityLabel={tr("Manual issuance help", "Bantuan pengeluaran manual")}
               >
                 <Ionicons name="help-circle-outline" size={iconSizes.md} color={colors.accent[400]} />
               </TouchableOpacity>
@@ -860,7 +862,7 @@ export default function GiveStampsScreen() {
 
             {/* Customer Phone Input */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>CUSTOMER PHONE NUMBER</Text>
+              <Text style={styles.label}>{tr("CUSTOMER PHONE NUMBER", "NOMBOR TELEFON PELANGGAN")}</Text>
               <View style={[styles.inputWrap, focusedField === 'phone' && styles.inputWrapFocused]}>
                 <View style={styles.prefixBox}>
                   <Text style={styles.flag}>🇲🇾</Text>
@@ -885,7 +887,7 @@ export default function GiveStampsScreen() {
                   onFocus={() => setFocusedField('phone')}
                   onBlur={() => setFocusedField(null)}
                   keyboardType="phone-pad"
-                  accessibilityLabel="Customer phone number"
+                  accessibilityLabel={tr("Customer phone number", "Nombor telefon pelanggan")}
                 />
               </View>
             </View>
@@ -893,22 +895,22 @@ export default function GiveStampsScreen() {
             {customerLookup === 'checking' && (
               <View style={styles.lookupNotice}>
                 <ActivityIndicator size="small" color="#A67A00" />
-                <Text style={styles.lookupNoticeText}>Checking customer number…</Text>
+                <Text style={styles.lookupNoticeText}>{tr("Checking customer number…", "Menyemak nombor pelanggan…")}</Text>
               </View>
             )}
             {customerLookup === 'error' && (
               <View style={[styles.lookupNotice, styles.lookupError]}>
                 <Ionicons name="alert-circle-outline" size={16} color="#B42318" />
-                <Text style={[styles.lookupNoticeText, { color: '#B42318' }]}>Could not check this number.</Text>
-                <TouchableOpacity onPress={() => setLookupRetry((value) => value + 1)} accessibilityRole="button" accessibilityLabel="Retry customer lookup">
-                  <Text style={styles.lookupRetry}>Retry</Text>
+                <Text style={[styles.lookupNoticeText, { color: '#B42318' }]}>{tr("Could not check this number.", "Tidak dapat menyemak nombor ini.")}</Text>
+                <TouchableOpacity onPress={() => setLookupRetry((value) => value + 1)} accessibilityRole="button" accessibilityLabel={tr("Retry customer lookup", "Cuba semula carian pelanggan")}>
+                  <Text style={styles.lookupRetry}>{tr("Retry", "Cuba lagi")}</Text>
                 </TouchableOpacity>
               </View>
             )}
             {lookupNameRequired && (customerLookup === 'new' || customerLookup === 'found') && (
             <View style={styles.inputContainer}>
               <View style={styles.nameLabelRow}>
-                <Text style={styles.label}>CUSTOMER NAME *</Text>
+                <Text style={styles.label}>{tr("CUSTOMER NAME *", "NAMA PELANGGAN *")}</Text>
                 <Text style={styles.nameRequiredBadge}>{customerLookup === 'new' ? 'NEW CUSTOMER' : 'NAME REQUIRED'}</Text>
               </View>
               <View style={[styles.inputWrap, focusedField === 'name' && styles.inputWrapFocused]}>
@@ -922,7 +924,7 @@ export default function GiveStampsScreen() {
                   onFocus={() => setFocusedField('name')}
                   onBlur={() => setFocusedField(null)}
                   autoCapitalize="words"
-                  accessibilityLabel="Customer name, required"
+                  accessibilityLabel={tr("Customer name, required", "Nama pelanggan, diperlukan")}
                 />
               </View>
             </View>
@@ -952,21 +954,21 @@ export default function GiveStampsScreen() {
             <View style={styles.sectionHeadingRow}>
               <View style={styles.sectionNumber}><Text style={styles.sectionNumberText}>02</Text></View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.manualSectionTitle}>Record this visit</Text>
-                <Text style={styles.sectionSubtitle}>Stamp count and sale</Text>
+                <Text style={styles.manualSectionTitle}>{tr("Record this visit", "Rekod lawatan ini")}</Text>
+                <Text style={styles.sectionSubtitle}>{tr("Stamp count and sale", "Bilangan setem dan jualan")}</Text>
               </View>
             </View>
 
             {/* Stamps to Issue Input (Hidden if Points-Only) */}
             {!isPointsOnly && (
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>STAMPS TO ISSUE</Text>
+                <Text style={styles.label}>{tr("STAMPS TO ISSUE", "SETEM UNTUK DIBERI")}</Text>
                 <View style={styles.stampStepper}>
                   <TouchableOpacity
                     style={styles.stepperButton}
                     onPress={() => setStampAmount(String(Math.max(1, stampsValue - 1)))}
                     accessibilityRole="button"
-                    accessibilityLabel="Decrease stamps"
+                    accessibilityLabel={tr("Decrease stamps", "Kurangkan setem")}
                   >
                     <Ionicons name="remove" size={21} color="#111111" />
                   </TouchableOpacity>
@@ -977,13 +979,13 @@ export default function GiveStampsScreen() {
                     value={stampAmount}
                     onChangeText={(value) => setStampAmount(value.replace(/\D/g, '').slice(0, 2))}
                     keyboardType="number-pad"
-                    accessibilityLabel="Number of stamps to issue"
+                    accessibilityLabel={tr("Number of stamps to issue", "Bilangan setem untuk diberi")}
                   />
                   <TouchableOpacity
                     style={[styles.stepperButton, styles.stepperButtonAdd]}
                     onPress={() => setStampAmount(String(Math.min(99, stampsValue + 1)))}
                     accessibilityRole="button"
-                    accessibilityLabel="Increase stamps"
+                    accessibilityLabel={tr("Increase stamps", "Tambah setem")}
                   >
                     <Ionicons name="add" size={22} color="#111111" />
                   </TouchableOpacity>
@@ -1126,16 +1128,16 @@ export default function GiveStampsScreen() {
                   <View style={[styles.cornerBracket, styles.bottomLeft]} />
                   <View style={[styles.cornerBracket, styles.bottomRight]} />
                 </View>
-                <Text style={styles.cameraHint}>Align the customer's QR inside the frame</Text>
+                <Text style={styles.cameraHint}>{tr("Align the customer's QR inside the frame", "Jajarkan QR pelanggan dalam bingkai")}</Text>
               </View>
             </CameraView>
 
             <View style={styles.cameraTopbar}>
-              <TouchableOpacity style={styles.cameraRoundBtn} onPress={closeCamera} accessibilityRole="button" accessibilityLabel="Close scanner">
+              <TouchableOpacity style={styles.cameraRoundBtn} onPress={closeCamera} accessibilityRole="button" accessibilityLabel={tr("Close scanner", "Tutup pengimbas")}>
                 <Ionicons name="close" size={iconSizes.lg} color={colors.white} />
               </TouchableOpacity>
-              <Text style={styles.cameraTitle}>Scan voucher</Text>
-              <TouchableOpacity style={styles.cameraRoundBtn} onPress={() => setTorchOn((value) => !value)} accessibilityRole="button" accessibilityLabel="Toggle torch">
+              <Text style={styles.cameraTitle}>{tr("Scan voucher", "Imbas baucar")}</Text>
+              <TouchableOpacity style={styles.cameraRoundBtn} onPress={() => setTorchOn((value) => !value)} accessibilityRole="button" accessibilityLabel={tr("Toggle torch", "Tukar lampu suluh")}>
                 <Ionicons name={torchOn ? 'flashlight' : 'flashlight-outline'} size={iconSizes.md} color={colors.white} />
               </TouchableOpacity>
             </View>
@@ -1143,27 +1145,27 @@ export default function GiveStampsScreen() {
             {!permission?.granted && (
               <View style={styles.cameraPermission}>
                 <Ionicons name="camera-outline" size={iconSizes.display} color={colors.white} />
-                <Text style={styles.cameraPermissionText}>Camera access is needed to scan vouchers.</Text>
+                <Text style={styles.cameraPermissionText}>{tr("Camera access is needed to scan vouchers.", "Akses kamera diperlukan untuk mengimbas baucar.")}</Text>
                 <TouchableOpacity style={styles.cameraPermissionBtn} onPress={requestPermission} activeOpacity={0.85}>
-                  <Text style={styles.cameraPermissionBtnText}>Allow camera</Text>
+                  <Text style={styles.cameraPermissionBtnText}>{tr("Allow camera", "Benarkan kamera")}</Text>
                 </TouchableOpacity>
               </View>
             )}
             <View style={styles.cameraBottomPanel}>
               <View style={styles.cameraHandle} />
               <View style={styles.cameraFallbackIcon}><Ionicons name="qr-code" size={23} color="#111111" /></View>
-              <Text style={styles.cameraFallbackTitle}>Having trouble scanning?</Text>
-              <Text style={styles.cameraFallbackCopy}>Enter the customer's voucher code manually.</Text>
+              <Text style={styles.cameraFallbackTitle}>{tr("Having trouble scanning?", "Masalah mengimbas?")}</Text>
+              <Text style={styles.cameraFallbackCopy}>{tr("Enter the customer's voucher code manually.", "Masukkan kod baucar pelanggan secara manual.")}</Text>
               <TouchableOpacity style={styles.cameraGalleryButton} onPress={scanFromGallery} accessibilityRole="button">
                 <Ionicons name="images-outline" size={17} color="#17202B" />
-                <Text style={styles.cameraGalleryText}>Choose QR Image</Text>
+                <Text style={styles.cameraGalleryText}>{tr("Choose QR Image", "Pilih Imej QR")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cameraManualButton}
                 onPress={() => { closeCamera(); setActiveTab('voucher'); setManualCodeOpen(true); }}
                 accessibilityRole="button"
               >
-                <Text style={styles.cameraManualText}>Enter Voucher Code</Text>
+                <Text style={styles.cameraManualText}>{tr("Enter Voucher Code", "Masukkan Kod Baucar")}</Text>
                 <Ionicons name="chevron-forward" size={18} color="#111111" />
               </TouchableOpacity>
             </View>
@@ -1176,9 +1178,9 @@ export default function GiveStampsScreen() {
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeReview} />
           <View style={[styles.reviewSheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
             <View style={styles.reviewHandle} />
-            <Text style={styles.reviewTitle}>Redeem this voucher?</Text>
+            <Text style={styles.reviewTitle}>{tr("Redeem this voucher?", "Tebus baucar ini?")}</Text>
             <View style={styles.reviewCodeBox}>
-              <Text style={styles.reviewCodeLabel}>VOUCHER</Text>
+              <Text style={styles.reviewCodeLabel}>{tr("VOUCHER", "BAUCAR")}</Text>
               <Text style={styles.reviewCodeValue}>{pendingVoucher?.code}</Text>
             </View>
             {pendingVoucher?.loading ? (
@@ -1188,15 +1190,15 @@ export default function GiveStampsScreen() {
             ) : pendingVoucher?.voucher ? (
               <View style={styles.reviewDetails}>
                 <View style={styles.reviewRow}>
-                  <Text style={styles.reviewRowLabel}>Reward</Text>
+                  <Text style={styles.reviewRowLabel}>{tr("Reward", "Ganjaran")}</Text>
                   <Text style={styles.reviewRowValue}>{pendingRewardName}</Text>
                 </View>
                 <View style={styles.reviewRow}>
-                  <Text style={styles.reviewRowLabel}>Customer</Text>
+                  <Text style={styles.reviewRowLabel}>{tr('Customer', 'Pelanggan')}</Text>
                   <Text style={styles.reviewRowValue}>{pendingCustomerName}</Text>
                 </View>
                 <View style={styles.reviewRow}>
-                  <Text style={styles.reviewRowLabel}>Expires</Text>
+                  <Text style={styles.reviewRowLabel}>{tr("Expires", "Luput")}</Text>
                   <Text style={styles.reviewRowValue}>{pendingExpiry}</Text>
                 </View>
               </View>
@@ -1213,12 +1215,12 @@ export default function GiveStampsScreen() {
               ) : (
                 <>
                   <Ionicons name="checkmark-circle-outline" size={iconSizes.md} color={colors.primary[400]} style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>Redeem voucher</Text>
+                  <Text style={styles.primaryBtnText}>{tr("Redeem voucher", "Tebus baucar")}</Text>
                 </>
               )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.reviewCancel} onPress={closeReview} activeOpacity={0.7}>
-              <Text style={styles.reviewCancelText}>Cancel</Text>
+              <Text style={styles.reviewCancelText}>{tr("Cancel", "Batal")}</Text>
             </TouchableOpacity>
           </View>
         </View>
