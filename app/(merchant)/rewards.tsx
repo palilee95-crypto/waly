@@ -21,6 +21,7 @@ import { pb } from '@/lib/pocketbase';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTr } from '@/lib/i18n';
 import UpgradeModal from './_components/UpgradeModal';
 import { RewardVisualPickerModal } from '@/components/RewardVisualPickerModal';
 import { getRewardVisualById, getRewardVisualUrl } from '@/lib/rewardVisuals';
@@ -115,6 +116,7 @@ export default function UnifiedRewardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const isMalay = locale === 'ms';
   const { width, height: screenHeight } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -796,8 +798,7 @@ export default function UnifiedRewardsScreen() {
     const finalValue = (birthdayForm.reward_value || finalTitle || 'Birthday Treat').trim();
 
     if (!finalTitle) {
-      Alert.alert(
-        'Validation Error',
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"),
         birthdayForm.reward_type === 'stamps'
           ? (isMalay ? 'Sila masukkan bilangan cop bonus.' : 'Please enter the number of bonus stamps.')
           : (isMalay ? 'Sila masukkan atau pilih tawaran hadiah hari jadi.' : 'Please enter or select the birthday gift offer.')
@@ -806,12 +807,12 @@ export default function UnifiedRewardsScreen() {
     }
     const expiryDays = parseInt(birthdayForm.expiry_days, 10);
     if (isNaN(expiryDays) || expiryDays < 1) {
-      Alert.alert('Validation Error', isMalay ? 'Tempoh luput mestilah sekurang-kurangnya 1 hari.' : 'Expiry must be at least 1 day.');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), isMalay ? 'Tempoh luput mestilah sekurang-kurangnya 1 hari.' : 'Expiry must be at least 1 day.');
       return;
     }
     const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)$/;
     if (!timeRegex.test(birthdayForm.send_time)) {
-      Alert.alert('Validation Error', isMalay ? 'Masa hantar mestilah dalam format JJ:MM (cth: 09:00).' : 'Send time must be HH:MM (e.g. 09:00).');
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), isMalay ? 'Masa hantar mestilah dalam format JJ:MM (cth: 09:00).' : 'Send time must be HH:MM (e.g. 09:00).');
       return;
     }
 
@@ -857,7 +858,7 @@ export default function UnifiedRewardsScreen() {
       );
     } catch (err: any) {
       console.warn('Failed to save birthday reward:', err.message || err);
-      Alert.alert('Error', err.message || 'Failed to save birthday reward.');
+      Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to save birthday reward.", "Gagal menyimpan ganjaran hari jadi."));
     } finally {
       setSavingBirthday(false);
     }
@@ -878,7 +879,7 @@ export default function UnifiedRewardsScreen() {
           : `Dihantar ${res?.sent || 0} · Dilangkau ${res?.skipped || 0} · Gagal ${res?.failed || 0}.`
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not run the birthday engine.');
+      Alert.alert(tr("Error", "Ralat"), err?.message || tr("Could not run the birthday engine.", "Tidak dapat menjalankan enjin hari jadi."));
     } finally {
       setRunningBirthday(false);
     }
@@ -900,9 +901,9 @@ export default function UnifiedRewardsScreen() {
             try {
               await pb.collection('birthday_rewards').delete(birthdayReward.id);
               await fetchBirthdayReward();
-              Alert.alert('Success', locale === 'en' ? 'Birthday reward removed.' : 'Ganjaran hari jadi dipadam.');
+              Alert.alert(tr("Success", "Berjaya"), locale === 'en' ? 'Birthday reward removed.' : 'Ganjaran hari jadi dipadam.');
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete birthday reward.');
+              Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to delete birthday reward.", "Gagal memadam ganjaran hari jadi."));
             }
           },
         },
@@ -1095,7 +1096,7 @@ export default function UnifiedRewardsScreen() {
       };
       input.click();
     } else {
-      Alert.alert("Not Supported", "Image upload is web-only in this demo.");
+      Alert.alert(tr("Not Supported", "Tidak Disokong"), tr("Image upload is web-only in this demo.", "Muat naik imej hanya tersedia di web dalam demo ini."));
     }
   };
 
@@ -1174,7 +1175,7 @@ export default function UnifiedRewardsScreen() {
       fetchRewards();
     } catch (err: any) {
       console.warn("Failed to save reward:", err.message || err);
-      Alert.alert("Error", err.message || "Failed to save reward.");
+      Alert.alert(tr("Error", "Ralat"), err.message || tr("Failed to save reward.", "Gagal menyimpan ganjaran."));
     } finally {
       setIsSavingReward(false);
     }
@@ -1200,12 +1201,12 @@ export default function UnifiedRewardsScreen() {
     try {
       await pb.collection('rewards').delete(selectedDeleteReward.id);
       setDeleteModalVisible(false);
-      Alert.alert("Success", "Reward deleted successfully!");
+      Alert.alert(tr("Success", "Berjaya"), "Reward deleted successfully!");
       fetchRewards();
     } catch (err: any) {
       console.warn("Failed to delete reward:", err.message || err);
       const msg = err?.response?.message || err?.data?.message || err?.message || "Failed to delete reward.";
-      Alert.alert("Error", msg);
+      Alert.alert(tr("Error", "Ralat"), msg);
     } finally {
       setIsDeletingReward(false);
     }
@@ -1249,7 +1250,7 @@ export default function UnifiedRewardsScreen() {
       };
       input.click();
     } else {
-      Alert.alert("Not Supported", "Image upload is web-only in this demo.");
+      Alert.alert(tr("Not Supported", "Tidak Disokong"), tr("Image upload is web-only in this demo.", "Muat naik imej hanya tersedia di web dalam demo ini."));
     }
   };
 
@@ -1268,7 +1269,7 @@ export default function UnifiedRewardsScreen() {
       };
       input.click();
     } else {
-      Alert.alert("Not Supported", "Image upload is web-only in this demo.");
+      Alert.alert(tr("Not Supported", "Tidak Disokong"), tr("Image upload is web-only in this demo.", "Muat naik imej hanya tersedia di web dalam demo ini."));
     }
   };
 
@@ -1285,7 +1286,7 @@ export default function UnifiedRewardsScreen() {
       };
       input.click();
     } else {
-      Alert.alert("Not Supported", "Image upload is web-only in this demo.");
+      Alert.alert(tr("Not Supported", "Tidak Disokong"), tr("Image upload is web-only in this demo.", "Muat naik imej hanya tersedia di web dalam demo ini."));
     }
   };
 
@@ -1364,7 +1365,7 @@ export default function UnifiedRewardsScreen() {
       setShowValidationWarning(false);
     } catch (err: any) {
       console.warn("Failed to create inline reward:", err.message || err);
-      Alert.alert("Error", err.message || "Failed to create reward.");
+      Alert.alert(tr("Error", "Ralat"), err.message || "Failed to create reward.");
     } finally {
       setIsSavingInlineReward(false);
     }
@@ -1432,7 +1433,7 @@ export default function UnifiedRewardsScreen() {
     }
     const days = parseInt(expiryDays, 10);
     if (isNaN(days) || days <= 0) {
-      Alert.alert("Validation Error", "Please enter a valid number of days for card expiry.");
+      Alert.alert(tr("Validation Error", "Ralat Pengesahan"), "Please enter a valid number of days for card expiry.");
       return;
     }
 
@@ -1512,7 +1513,7 @@ export default function UnifiedRewardsScreen() {
       setSaveSuccessModalVisible(true);
     } catch (err: any) {
       console.warn(err);
-      Alert.alert("Error", err.message || "Failed to save card configuration.");
+      Alert.alert(tr("Error", "Ralat"), err.message || "Failed to save card configuration.");
     } finally {
       setIsSavingCard(false);
     }
@@ -1587,7 +1588,7 @@ export default function UnifiedRewardsScreen() {
       );
     } catch (err: any) {
       console.warn("Failed to save points rate:", err);
-      Alert.alert("Error", err.message || "Failed to save points rule.");
+      Alert.alert(tr("Error", "Ralat"), err.message || "Failed to save points rule.");
     } finally {
       setSavingPointsRate(false);
     }
@@ -1685,7 +1686,7 @@ export default function UnifiedRewardsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#050505" />
-        <Text style={styles.loadingText}>Loading loyalty configurations...</Text>
+        <Text style={styles.loadingText}>{tr("Loading loyalty configurations...", "Memuatkan konfigurasi kesetiaan...")}</Text>
       </View>
     );
   }
@@ -2110,9 +2111,7 @@ export default function UnifiedRewardsScreen() {
                     <Ionicons name="card" size={17} color={stampReward ? '#FFFFFF' : '#64748B'} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.6 }}>
-                      STAMP REWARD
-                    </Text>
+                    <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.6 }}>{tr("STAMP REWARD", "GANJARAN SETEM")}</Text>
                     <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', marginTop: 1 }}>
                       {stampReward
                         ? stampReward.name
@@ -2337,9 +2336,7 @@ export default function UnifiedRewardsScreen() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                               }}>
-                                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>
-                                  BIRTHDAY PASS
-                                </Text>
+                                <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: brandTextColor, letterSpacing: 0.8, textAlign: 'center' }} numberOfLines={1}>{tr("BIRTHDAY PASS", "PAS HARI JADI")}</Text>
                                 <Text style={{ fontSize: 7, fontFamily: 'PlusJakartaSans_700Bold', color: brandTextColor, opacity: 0.85, letterSpacing: 1.2, marginTop: 1 }}>
                                   ANNUAL REWARD
                                 </Text>
@@ -2358,7 +2355,7 @@ export default function UnifiedRewardsScreen() {
                               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <View style={{ backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
                                   <Ionicons name="sparkles" size={11} color="#B45309" />
-                                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Birthday Special</Text>
+                                  <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>{tr("Birthday Special", "Istimewa Hari Jadi")}</Text>
                                 </View>
 
                                 <View style={{
@@ -2396,7 +2393,7 @@ export default function UnifiedRewardsScreen() {
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
                                   <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                     <Ionicons name="gift" size={9} color="#DC2626" />
-                                    <Text style={{ color: '#DC2626', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>BIRTHDAY PASS</Text>
+                                    <Text style={{ color: '#DC2626', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>{tr("BIRTHDAY PASS", "PAS HARI JADI")}</Text>
                                   </View>
 
                                   <Text style={{ fontSize: 10, color: '#CBD5E1' }}>|</Text>
@@ -2615,7 +2612,7 @@ export default function UnifiedRewardsScreen() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                               <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
                                 <Ionicons name="gift" size={11} color="#B45309" />
-                                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Ready to redeem</Text>
+                                <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>{tr("Ready to redeem", "Sedia ditebus")}</Text>
                               </View>
 
                               <View style={{
@@ -2654,7 +2651,7 @@ export default function UnifiedRewardsScreen() {
                                 {reward.id === linkedRewardId ? (
                                   <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                     <Ionicons name="card" size={9} color="#059669" />
-                                    <Text style={{ color: '#059669', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>STAMP REWARD</Text>
+                                    <Text style={{ color: '#059669', fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 8, letterSpacing: 0.3 }}>{tr("STAMP REWARD", "GANJARAN SETEM")}</Text>
                                   </View>
                                 ) : (
                                   <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -2831,7 +2828,7 @@ export default function UnifiedRewardsScreen() {
               <Text style={[styles.previewSectionHeader, { marginTop: 0, marginBottom: 0 }]}>{t('live_preview_card')}</Text>
               <TouchableOpacity style={[styles.flipBtn, { marginTop: 0, marginBottom: 0 }]} onPress={flipCard} activeOpacity={0.8}>
                 <Ionicons name="sync-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
-                <Text style={styles.flipBtnText}>Tap card to flip</Text>
+                <Text style={styles.flipBtnText}>{tr("Tap card to flip", "Ketik kad untuk selak")}</Text>
               </TouchableOpacity>
             </View>
 
@@ -2873,7 +2870,7 @@ export default function UnifiedRewardsScreen() {
                     <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: fontColor || '#FFFFFF' }}>
                       3/{requiredStamps}
                     </Text>
-                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: fontColor || '#FFFFFF', opacity: 0.75 }}>STAMPS</Text>
+                    <Text style={{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: fontColor || '#FFFFFF', opacity: 0.75 }}>{tr("STAMPS", "SETEM")}</Text>
                   </View>
                 </View>
 
@@ -4063,7 +4060,7 @@ export default function UnifiedRewardsScreen() {
                         fontFamily: 'PlusJakartaSans_600SemiBold',
                         color: '#000000',
                       }}
-                      placeholder="Search menu items..."
+                      placeholder={tr("Search menu items...", "Cari item menu...")}
                       placeholderTextColor="#94A3B8"
                       value={rewardSearchQuery}
                       onChangeText={setRewardSearchQuery}
@@ -4183,7 +4180,7 @@ export default function UnifiedRewardsScreen() {
                           fontFamily: 'PlusJakartaSans_600SemiBold',
                           color: '#000000',
                         }}
-                        placeholder="e.g. Free Hot Latte / RM10 Off"
+                        placeholder={tr("e.g. Free Hot Latte / RM10 Off", "cth. Latte Panas Percuma / RM10 Diskaun")}
                         placeholderTextColor="#94A3B8"
                         value={tempRewardDesc}
                         onChangeText={(val) => {
@@ -4738,7 +4735,7 @@ export default function UnifiedRewardsScreen() {
                           }}
                           value={milestoneFormTitle}
                           onChangeText={setMilestoneFormTitle}
-                          placeholder="e.g. Free AISKRM Cup"
+                          placeholder={tr("e.g. Free AISKRM Cup", "cth. Aiskrim Percuma")}
                           placeholderTextColor="#94A3B8"
                         />
                       </View>
@@ -5559,14 +5556,14 @@ export default function UnifiedRewardsScreen() {
                     justifyContent: 'space-between',
                   }}>
                     <View>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Spend</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Spend", "Perbelanjaan")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 2 }}>
                         RM {currentSpendVal || 1}
                       </Text>
                     </View>
                     <Ionicons name="arrow-forward" size={18} color="#94A3B8" />
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Customer Earns</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Customer Earns", "Pelanggan Dapat")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', marginTop: 2 }}>
                         1 Point
                       </Text>
@@ -5771,14 +5768,14 @@ export default function UnifiedRewardsScreen() {
                     justifyContent: 'space-between',
                   }}>
                     <View>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Points Redeemed</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Points Redeemed", "Mata Ditebus")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 2 }}>
                         {currentRedeemPts || 100} Pts
                       </Text>
                     </View>
                     <Ionicons name="arrow-forward" size={18} color="#94A3B8" />
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>Cashback Discount</Text>
+                      <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("Cashback Discount", "Diskaun Pulangan Tunai")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706', marginTop: 2 }}>
                         RM 1.00
                       </Text>
@@ -6089,28 +6086,28 @@ export default function UnifiedRewardsScreen() {
                     </Text>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>Points Earned</Text>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>{tr("Points Earned", "Mata Diperoleh")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{calculatedPoints} Pts</Text>
                     </View>
 
                     <View style={{ height: 1, backgroundColor: '#FDE047', opacity: 0.5 }} />
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>Cashback Discount Value</Text>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>{tr("Cashback Discount Value", "Nilai Diskaun Pulangan Tunai")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669' }}>RM {calculatedDiscount}</Text>
                     </View>
 
                     <View style={{ height: 1, backgroundColor: '#FDE047', opacity: 0.5 }} />
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>Effective Cashback Rate</Text>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#4B5563' }}>{tr("Effective Cashback Rate", "Kadar Pulangan Tunai Berkesan")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#D97706' }}>{rewardRatePercent}%</Text>
                     </View>
 
                     <View style={{ height: 1, backgroundColor: '#FDE047', opacity: 0.5 }} />
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>Net Merchant Revenue</Text>
+                      <Text style={{ fontSize: 13.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A' }}>{tr("Net Merchant Revenue", "Hasil Bersih Peniaga")}</Text>
                       <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>
                         RM {(testSpendNum - parseFloat(calculatedDiscount)).toFixed(2)}
                       </Text>
@@ -6171,7 +6168,7 @@ export default function UnifiedRewardsScreen() {
                   }}
                   onPress={async () => {
                     if (enablePoints && !enableStamps) {
-                      Alert.alert('Action Restricted', 'At least one loyalty module (Stamps or Points) must remain active.');
+                      Alert.alert(tr("Action Restricted", "Tindakan Terhad"), 'At least one loyalty module (Stamps or Points) must remain active.');
                       return;
                     }
                     // This pill used to only change local state, so the toggle silently
@@ -6183,7 +6180,7 @@ export default function UnifiedRewardsScreen() {
                         await pb.collection('loyalty_programs').update(programId, { enable_points: next });
                       } catch (err) {
                         setEnablePoints(!next);
-                        Alert.alert('Error', 'Could not update points. Please try again.');
+                        Alert.alert(tr("Error", "Ralat"), 'Could not update points. Please try again.');
                       }
                     }
                   }}
@@ -7284,7 +7281,7 @@ export default function UnifiedRewardsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
                             <Ionicons name="gift" size={10} color="#B45309" />
-                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Ready to redeem</Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>{tr("Ready to redeem", "Sedia ditebus")}</Text>
                           </View>
 
                           <View style={{
@@ -7330,7 +7327,7 @@ export default function UnifiedRewardsScreen() {
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                               <Ionicons name="card" size={8.5} color="#059669" />
-                              <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }}>STAMP REWARD</Text>
+                              <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }}>{tr("STAMP REWARD", "GANJARAN SETEM")}</Text>
                             </View>
                             <Text style={{ fontSize: 9, color: '#CBD5E1' }}>|</Text>
                             <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
@@ -7340,7 +7337,7 @@ export default function UnifiedRewardsScreen() {
 
                           {/* Customer CTA Button */}
                           <View style={{ height: 24, borderRadius: 12, backgroundColor: '#0F172A', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>Use Voucher ➔</Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>{tr("Use Voucher ➔", "Guna Baucar ➔")}</Text>
                           </View>
                         </View>
                       </View>
@@ -8478,13 +8475,13 @@ export default function UnifiedRewardsScreen() {
                 style={{ flex: 1, height: 46, borderRadius: 14, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
                 onPress={() => setCropModalVisible(false)}
               >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>Cancel</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B' }}>{tr("Cancel", "Batal")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ flex: 1, height: 46, borderRadius: 14, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}
                 onPress={performCropAndSave}
               >
-                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>Confirm 3:4 Crop</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>{tr("Confirm 3:4 Crop", "Sahkan Potongan 3:4")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -8620,7 +8617,7 @@ export default function UnifiedRewardsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3.5 }}>
                             <Ionicons name="gift" size={10} color="#B45309" />
-                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>Ready to redeem</Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#B45309' }}>{tr("Ready to redeem", "Sedia ditebus")}</Text>
                           </View>
 
                           <View style={{
@@ -8666,7 +8663,7 @@ export default function UnifiedRewardsScreen() {
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                               <Ionicons name="card" size={8.5} color="#059669" />
-                              <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }}>STAMP REWARD</Text>
+                              <Text style={{ fontSize: 7.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#059669', letterSpacing: 0.3 }}>{tr("STAMP REWARD", "GANJARAN SETEM")}</Text>
                             </View>
                             <Text style={{ fontSize: 9, color: '#CBD5E1' }}>|</Text>
                             <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>
@@ -8676,7 +8673,7 @@ export default function UnifiedRewardsScreen() {
 
                           {/* Customer CTA Button */}
                           <View style={{ height: 24, borderRadius: 12, backgroundColor: '#0F172A', paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>Use Voucher ➔</Text>
+                            <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }} numberOfLines={1}>{tr("Use Voucher ➔", "Guna Baucar ➔")}</Text>
                           </View>
                         </View>
                       </View>
