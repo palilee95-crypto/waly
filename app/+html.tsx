@@ -17,16 +17,22 @@ const bootGuardScript = `
     return document.documentElement.getAttribute('data-risev-boot') === 'done';
   }
 
-  function fail(reason) {
+  function cleanUrl() {
+    var url = location.pathname + location.search;
+    url = url.replace(/([?&])risev_bust=[^&]*&?/, '$1').replace(/[?&]$/, '');
+    return url || '/';
+  }
+
+  function fail() {
     var el = document.getElementById(BOOT);
     if (!el || el.__risevGone || booted()) return;
     var retried = false;
     try { retried = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
     if (!retried) {
       try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
-      var url = location.pathname + location.search;
-      url += (url.indexOf('?') === -1 ? '?' : '&') + 'risev_bust=' + Date.now();
-      location.replace(url);
+      var target = cleanUrl();
+      target += (target.indexOf('?') === -1 ? '?' : '&') + 'risev_bust=' + Date.now();
+      location.replace(target);
       return;
     }
     el.style.backgroundColor = '#FFFFFF';
@@ -35,23 +41,30 @@ const bootGuardScript = `
         '<img class="risev-recover-logo" src="/risev-boot.png" alt="" />' +
         '<div class="risev-recover-title">The app could not load</div>' +
         '<div class="risev-recover-body">You may be on an older cached version. Check your connection, then reload.</div>' +
-        '<button class="risev-recover-btn" type="button" onclick="location.replace(\\'/?risev_bust=\\' + Date.now())">Reload</button>' +
+        '<button class="risev-recover-btn" type="button">Reload</button>' +
       '</div>';
+    var btn = el.querySelector('.risev-recover-btn');
+    if (btn) {
+      btn.onclick = function () {
+        try { sessionStorage.removeItem(KEY); } catch (e) {}
+        location.replace(cleanUrl());
+      };
+    }
   }
 
-  // A script element that fails to load or parse. Only ours is fatal — an
-  // ad-blocked Turnstile/Facebook SDK must not trigger a reload loop.
+  // A script element that fails to load or parse. Only our bundle is fatal — an
+  // ad-blocked Turnstile/Facebook SDK (or an inline script) must not reload.
   window.addEventListener('error', function (e) {
     var t = e && e.target;
     if (t && t.tagName === 'SCRIPT') {
       var src = t.src || '';
-      if (src && src.indexOf('/_expo/') === -1) return;
-      fail('script');
+      if (!src || src.indexOf('/_expo/') === -1) return;
+      fail();
       return;
     }
     var msg = String((e && e.message) || '');
     if (/Unexpected token\\s*'<'|Loading chunk|Importing a module script failed|error loading dynamically imported module/i.test(msg)) {
-      fail('chunk');
+      fail();
     }
   }, true);
 
@@ -59,16 +72,24 @@ const bootGuardScript = `
     var r = e && e.reason;
     var msg = String((r && r.message) || r || '');
     if (/Loading chunk|Importing a module script failed|Unexpected token\\s*'<'|error loading dynamically imported module/i.test(msg)) {
-      fail('chunk');
+      fail();
     }
   });
 
-  // Last resort: the page finished loading but the bundle never mounted. If the
-  // document is still fetching (slow Android connection), give it more time.
-  window.setTimeout(function () {
-    if (document.readyState !== 'complete') return;
-    if (document.getElementById(BOOT)) fail('timeout');
-  }, 12000);
+  // Last resort: the bundle never mounted. A stalled request can keep the
+  // document at 'interactive' forever, so wait a little longer in that case
+  // instead of skipping the check entirely.
+  var passes = 0;
+  function watchdog() {
+    if (!document.getElementById(BOOT)) return;
+    if (document.readyState === 'loading' && passes < 3) {
+      passes += 1;
+      window.setTimeout(watchdog, 6000);
+      return;
+    }
+    fail();
+  }
+  window.setTimeout(watchdog, 12000);
 })();
 `;
 

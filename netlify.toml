@@ -10,14 +10,15 @@
     Cache-Control = "public, max-age=31536000, immutable"
 
 # The shell names the current build's chunks; reusing an old copy points the
-# browser at files that no longer exist and blanks the app.
+# browser at files that no longer exist and blanks the app. Every exported
+# shell is covered, not just the root one.
 [[headers]]
   for = "/"
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate"
 
 [[headers]]
-  for = "/index.html"
+  for = "/*.html"
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate"
 
