@@ -34,6 +34,8 @@ interface Reward {
   description: string;
   points_cost: number;
   stock: number;
+  /** 0 / unset = unlimited; otherwise the number of times one customer may redeem. */
+  max_per_customer?: number;
   is_active: boolean;
   type: 'free_item' | 'discount' | 'experience' | 'cash_credit';
   image: string;
@@ -175,6 +177,7 @@ export default function UnifiedRewardsScreen() {
   const [formDesc, setFormDesc] = useState('');
   const [formPointsCost, setFormPointsCost] = useState('0');
   const [formStock, setFormStock] = useState('50');
+  const [formMaxPerCustomer, setFormMaxPerCustomer] = useState('0');
   const [formType, setFormType] = useState<'free_item' | 'discount'>('free_item');
   const [formCampaignType, setFormCampaignType] = useState<string | null>(null);
   const [formDiscountType, setFormDiscountType] = useState<'percentage' | 'fixed_amount'>('percentage');
@@ -497,6 +500,7 @@ export default function UnifiedRewardsScreen() {
   const [inlineCampaignType, setInlineCampaignType] = useState<string | null>(null);
   const [inlineDesc, setInlineDesc] = useState('');
   const [inlineStock, setInlineStock] = useState('50');
+  const [inlineMaxPerCustomer, setInlineMaxPerCustomer] = useState('0');
   const [inlineImageFile, setInlineImageFile] = useState<any>(null);
   const [inlineImagePreview, setInlineImagePreview] = useState<string | null>(null);
   const [linkToStampCard, setLinkToStampCard] = useState<boolean>(true);
@@ -889,6 +893,7 @@ export default function UnifiedRewardsScreen() {
     setFormDesc('');
     setFormPointsCost('0');
     setFormStock('50');
+    setFormMaxPerCustomer('0');
     setFormType('free_item');
     setFormDiscountType('percentage');
     setFormDiscountValue('');
@@ -912,6 +917,7 @@ export default function UnifiedRewardsScreen() {
     setFormDesc(reward.description || '');
     setFormPointsCost(String(reward.points_cost || 0));
     setFormStock(String(reward.stock || 50));
+    setFormMaxPerCustomer(String(reward.max_per_customer || 0));
     setFormType(reward.type === 'discount' ? 'discount' : 'free_item');
     setFormCampaignType(reward.metadata?.campaign_type || null);
     setFormDiscountType(reward.discount_type || 'percentage');
@@ -1083,6 +1089,7 @@ export default function UnifiedRewardsScreen() {
       formData.append('description', formDesc.trim());
       formData.append('points_cost', String(parseInt(formPointsCost, 10) || 0));
       formData.append('stock', String(parseInt(formStock, 10) || 1000000));
+      formData.append('max_per_customer', String(Math.max(0, parseInt(formMaxPerCustomer, 10) || 0)));
       formData.append('type', formType);
       formData.append('discount_type', formType === 'discount' ? formDiscountType : 'none');
       formData.append('discount_value', String(formType === 'discount' ? (parseFloat(formDiscountValue) || 0) : 0));
@@ -1280,6 +1287,7 @@ export default function UnifiedRewardsScreen() {
       formData.append('applicable_items_text', inlineApplicableItemsText.trim());
       formData.append('discount_scope', inlineType === 'discount' ? inlineDiscountScope : 'all');
       formData.append('stock', String(inlineStock ? (parseInt(inlineStock, 10) || 1000000) : 1000000));
+      formData.append('max_per_customer', String(Math.max(0, parseInt(inlineMaxPerCustomer, 10) || 0)));
       formData.append('points_cost', '0');
       formData.append('is_active', 'true');
       formData.append('reward_scope', linkToStampCard ? 'stamp_goal' : 'catalog');
@@ -2637,6 +2645,12 @@ export default function UnifiedRewardsScreen() {
                                 <View style={{ opacity: 0.95 }}>
                                   {renderStockLabel(reward.stock)}
                                 </View>
+
+                                {Number(reward.max_per_customer) > 0 ? (
+                                  <Text style={{ fontSize: 8.5, fontFamily: 'PlusJakartaSans_700Bold', color: '#B45309' }}>
+                                    · {Number(reward.max_per_customer) === 1 ? '1' : reward.max_per_customer}/customer
+                                  </Text>
+                                ) : null}
                               </View>
 
                               {/* Apple Squircle Action Buttons */}
@@ -7997,6 +8011,25 @@ export default function UnifiedRewardsScreen() {
                 {locale === 'en' ? 'Leave blank for unlimited.' : 'Biarkan kosong untuk tanpa had.'}
               </Text>
 
+              {/* Per-customer redemption limit */}
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
+                {locale === 'en' ? 'Limit per customer (optional)' : 'Had per pelanggan (pilihan)'}
+              </Text>
+              <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 4, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                <Ionicons name="repeat-outline" size={18} color="#64748B" style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.nestedTextInput}
+                  value={formMaxPerCustomer}
+                  onChangeText={setFormMaxPerCustomer}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16, marginLeft: 2 }}>
+                {locale === 'en' ? 'How many times one customer can redeem this reward. 0 = unlimited.' : 'Berapa kali seorang pelanggan boleh menebus ganjaran ini. 0 = tanpa had.'}
+              </Text>
+
               {/* Publish Switch */}
               <View style={{
                 flexDirection: 'row',
@@ -9312,6 +9345,25 @@ export default function UnifiedRewardsScreen() {
               </View>
               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16, marginLeft: 2 }}>
                 {locale === 'en' ? 'Leave blank for unlimited.' : 'Biarkan kosong untuk tanpa had.'}
+              </Text>
+
+              {/* Per-customer redemption limit */}
+              <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#1E293B', marginBottom: 6 }}>
+                {locale === 'en' ? 'Limit per customer (optional)' : 'Had per pelanggan (pilihan)'}
+              </Text>
+              <View style={[styles.inputWrapper, { height: 48, borderRadius: 14, marginBottom: 4, paddingHorizontal: 14, backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                <Ionicons name="repeat-outline" size={18} color="#64748B" style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.nestedTextInput}
+                  value={inlineMaxPerCustomer}
+                  onChangeText={setInlineMaxPerCustomer}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginBottom: 16, marginLeft: 2 }}>
+                {locale === 'en' ? 'How many times one customer can redeem this reward. 0 = unlimited.' : 'Berapa kali seorang pelanggan boleh menebus ganjaran ini. 0 = tanpa had.'}
               </Text>
 
               {/* Link to Stamp Card Banner */}
