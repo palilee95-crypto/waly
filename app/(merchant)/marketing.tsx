@@ -1150,7 +1150,7 @@ export default function MarketingScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       {/* Restrict to Owner Modal Overlay */}
       <Modal
-        visible={isFocused && !isOwner && !staffPermissions?.can_view_marketing}
+        visible={isFocused && !isOwner}
         transparent={true}
         animationType="fade"
       >

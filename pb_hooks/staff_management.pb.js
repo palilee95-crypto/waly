@@ -778,7 +778,6 @@ routerAdd("GET", "/api/risev/merchant/staff/permissions", (e) => {
 
   const defaultPermissions = {
     can_view_analytics: false,
-    can_view_marketing: false,
     can_manage_rewards: false,
     can_manage_customers: false,
     can_edit_store_profile: false,
@@ -848,7 +847,6 @@ routerAdd("POST", "/api/risev/merchant/staff/permissions", (e) => {
 
   meta.staff_permissions = {
     can_view_analytics: !!newPermissions.can_view_analytics,
-    can_view_marketing: !!newPermissions.can_view_marketing,
     can_manage_rewards: !!newPermissions.can_manage_rewards,
     can_manage_customers: !!newPermissions.can_manage_customers,
     can_edit_store_profile: !!newPermissions.can_edit_store_profile,

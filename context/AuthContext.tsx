@@ -97,7 +97,6 @@ export type UserRole = 'customer' | 'merchant' | null;
 
 export interface StaffPermissions {
   can_view_analytics?: boolean;
-  can_view_marketing?: boolean;
   can_manage_rewards?: boolean;
   can_manage_customers?: boolean;
   can_edit_store_profile?: boolean;
@@ -106,7 +105,6 @@ export interface StaffPermissions {
 
 export const defaultStaffPermissions: StaffPermissions = {
   can_view_analytics: false,
-  can_view_marketing: false,
   can_manage_rewards: false,
   can_manage_customers: false,
   can_edit_store_profile: false,
