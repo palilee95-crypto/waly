@@ -6,12 +6,14 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { cachedFetch } from '@/lib/data-cache';
+import { useTr } from '@/lib/i18n';
 import { cacheKeys, TTL } from '@/lib/cache-keys';
 import { colors } from '@/theme';
 import { parseAndNormalizeBirthday } from '@/lib/emailValidator';
 
 export default function CustomerProfile() {
   const { user, logout, switchRole, updateProfile, refreshSession } = useAuth();
+  const tr = useTr();
   const router = useRouter();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -231,23 +233,23 @@ export default function CustomerProfile() {
       };
       input.click();
     } else {
-      Alert.alert('Not Supported', 'Image upload is currently web-only in this demo.');
+      Alert.alert(tr('Not Supported', 'Tidak Disokong'), tr('Image upload is currently web-only in this demo.', 'Muat naik imej hanya tersedia di web dalam demo ini.'));
     }
   };
 
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
-      Alert.alert('Validation Error', 'Full Name is required.');
+      Alert.alert(tr('Validation Error', 'Ralat Pengesahan'), tr('Full Name is required.', 'Nama penuh diperlukan.'));
       return;
     }
 
     if (editPassword) {
       if (editPassword.length < 8) {
-        Alert.alert('Validation Error', 'Password must be at least 8 characters long.');
+        Alert.alert(tr('Validation Error', 'Ralat Pengesahan'), tr('Password must be at least 8 characters long.', 'Kata laluan mesti sekurang-kurangnya 8 aksara.'));
         return;
       }
       if (editPassword !== editConfirmPassword) {
-        Alert.alert('Validation Error', 'Passwords do not match.');
+        Alert.alert(tr('Validation Error', 'Ralat Pengesahan'), tr('Passwords do not match.', 'Kata laluan tidak sepadan.'));
         return;
       }
     }
@@ -256,7 +258,7 @@ export default function CustomerProfile() {
     if (editBirthday && editBirthday.trim()) {
       const bdayCheck = parseAndNormalizeBirthday(editBirthday);
       if (!bdayCheck.isValid) {
-        Alert.alert('Validation Error', bdayCheck.error || 'Please enter a valid birthday in DD-MM-YYYY format (e.g. 01-09-2000).');
+        Alert.alert(tr('Validation Error', 'Ralat Pengesahan'), bdayCheck.error || tr('Please enter a valid birthday in DD-MM-YYYY format (e.g. 01-09-2000).', 'Sila masukkan tarikh lahir yang sah dalam format HH-BB-TTTT (cth. 01-09-2000).'));
         return;
       }
       birthDateToSave = bdayCheck.isoDate;
@@ -272,9 +274,9 @@ export default function CustomerProfile() {
         birthDateToSave
       );
       setEditModalVisible(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert(tr('Success', 'Berjaya'), tr('Profile updated successfully!', 'Profil berjaya dikemas kini!'));
     } catch (e: any) {
-      Alert.alert('Update Error', e?.message || 'Failed to update profile. Please try again.');
+      Alert.alert(tr('Update Error', 'Ralat Kemas Kini'), e?.message || tr('Failed to update profile. Please try again.', 'Gagal mengemas kini profil. Sila cuba lagi.'));
     } finally {
       setIsSaving(false);
     }
@@ -282,7 +284,7 @@ export default function CustomerProfile() {
 
   const handleSendSupport = () => {
     if (!supportMessage.trim()) {
-      Alert.alert('Validation Error', 'Please enter a message to support.');
+      Alert.alert(tr('Validation Error', 'Ralat Pengesahan'), tr('Please enter a message to support.', 'Sila masukkan mesej kepada sokongan.'));
       return;
     }
     setIsSendingSupport(true);
@@ -290,13 +292,13 @@ export default function CustomerProfile() {
       setIsSendingSupport(false);
       setSupportMessage('');
       setSupportModalVisible(false);
-      Alert.alert('Support Request Sent', 'Thank you! RISEV support team has received your message and will respond shortly.');
+      Alert.alert(tr('Support Request Sent', 'Permintaan Sokongan Dihantar'), tr('Thank you! RISEV support team has received your message and will respond shortly.', 'Terima kasih! Pasukan sokongan RISEV telah menerima mesej anda dan akan membalas tidak lama lagi.'));
     }, 1200);
   };
 
   const handleWhatsAppSupport = () => {
     Linking.openURL('https://wa.me/60104648598').catch(() => {
-      Alert.alert('Error', 'Unable to open WhatsApp.');
+      Alert.alert(tr('Error', 'Ralat'), tr('Unable to open WhatsApp.', 'Tidak dapat membuka WhatsApp.'));
     });
   };
 
@@ -319,7 +321,7 @@ export default function CustomerProfile() {
                   onPress={() => router.back()}
                   style={styles.roundHeaderBtn}
                   activeOpacity={0.75}
-                  accessibilityLabel="Back"
+                  accessibilityLabel={tr('Back', 'Kembali')}
                 >
                   <Ionicons name="chevron-back" size={18} color="#000000" />
                 </TouchableOpacity>
@@ -329,7 +331,7 @@ export default function CustomerProfile() {
                 style={styles.headerLogo}
               />
               <View style={styles.headerLogoDivider} />
-              <Text style={styles.headerTitle}>My Profile</Text>
+              <Text style={styles.headerTitle}>{tr('My Profile', 'Profil Saya')}</Text>
             </View>
 
             <View style={styles.headerRightActions}>
@@ -337,7 +339,7 @@ export default function CustomerProfile() {
                 style={styles.roundHeaderBtn}
                 onPress={handleOpenEdit}
                 activeOpacity={0.8}
-                accessibilityLabel="Edit Profile"
+                accessibilityLabel={tr('Edit Profile', 'Edit Profil')}
               >
                 <Ionicons name="create-outline" size={18} color="#000000" />
               </TouchableOpacity>
@@ -346,7 +348,7 @@ export default function CustomerProfile() {
                 style={styles.roundHeaderBtn}
                 onPress={() => setSupportModalVisible(true)}
                 activeOpacity={0.8}
-                accessibilityLabel="Help & Support"
+                accessibilityLabel={tr('Help & Support', 'Bantuan & Sokongan')}
               >
                 <Ionicons name="help-buoy-outline" size={18} color="#000000" />
               </TouchableOpacity>
@@ -396,7 +398,7 @@ export default function CustomerProfile() {
                   <Ionicons name="star" size={13} color="#FFCC00" />
                 </View>
                 <Text style={styles.statNumber}>{user?.total_points || 0}</Text>
-                <Text style={styles.statLabel}>Total Points</Text>
+                <Text style={styles.statLabel}>{tr('Total Points', 'Jumlah Mata')}</Text>
               </View>
 
               <View style={styles.statDivider} />
@@ -410,7 +412,7 @@ export default function CustomerProfile() {
                   <Ionicons name="card-outline" size={13} color="#000000" />
                 </View>
                 <Text style={styles.statNumber}>{cardsCount}</Text>
-                <Text style={styles.statLabel}>Stamp Cards</Text>
+                <Text style={styles.statLabel}>{tr('Stamp Cards', 'Kad Setem')}</Text>
               </TouchableOpacity>
 
               <View style={styles.statDivider} />
@@ -424,7 +426,7 @@ export default function CustomerProfile() {
                   <Ionicons name="ticket-outline" size={13} color="#000000" />
                 </View>
                 <Text style={styles.statNumber}>{vouchersCount}</Text>
-                <Text style={styles.statLabel}>My Vouchers</Text>
+                <Text style={styles.statLabel}>{tr('My Vouchers', 'Baucar Saya')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -436,9 +438,9 @@ export default function CustomerProfile() {
                 <Ionicons name="storefront" size={18} color="#FFCC00" />
               </View>
               <View style={styles.merchantTextCol}>
-                <Text style={styles.merchantTitle}>Business Owner?</Text>
+                <Text style={styles.merchantTitle}>{tr('Business Owner?', 'Pemilik Perniagaan?')}</Text>
                 <Text style={styles.merchantSubtitle}>
-                  More stamps, more bookings. 10x more repeat customers.
+                  {tr('More stamps, more bookings. 10x more repeat customers.', 'Lebih banyak setem, lebih banyak tempahan. 10x lebih ramai pelanggan berulang.')}
                 </Text>
               </View>
             </View>
@@ -447,7 +449,7 @@ export default function CustomerProfile() {
               onPress={handleSwitchToMerchant}
               activeOpacity={0.85}
             >
-              <Text style={styles.merchantCtaText}>Manage My Business</Text>
+              <Text style={styles.merchantCtaText}>{tr('Manage My Business', 'Urus Perniagaan Saya')}</Text>
               <Ionicons name="arrow-forward" size={15} color="#FFCC00" />
             </TouchableOpacity>
           </View>
@@ -465,13 +467,13 @@ export default function CustomerProfile() {
                 </View>
                 <View style={styles.birthdayPromptTextCol}>
                   <View style={styles.birthdayPromptTitleRow}>
-                    <Text style={styles.birthdayPromptTitle}>Set Your Real Birthday 🎂</Text>
+                    <Text style={styles.birthdayPromptTitle}>{tr('Set Your Real Birthday 🎂', 'Tetapkan Tarikh Lahir Sebenar 🎂')}</Text>
                     <View style={styles.birthdayPromptBadge}>
-                      <Text style={styles.birthdayPromptBadgeText}>REWARD READY</Text>
+                      <Text style={styles.birthdayPromptBadgeText}>{tr('REWARD READY', 'GANJARAN SEDIA')}</Text>
                     </View>
                   </View>
                   <Text style={styles.birthdayPromptSubtitle}>
-                    Stores give free birthday vouchers & treats! Tap to confirm your date.
+                    {tr('Stores give free birthday vouchers & treats! Tap to confirm your date.', 'Kedai memberi baucar & hadiah hari jadi percuma! Ketik untuk mengesahkan tarikh anda.')}
                   </Text>
                 </View>
               </View>
@@ -483,7 +485,7 @@ export default function CustomerProfile() {
 
           {/* ── Inset Grouped Settings Sections ── */}
           <View style={styles.sectionGroup}>
-            <Text style={styles.sectionHeaderTitle}>Account & Wallet</Text>
+            <Text style={styles.sectionHeaderTitle}>{tr('Account & Wallet', 'Akaun & Dompet')}</Text>
             
             <View style={styles.groupedContainer}>
               <TouchableOpacity
@@ -495,7 +497,7 @@ export default function CustomerProfile() {
                   <View style={styles.cellIconBg}>
                     <Ionicons name="person-outline" size={18} color="#000000" />
                   </View>
-                  <Text style={styles.cellTitle}>Edit Profile Information</Text>
+                  <Text style={styles.cellTitle}>{tr('Edit Profile Information', 'Edit Maklumat Profil')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
               </TouchableOpacity>
@@ -511,7 +513,7 @@ export default function CustomerProfile() {
                   <View style={styles.cellIconBg}>
                     <Ionicons name="time-outline" size={18} color="#000000" />
                   </View>
-                  <Text style={styles.cellTitle}>Stamp History & Logs</Text>
+                  <Text style={styles.cellTitle}>{tr('Stamp History & Logs', 'Sejarah & Log Setem')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
               </TouchableOpacity>
@@ -519,7 +521,7 @@ export default function CustomerProfile() {
           </View>
 
           <View style={styles.sectionGroup}>
-            <Text style={styles.sectionHeaderTitle}>Preferences & Support</Text>
+            <Text style={styles.sectionHeaderTitle}>{tr('Preferences & Support', 'Keutamaan & Sokongan')}</Text>
 
             <View style={styles.groupedContainer}>
               <View style={styles.groupedCell}>
@@ -528,9 +530,9 @@ export default function CustomerProfile() {
                     <Ionicons name="notifications-outline" size={18} color="#000000" />
                   </View>
                   <View style={{ gap: 2, flex: 1, paddingRight: 8 }}>
-                    <Text style={styles.cellTitle}>Push Notifications</Text>
+                    <Text style={styles.cellTitle}>{tr('Push Notifications', 'Pemberitahuan Tolak')}</Text>
                     <Text style={styles.cellSubtitle} numberOfLines={1}>
-                      Receive instant alerts for rewards, stamps & promos
+                      {tr('Receive instant alerts for rewards, stamps & promos', 'Terima makluman segera untuk ganjaran, setem & promosi')}
                     </Text>
                   </View>
                 </View>
@@ -553,7 +555,7 @@ export default function CustomerProfile() {
                   <View style={styles.cellIconBg}>
                     <Ionicons name="help-buoy-outline" size={18} color="#000000" />
                   </View>
-                  <Text style={styles.cellTitle}>Help & Customer Support</Text>
+                  <Text style={styles.cellTitle}>{tr('Help & Customer Support', 'Bantuan & Sokongan Pelanggan')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
               </TouchableOpacity>
@@ -569,7 +571,7 @@ export default function CustomerProfile() {
                   <View style={styles.cellIconBg}>
                     <Ionicons name="shield-checkmark-outline" size={18} color="#000000" />
                   </View>
-                  <Text style={styles.cellTitle}>Privacy & Terms of Service</Text>
+                  <Text style={styles.cellTitle}>{tr('Privacy & Terms of Service', 'Privasi & Terma Perkhidmatan')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
               </TouchableOpacity>
@@ -583,7 +585,7 @@ export default function CustomerProfile() {
             activeOpacity={0.8}
           >
             <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-            <Text style={styles.logoutText}>Log Out Account</Text>
+            <Text style={styles.logoutText}>{tr('Log Out Account', 'Log Keluar Akaun')}</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -615,26 +617,26 @@ export default function CustomerProfile() {
               <Ionicons name={vouchersCount > 0 ? "ticket-outline" : "log-out-outline"} size={26} color="#EF4444" />
             </View>
 
-            <Text style={styles.logoutSheetTitle}>We'll Miss You!</Text>
+            <Text style={styles.logoutSheetTitle}>{tr("We'll Miss You!", 'Kami Akan Rindukan Anda!')}</Text>
             <Text style={styles.logoutSheetSubtitle}>
               {vouchersCount > 0 ? (
                 <>
-                  Don't forget you have{' '}
+                  {tr("Don't forget you have ", 'Jangan lupa anda mempunyai ')}
                   <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
-                    {vouchersCount} {vouchersCount === 1 ? 'voucher' : 'vouchers'}
+                    {vouchersCount} {vouchersCount === 1 ? tr('voucher', 'baucar') : tr('vouchers', 'baucar')}
                   </Text>
                   {vouchersTotalValue > 0 ? (
                     <>
-                      {' '}worth{' '}
+                      {' '}{tr('worth ', 'bernilai ')}
                       <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>
                         RM {vouchersTotalValue % 1 === 0 ? vouchersTotalValue : vouchersTotalValue.toFixed(2)}
                       </Text>
                     </>
                   ) : null}{' '}
-                  waiting in your wallet.
+                  {tr('waiting in your wallet.', 'menanti dalam dompet anda.')}
                 </>
               ) : (
-                "Are you sure you want to log out of your RISEV account? You can sign back in anytime with your credentials."
+                tr('Are you sure you want to log out of your RISEV account? You can sign back in anytime with your credentials.', 'Adakah anda pasti mahu log keluar dari akaun RISEV anda? Anda boleh log masuk semula pada bila-bila masa dengan kelayakan anda.')
               )}
             </Text>
 
@@ -646,7 +648,7 @@ export default function CustomerProfile() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.logoutConfirmPillText}>Log Out</Text>
+                <Text style={styles.logoutConfirmPillText}>{tr('Log Out', 'Log Keluar')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -654,7 +656,7 @@ export default function CustomerProfile() {
                 onPress={() => setLogoutModalVisible(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.logoutCancelPillText}>Cancel</Text>
+                <Text style={styles.logoutCancelPillText}>{tr('Cancel', 'Batal')}</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -670,7 +672,7 @@ export default function CustomerProfile() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.editModalCard]}>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <Text style={styles.modalTitle}>{tr('Edit Profile', 'Edit Profil')}</Text>
             
             {/* Avatar Picker */}
             <TouchableOpacity style={styles.avatarPickerContainer} onPress={handlePickImage} activeOpacity={0.85}>
@@ -679,16 +681,16 @@ export default function CustomerProfile() {
                 <Ionicons name="camera" size={14} color="#FFFFFF" />
               </View>
             </TouchableOpacity>
-            <Text style={styles.avatarPickerLabel}>Tap avatar to upload image</Text>
+            <Text style={styles.avatarPickerLabel}>{tr('Tap avatar to upload image', 'Ketik avatar untuk memuat naik imej')}</Text>
 
             {/* Input field */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Full Name</Text>
+              <Text style={styles.inputLabel}>{tr('Full Name', 'Nama Penuh')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={editName}
                 onChangeText={setEditName}
-                placeholder="Enter your full name"
+                placeholder={tr('Enter your full name', 'Masukkan nama penuh anda')}
                 placeholderTextColor="#94A3B8"
                 {...Platform.select({
                   web: {
@@ -700,12 +702,12 @@ export default function CustomerProfile() {
 
             {/* Birthday field */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Birthday (DD-MM-YYYY)</Text>
+              <Text style={styles.inputLabel}>{tr('Birthday (DD-MM-YYYY)', 'Tarikh Lahir (HH-BB-TTTT)')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={editBirthday}
                 onChangeText={handleBirthdayChange}
-                placeholder="DD-MM-YYYY (e.g. 01-09-2000)"
+                placeholder={tr('DD-MM-YYYY (e.g. 01-09-2000)', 'HH-BB-TTTT (cth. 01-09-2000)')}
                 placeholderTextColor="#94A3B8"
                 keyboardType="numbers-and-punctuation"
                 maxLength={10}
@@ -716,18 +718,18 @@ export default function CustomerProfile() {
                 })}
               />
               <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#64748B', marginTop: 4 }}>
-                🎁 Needed for merchants to send you birthday surprise rewards!
+                {tr('🎁 Needed for merchants to send you birthday surprise rewards!', '🎁 Diperlukan untuk peniaga menghantar ganjaran hari jadi!')}
               </Text>
             </View>
 
             {/* Optional Change Password Section */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>New Password (Optional)</Text>
+              <Text style={styles.inputLabel}>{tr('New Password (Optional)', 'Kata Laluan Baharu (Pilihan)')}</Text>
               <TextInput
                 style={[styles.textInput, passwordFocused && styles.textInputFocused]}
                 value={editPassword}
                 onChangeText={setEditPassword}
-                placeholder="Leave blank to keep current"
+                placeholder={tr('Leave blank to keep current', 'Biarkan kosong untuk kekalkan')}
                 placeholderTextColor="#BEC6E0"
                 secureTextEntry
                 autoCapitalize="none"
@@ -742,12 +744,12 @@ export default function CustomerProfile() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Confirm New Password</Text>
+              <Text style={styles.inputLabel}>{tr('Confirm New Password', 'Sahkan Kata Laluan Baharu')}</Text>
               <TextInput
                 style={[styles.textInput, confirmPasswordFocused && styles.textInputFocused]}
                 value={editConfirmPassword}
                 onChangeText={setEditConfirmPassword}
-                placeholder="Re-type new password"
+                placeholder={tr('Re-type new password', 'Taip semula kata laluan baharu')}
                 placeholderTextColor="#BEC6E0"
                 secureTextEntry
                 autoCapitalize="none"
@@ -769,7 +771,7 @@ export default function CustomerProfile() {
                 disabled={isSaving}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{tr('Cancel', 'Batal')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtnBlack}
@@ -780,7 +782,7 @@ export default function CustomerProfile() {
                 {isSaving ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Save</Text>
+                  <Text style={styles.modalConfirmText}>{tr('Save', 'Simpan')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -797,22 +799,31 @@ export default function CustomerProfile() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.privacyModalCard]}>
-            <Text style={styles.modalTitle}>Privacy & Terms</Text>
+            <Text style={styles.modalTitle}>{tr('Privacy & Terms', 'Privasi & Terma')}</Text>
             
             <ScrollView style={styles.privacyScroll} showsVerticalScrollIndicator={false}>
-              <Text style={styles.privacyHeading}>1. Terms of Service</Text>
+              <Text style={styles.privacyHeading}>{tr('1. Terms of Service', '1. Terma Perkhidmatan')}</Text>
               <Text style={styles.privacyText}>
-                Welcome to RISEV. By using our loyalty and rewards application, you agree to comply with our stamp validation protocols. Any attempt to exploit points, forge transactions, or bypass security rules will result in the immediate termination of your active cards.
+                {tr(
+                  'Welcome to RISEV. By using our loyalty and rewards application, you agree to comply with our stamp validation protocols. Any attempt to exploit points, forge transactions, or bypass security rules will result in the immediate termination of your active cards.',
+                  'Selamat datang ke RISEV. Dengan menggunakan aplikasi kesetiaan dan ganjaran kami, anda bersetuju mematuhi protokol pengesahan setem kami. Sebarang cubaan mengeksploitasi mata, memalsukan transaksi, atau memintas peraturan keselamatan akan menyebabkan kad aktif anda ditamatkan serta-merta.'
+                )}
               </Text>
               
-              <Text style={styles.privacyHeading}>2. Data Privacy</Text>
+              <Text style={styles.privacyHeading}>{tr('2. Data Privacy', '2. Privasi Data')}</Text>
               <Text style={styles.privacyText}>
-                We collect your phone number and email address to manage reward programs, secure your credentials, and display transactions logs. We implement strict data integrity measures and do not sell your personal details to third-party advertisers.
+                {tr(
+                  'We collect your phone number and email address to manage reward programs, secure your credentials, and display transactions logs. We implement strict data integrity measures and do not sell your personal details to third-party advertisers.',
+                  'Kami mengumpul nombor telefon dan alamat e-mel anda untuk mengurus program ganjaran, melindungi kelayakan anda, dan memaparkan log transaksi. Kami melaksanakan langkah integriti data yang ketat dan tidak menjual butiran peribadi anda kepada pengiklan pihak ketiga.'
+                )}
               </Text>
               
-              <Text style={styles.privacyHeading}>3. Push Notifications & Alerts</Text>
+              <Text style={styles.privacyHeading}>{tr('3. Push Notifications & Alerts', '3. Pemberitahuan Tolak & Makluman')}</Text>
               <Text style={styles.privacyText}>
-                RISEV dispatches real-time push notifications for stamp rewards, voucher redemptions, and exclusive promotions. You can customize your notification preferences at any time in your profile settings.
+                {tr(
+                  'RISEV dispatches real-time push notifications for stamp rewards, voucher redemptions, and exclusive promotions. You can customize your notification preferences at any time in your profile settings.',
+                  'RISEV menghantar pemberitahuan tolak masa nyata untuk ganjaran setem, penebusan baucar, dan promosi eksklusif. Anda boleh menyesuaikan keutamaan pemberitahuan anda pada bila-bila masa dalam tetapan profil anda.'
+                )}
               </Text>
             </ScrollView>
 
@@ -821,7 +832,7 @@ export default function CustomerProfile() {
               onPress={() => setPrivacyModalVisible(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.modalConfirmText}>Accept & Close</Text>
+              <Text style={styles.modalConfirmText}>{tr('Accept & Close', 'Terima & Tutup')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -836,17 +847,17 @@ export default function CustomerProfile() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.supportModalCard]}>
-            <Text style={styles.modalTitle}>Help & Support</Text>
-            <Text style={styles.modalSubtitle}>How can we assist you today?</Text>
+            <Text style={styles.modalTitle}>{tr('Help & Support', 'Bantuan & Sokongan')}</Text>
+            <Text style={styles.modalSubtitle}>{tr('How can we assist you today?', 'Bagaimana kami boleh membantu anda hari ini?')}</Text>
 
             {/* Support Form message */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Message</Text>
+              <Text style={styles.inputLabel}>{tr('Message', 'Mesej')}</Text>
               <TextInput
                 style={[styles.textInput, styles.supportTextInput, supportFocused && styles.textInputFocused]}
                 value={supportMessage}
                 onChangeText={setSupportMessage}
-                placeholder="Describe your issue or feedback..."
+                placeholder={tr('Describe your issue or feedback...', 'Terangkan isu atau maklum balas anda...')}
                 placeholderTextColor="#94A3B8"
                 multiline
                 numberOfLines={4}
@@ -871,7 +882,7 @@ export default function CustomerProfile() {
                 disabled={isSendingSupport}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{tr('Cancel', 'Batal')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtnBlack}
@@ -882,21 +893,21 @@ export default function CustomerProfile() {
                 {isSendingSupport ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Send</Text>
+                  <Text style={styles.modalConfirmText}>{tr('Send', 'Hantar')}</Text>
                 )}
               </TouchableOpacity>
             </View>
 
             {/* Quick WhatsApp Support Shortcut */}
             <View style={styles.whatsappContainer}>
-              <Text style={styles.whatsappLabel}>Or reach us instantly on WhatsApp:</Text>
+              <Text style={styles.whatsappLabel}>{tr('Or reach us instantly on WhatsApp:', 'Atau hubungi kami serta-merta di WhatsApp:')}</Text>
               <TouchableOpacity
                 style={styles.whatsappBtn}
                 onPress={handleWhatsAppSupport}
                 activeOpacity={0.8}
               >
                 <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
-                <Text style={styles.whatsappBtnText}>Chat on WhatsApp</Text>
+                <Text style={styles.whatsappBtnText}>{tr('Chat on WhatsApp', 'Sembang di WhatsApp')}</Text>
               </TouchableOpacity>
             </View>
           </View>
