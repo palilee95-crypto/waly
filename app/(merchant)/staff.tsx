@@ -1586,7 +1586,7 @@ export default function StaffManagementScreen() {
                           setIsEditBranchPickerOpen(false);
                         }}
                       >
-                        <Text style={styles.editDropdownMenuItemText}>{branch}</Text>
+                        <Text style={[styles.editDropdownMenuItemText, { flex: 1 }]} numberOfLines={1}>{branch}</Text>
                         {editingMember?.branch_name === branch && <Ionicons name="checkmark" size={16} color="#050505" />}
                       </TouchableOpacity>
                     ))}
