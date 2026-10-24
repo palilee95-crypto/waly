@@ -26,6 +26,7 @@ import { colors, radii } from '@/theme';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTr } from '@/lib/i18n';
 import { handleSmartBack } from '@/lib/navigation';
 import { ALL_TIME_SLOTS, fitsOpeningHours, formatMinutesLabel, hoursForDate, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
 import { openBookingCheckout } from '@/lib/openBookingCheckout';
@@ -122,6 +123,7 @@ export default function BookingsScreen() {
   const reportParams = useLocalSearchParams<{ reportStatus?: string; reportDate?: string; reportView?: string }>();
   const { user } = useAuth();
   const { locale } = useLanguage();
+  const tr = useTr();
   const { width } = useWindowDimensions();
 
   const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'pwa'>('appointments');
@@ -479,7 +481,10 @@ export default function BookingsScreen() {
       try {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          Alert.alert(
+            tr('Permission Denied', 'Kebenaran Ditolak'),
+            tr('Permission to access photo gallery is required.', 'Kebenaran untuk mengakses galeri foto diperlukan.')
+          );
           return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -500,7 +505,7 @@ export default function BookingsScreen() {
           });
         }
       } catch (err: any) {
-        Alert.alert('Error', 'Failed to pick image from library.');
+        Alert.alert(tr('Error', 'Ralat'), tr('Failed to pick image from library.', 'Gagal memilih imej daripada galeri.'));
       }
     }
   };
@@ -557,10 +562,13 @@ export default function BookingsScreen() {
         });
       }
       setPreviewRefreshKey(Date.now());
-      Alert.alert('Settings Saved', 'Your store hero photo and booking page details have been updated!');
+      Alert.alert(
+        tr('Settings Saved', 'Tetapan Disimpan'),
+        tr('Your store hero photo and booking page details have been updated!', 'Foto utama kedai dan butiran halaman tempahan anda telah dikemas kini!')
+      );
     } catch (e: any) {
       console.warn('Save branding error:', e);
-      Alert.alert('Error', e?.message || 'Failed to update branding.');
+      Alert.alert(tr('Error', 'Ralat'), e?.message || tr('Failed to update branding.', 'Gagal mengemas kini penjenamaan.'));
     } finally {
       setIsSavingBranding(false);
     }
@@ -874,19 +882,28 @@ export default function BookingsScreen() {
       }
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
       if (newStatus === 'completed') {
-        Alert.alert('Completed & Stamped! 🎉', 'Customer loyalty stamps credited and digital receipt issued.');
+        Alert.alert(
+          tr('Completed & Stamped! 🎉', 'Selesai & Setem Diberikan! 🎉'),
+          tr('Customer loyalty stamps credited and digital receipt issued.', 'Setem kesetiaan pelanggan telah dikreditkan dan resit digital dikeluarkan.')
+        );
       } else if (newStatus === 'no_show') {
-        Alert.alert('Marked as No Show', 'The appointment has been marked as No Show.');
+        Alert.alert(
+          tr('Marked as No Show', 'Ditanda Tidak Hadir'),
+          tr('The appointment has been marked as No Show.', 'Temujanji telah ditanda sebagai Tidak Hadir.')
+        );
       } else {
-        Alert.alert('Status Updated', `Appointment marked as ${newStatus.toUpperCase()}`);
+        Alert.alert(
+          tr('Status Updated', 'Status Dikemas Kini'),
+          tr(`Appointment marked as ${newStatus.toUpperCase()}`, `Temujanji ditanda sebagai ${newStatus.toUpperCase()}`)
+        );
       }
     } catch (e: any) {
       console.warn('Status update error:', e);
       const code = e?.response?.code || e?.data?.code || '';
       const message = code === 'BOOKING_NOT_TODAY'
-        ? 'This appointment can only be marked arrived on its scheduled day.'
-        : (e?.message || 'Failed to update appointment status.');
-      Alert.alert('Error', message);
+        ? tr('This appointment can only be marked arrived on its scheduled day.', 'Temujanji ini hanya boleh ditanda tiba pada hari yang dijadualkan.')
+        : (e?.message || tr('Failed to update appointment status.', 'Gagal mengemas kini status temujanji.'));
+      Alert.alert(tr('Error', 'Ralat'), message);
     } finally {
       setUpdatingId(null);
     }
@@ -904,7 +921,7 @@ export default function BookingsScreen() {
     const text = `Hi ${b.customer_name || 'there'}, we missed you today for your ${b.service_name || 'appointment'} at ${storeTitle}! Would you like to reschedule for another time? You can pick a new slot here: ${bookingUrl}`;
     const waUrl = `https://wa.me/${rawPhone}?text=${encodeURIComponent(text)}`;
     Linking.openURL(waUrl).catch(() => {
-      Alert.alert('Error', 'Unable to open WhatsApp.');
+      Alert.alert(tr('Error', 'Ralat'), tr('Unable to open WhatsApp.', 'Tidak dapat membuka WhatsApp.'));
     });
   };
 
@@ -962,20 +979,20 @@ export default function BookingsScreen() {
           }
         : b));
       setRescheduleTarget(null);
-      Alert.alert('Appointment moved', 'The customer sees the new slot on their pass.');
+      Alert.alert(tr('Appointment moved', 'Temujanji Dipindahkan'), tr('The customer sees the new slot on their pass.', 'Pelanggan akan melihat slot baharu pada pas mereka.'));
     } catch (err: any) {
       const code = err?.response?.code || err?.data?.code || '';
       const messages: Record<string, string> = {
-        BOOKING_SLOT_TAKEN: 'That provider already has an appointment at this time.',
-        BOOKING_SLOT_PAST: 'That slot is in the past.',
-        BOOKING_NOT_ACTIVE: 'This booking can no longer be moved.',
-        BOOKING_STAFF_INVALID: 'That provider is not available for this store.',
-        BOOKING_STAFF_UNAVAILABLE: 'That provider is inactive or on leave. Choose another provider.',
-        BOOKING_AVAILABILITY_UNAVAILABLE: 'Could not verify provider availability. Please try again.',
-        BOOKING_TIME_INVALID: 'Choose a valid time slot.',
-        BOOKING_DATE_INVALID: 'Choose a valid date.',
+        BOOKING_SLOT_TAKEN: tr('That provider already has an appointment at this time.', 'Penyedia itu sudah mempunyai temujanji pada masa ini.'),
+        BOOKING_SLOT_PAST: tr('That slot is in the past.', 'Slot itu sudah berlalu.'),
+        BOOKING_NOT_ACTIVE: tr('This booking can no longer be moved.', 'Tempahan ini tidak boleh dipindahkan lagi.'),
+        BOOKING_STAFF_INVALID: tr('That provider is not available for this store.', 'Penyedia itu tidak tersedia untuk kedai ini.'),
+        BOOKING_STAFF_UNAVAILABLE: tr('That provider is inactive or on leave. Choose another provider.', 'Penyedia itu tidak aktif atau sedang bercuti. Pilih penyedia lain.'),
+        BOOKING_AVAILABILITY_UNAVAILABLE: tr('Could not verify provider availability. Please try again.', 'Tidak dapat mengesahkan ketersediaan penyedia. Sila cuba lagi.'),
+        BOOKING_TIME_INVALID: tr('Choose a valid time slot.', 'Pilih slot masa yang sah.'),
+        BOOKING_DATE_INVALID: tr('Choose a valid date.', 'Pilih tarikh yang sah.'),
       };
-      setRescheduleError(messages[code] || err?.message || 'Could not move this appointment.');
+      setRescheduleError(messages[code] || err?.message || tr('Could not move this appointment.', 'Tidak dapat memindahkan temujanji ini.'));
     } finally {
       setRescheduleBusy(false);
     }
@@ -991,9 +1008,9 @@ export default function BookingsScreen() {
     } catch (err: any) {
       const code = err?.response?.code || '';
       const message = code === 'BOOKING_NOT_ACTIVE'
-        ? 'This booking has already been closed.'
-        : 'Could not open the checkout for this booking.';
-      Alert.alert('Checkout unavailable', message);
+        ? tr('This booking has already been closed.', 'Tempahan ini telah ditutup.')
+        : tr('Could not open the checkout for this booking.', 'Tidak dapat membuka pembayaran untuk tempahan ini.');
+      Alert.alert(tr('Checkout unavailable', 'Pembayaran tidak tersedia'), message);
     } finally {
       setUpdatingId(null);
     }
@@ -1061,7 +1078,7 @@ export default function BookingsScreen() {
     const text = `Hi ${b.customer_name || 'there'}, regarding your booking for ${b.service_name || 'service'} at ${storeTitle} on ${b.booking_date} at ${b.start_time}:`;
     const waUrl = `https://wa.me/${rawPhone}?text=${encodeURIComponent(text)}`;
     Linking.openURL(waUrl).catch(() => {
-      Alert.alert('Error', 'Unable to open WhatsApp.');
+      Alert.alert(tr('Error', 'Ralat'), tr('Unable to open WhatsApp.', 'Tidak dapat membuka WhatsApp.'));
     });
   };
 
@@ -1190,9 +1207,12 @@ export default function BookingsScreen() {
       }
       setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: nextStatus } : s));
       setShowServiceActionModal(false);
-      Alert.alert('Status Updated', `"${service.name}" is now ${nextStatus ? 'Active' : 'Inactive'}.`);
+      Alert.alert(
+        tr('Status Updated', 'Status Dikemas Kini'),
+        tr(`"${service.name}" is now ${nextStatus ? 'Active' : 'Inactive'}.`, `"${service.name}" kini ${nextStatus ? 'Aktif' : 'Tidak Aktif'}.`)
+      );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to update status.');
+      Alert.alert(tr('Error', 'Ralat'), err?.message || tr('Failed to update status.', 'Gagal mengemas kini status.'));
     }
   };
 
@@ -1206,25 +1226,25 @@ export default function BookingsScreen() {
         }
         setServices(prev => prev.filter(s => s.id !== service.id));
         setShowServiceActionModal(false);
-        Alert.alert('Deleted', `"${service.name}" was removed from your catalog.`);
+        Alert.alert(tr('Deleted', 'Dipadam'), tr(`"${service.name}" was removed from your catalog.`, `"${service.name}" telah dikeluarkan daripada katalog anda.`));
       } catch (err: any) {
-        Alert.alert('Error', err?.message || 'Failed to delete service.');
+        Alert.alert(tr('Error', 'Ralat'), err?.message || tr('Failed to delete service.', 'Gagal memadam perkhidmatan.'));
       } finally {
         setIsDeletingService(false);
       }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to delete "${service.name}"?`)) {
+      if (window.confirm(tr(`Are you sure you want to delete "${service.name}"?`, `Adakah anda pasti mahu memadam "${service.name}"?`))) {
         doDelete();
       }
     } else {
       Alert.alert(
-        'Delete Service',
-        `Are you sure you want to delete "${service.name}"?`,
+        tr('Delete Service', 'Padam Perkhidmatan'),
+        tr(`Are you sure you want to delete "${service.name}"?`, `Adakah anda pasti mahu memadam "${service.name}"?`),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: doDelete }
+          { text: tr('Cancel', 'Batal'), style: 'cancel' },
+          { text: tr('Delete', 'Padam'), style: 'destructive', onPress: doDelete }
         ]
       );
     }
@@ -1268,7 +1288,10 @@ export default function BookingsScreen() {
       try {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          Alert.alert(
+            tr('Permission Denied', 'Kebenaran Ditolak'),
+            tr('Permission to access photo gallery is required.', 'Kebenaran untuk mengakses galeri foto diperlukan.')
+          );
           return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -1289,18 +1312,18 @@ export default function BookingsScreen() {
           });
         }
       } catch (err: any) {
-        Alert.alert('Error', 'Failed to pick image from library.');
+        Alert.alert(tr('Error', 'Ralat'), tr('Failed to pick image from library.', 'Gagal memilih imej daripada galeri.'));
       }
     }
   };
 
   const handleSaveService = async (): Promise<boolean> => {
     if (!newServiceName.trim()) {
-      Alert.alert('Missing Details', 'Service name is required.');
+      Alert.alert(tr('Missing Details', 'Butiran Tidak Lengkap'), tr('Service name is required.', 'Nama perkhidmatan diperlukan.'));
       return false;
     }
     if (!newServicePrice.trim()) {
-      Alert.alert('Missing Details', 'Price is required.');
+      Alert.alert(tr('Missing Details', 'Butiran Tidak Lengkap'), tr('Price is required.', 'Harga diperlukan.'));
       return false;
     }
     setIsSavingService(true);
@@ -1469,7 +1492,7 @@ export default function BookingsScreen() {
         setServices(prev => prev.map(s => s.id === editingService.id ? updatedService : s));
         handleCloseAddService();
         DeviceEventEmitter.emit('MERCHANT_SERVICES_UPDATED');
-        Alert.alert('Saved ✨', `"${updatedService.name}" updated successfully.`);
+        Alert.alert(tr('Saved ✨', 'Disimpan ✨'), tr(`"${updatedService.name}" updated successfully.`, `"${updatedService.name}" berjaya dikemas kini.`));
         return true;
       }
 
@@ -1580,10 +1603,10 @@ export default function BookingsScreen() {
       setServices(prev => [newService, ...prev]);
       handleCloseAddService();
       DeviceEventEmitter.emit('MERCHANT_SERVICES_UPDATED');
-      Alert.alert('Success 🎉', `"${newService.name}" has been added to your catalog.`);
+      Alert.alert(tr('Success 🎉', 'Berjaya 🎉'), tr(`"${newService.name}" has been added to your catalog.`, `"${newService.name}" telah ditambah ke katalog anda.`));
       return true;
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to add service.');
+      Alert.alert(tr('Error', 'Ralat'), err?.message || tr('Failed to add service.', 'Gagal menambah perkhidmatan.'));
       return false;
     } finally {
       setIsSavingService(false);
@@ -1597,7 +1620,7 @@ export default function BookingsScreen() {
     Clipboard.setString(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
-    Alert.alert('Link Copied! 📋', `Your booking page URL:\n${url}`);
+    Alert.alert(tr('Link Copied! 📋', 'Pautan Disalin! 📋'), tr(`Your booking page URL:\n${url}`, `URL halaman tempahan anda:\n${url}`));
   };
 
   const handleShare = async (platform: string) => {
@@ -2601,12 +2624,12 @@ export default function BookingsScreen() {
                 </View>
 
                 {/* Tagline Field */}
-                <Text style={[styles.brandingFieldLabel, { marginTop: 12 }]}>Store Tagline & Subtitle</Text>
+                <Text style={[styles.brandingFieldLabel, { marginTop: 12 }]}>{tr('Store Tagline & Subtitle', 'Slogan & Subtajuk Kedai')}</Text>
                 <View style={styles.taglineInputRow}>
                   <Ionicons name="pricetag-outline" size={18} color="#64748B" />
                   <TextInput
                     style={styles.taglineTextInput}
-                    placeholder="e.g. Handcrafted Gelato • Waffles • Desserts"
+                    placeholder={tr('e.g. Handcrafted Gelato • Waffles • Desserts', 'cth. Gelato Buatan Tangan • Wafel • Pencuci Mulut')}
                     value={customTagline}
                     onChangeText={(val) => {
                       setCustomTagline(val);
@@ -2778,7 +2801,7 @@ export default function BookingsScreen() {
       {/* Floating Action Help Button (FAB) */}
       <TouchableOpacity
         style={styles.fabHelpButton}
-        onPress={() => Alert.alert('Help Center', 'Need help with Booking Suite? Contact Risev support.')}
+        onPress={() => Alert.alert(tr('Help Center', 'Pusat Bantuan'), tr('Need help with Booking Suite? Contact Risev support.', 'Perlukan bantuan dengan Suite Tempahan? Hubungi sokongan Risev.'))}
         activeOpacity={0.85}
       >
         <Text style={styles.fabHelpText}>?</Text>
@@ -3403,7 +3426,7 @@ export default function BookingsScreen() {
                           activeOpacity={0.8}
                         >
                           <Ionicons name="add" size={14} color="#000" />
-                          <Text style={styles.btnAddStaffText}>Add Staff</Text>
+                          <Text style={styles.btnAddStaffText}>{tr('Add Staff', 'Tambah Kakitangan')}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -3414,7 +3437,7 @@ export default function BookingsScreen() {
                         <View style={styles.staffInputWrap}>
                           <TextInput
                             style={styles.staffInputField}
-                            placeholder="Staff or Provider Name..."
+                            placeholder={tr('Staff or Provider Name...', 'Nama Kakitangan atau Penyedia...')}
                             placeholderTextColor="#94A3B8"
                             value={newStaffInput}
                             onChangeText={setNewStaffInput}

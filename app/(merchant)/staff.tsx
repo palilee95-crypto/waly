@@ -23,6 +23,7 @@ import { colors, radii } from '@/theme';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAuth, StaffPermissions, defaultStaffPermissions } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTr } from '@/lib/i18n';
 import { handleSmartBack } from '@/lib/navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -211,6 +212,7 @@ export default function StaffManagementScreen() {
   const params = useLocalSearchParams<{ tab?: string; anomaly_staff_id?: string }>();
   const { user, fetchStaffPermissions } = useAuth();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -487,7 +489,7 @@ export default function StaffManagementScreen() {
     if (savingRoleTier) return;
     const titleTrimmed = roleFormTitle.trim();
     if (!titleTrimmed) {
-      Alert.alert('Role Title Required', 'Please enter a name for this role/tier.');
+      Alert.alert(tr('Role Title Required', 'Tajuk Peranan Diperlukan'), tr('Please enter a name for this role/tier.', 'Sila masukkan nama untuk peranan/tahap ini.'));
       return;
     }
 
@@ -520,7 +522,7 @@ export default function StaffManagementScreen() {
       }
 
       await saveRoles(updated);
-      Alert.alert('Saved', `Role tier "${titleTrimmed}" successfully saved!`);
+      Alert.alert(tr('Saved', 'Disimpan'), tr(`Role tier "${titleTrimmed}" successfully saved!`, `Tahap peranan "${titleTrimmed}" berjaya disimpan!`));
       if (returnToEditStaff) {
         setIsRolesPage(false);
         setIsEditingStaffPage(true);
@@ -1266,7 +1268,7 @@ export default function StaffManagementScreen() {
       try {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          Alert.alert(tr('Permission Denied', 'Kebenaran Ditolak'), tr('Permission to access photo gallery is required.', 'Kebenaran untuk mengakses galeri foto diperlukan.'));
           return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -1286,7 +1288,7 @@ export default function StaffManagementScreen() {
           });
         }
       } catch (err: any) {
-        Alert.alert('Error', 'Failed to pick image from library.');
+        Alert.alert(tr('Error', 'Ralat'), tr('Failed to pick image from library.', 'Gagal memilih imej daripada galeri.'));
       }
     }
   };
@@ -1375,8 +1377,8 @@ export default function StaffManagementScreen() {
       fetchStaff();
     } catch (err: any) {
       console.warn('Failed to save staff edit:', err);
-      const msg = err?.data?.message || err?.response?.message || err?.message || 'Failed to update staff profile.';
-      Alert.alert('Error', msg);
+      const msg = err?.data?.message || err?.response?.message || err?.message || tr('Failed to update staff profile.', 'Gagal mengemas kini profil kakitangan.');
+      Alert.alert(tr('Error', 'Ralat'), msg);
     } finally {
       setIsSavingStaff(false);
     }
@@ -1461,7 +1463,7 @@ export default function StaffManagementScreen() {
                     style={styles.editTextInput}
                     value={editName}
                     onChangeText={setEditName}
-                    placeholder="e.g. Hashiff"
+                    placeholder={tr('e.g. Hashiff', 'cth. Hashiff')}
                     placeholderTextColor="#94A3B8"
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
@@ -2261,7 +2263,7 @@ export default function StaffManagementScreen() {
                     style={styles.roleFormInput}
                     value={roleFormTitle}
                     onChangeText={setRoleFormTitle}
-                    placeholder="e.g. Senior Barber, Barista, Crew"
+                    placeholder={tr('e.g. Senior Barber, Barista, Crew', 'cth. Tukang Gunting Kanan, Barista, Kru')}
                     placeholderTextColor="#94A3B8"
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
@@ -2406,7 +2408,7 @@ export default function StaffManagementScreen() {
                     style={[styles.roleFormInput, { height: 72, textAlignVertical: 'top', paddingTop: 12 }]}
                     value={roleFormDesc}
                     onChangeText={setRoleFormDesc}
-                    placeholder="e.g. Lead specialist tier with 15% service sales commission."
+                    placeholder={tr('e.g. Lead specialist tier with 15% service sales commission.', 'cth. Tahap pakar utama dengan 15% komisen jualan perkhidmatan.')}
                     placeholderTextColor="#94A3B8"
                     multiline
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
