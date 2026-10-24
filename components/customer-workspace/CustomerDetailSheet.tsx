@@ -22,6 +22,7 @@ import {
 } from '@/lib/customer-workspace';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
 import { cleanCustomerName } from '@/lib/customer-name';
+import { useTr } from '@/lib/i18n';
 import LoyaltyCardBack, { inkOn } from '@/components/LoyaltyCardBack';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -32,6 +33,23 @@ const TYPE_LABEL: Record<string, string> = {
   points: 'Points earned',
   adjust: 'Adjustment',
 };
+
+function typeLabel(tr: (en: string, ms: string) => string, type: string): string {
+  switch (type) {
+    case 'earn':
+    case 'stamp':
+      return tr('Stamp earned', 'Setem diperoleh');
+    case 'spend':
+    case 'redeem':
+      return tr('Reward redeemed', 'Ganjaran ditebus');
+    case 'points':
+      return tr('Points earned', 'Mata diperoleh');
+    case 'adjust':
+      return tr('Adjustment', 'Pelarasan');
+    default:
+      return TYPE_LABEL[type] || type || tr('Activity', 'Aktiviti');
+  }
+}
 
 type Props = {
   visible: boolean;
@@ -50,6 +68,7 @@ export default function CustomerDetailSheet({
   onClose,
   onDeleted,
 }: Props) {
+  const tr = useTr();
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,21 +202,21 @@ export default function CustomerDetailSheet({
                 {displayName}
               </Text>
               <Text style={styles.subtitle} numberOfLines={1}>
-                {detail?.phone || phone || 'No phone on file'}
+                {detail?.phone || phone || tr('No phone on file', 'Tiada nombor telefon')}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setShowActions((value) => !value)} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Customer actions">
+            <TouchableOpacity onPress={() => setShowActions((value) => !value)} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={tr('Customer actions', 'Tindakan pelanggan')}>
               <Ionicons name="ellipsis-horizontal" size={18} color={colors.black} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Close customer details">
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={tr('Close customer details', 'Tutup butiran pelanggan')}>
               <Ionicons name="close" size={18} color={colors.black} />
             </TouchableOpacity>
           </View>
 
           {showActions ? (
-            <TouchableOpacity style={styles.actionMenuItem} onPress={remove} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Remove customer from this store">
+            <TouchableOpacity style={styles.actionMenuItem} onPress={remove} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={tr('Remove customer from this store', 'Alih keluar pelanggan dari kedai ini')}>
               <Ionicons name="trash-outline" size={17} color={colors.error.dark} />
-              <Text style={styles.actionMenuText}>Remove from this store</Text>
+              <Text style={styles.actionMenuText}>{tr('Remove from this store', 'Alih keluar dari kedai ini')}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -245,23 +264,23 @@ export default function CustomerDetailSheet({
               <View style={styles.statRow}>
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{detail.points.toLocaleString('en-MY')}</Text>
-                  <Text style={styles.statLabel}>Points</Text>
+                  <Text style={styles.statLabel}>{tr('Points', 'Mata')}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{detail.completions}</Text>
-                  <Text style={styles.statLabel}>Rewards</Text>
+                  <Text style={styles.statLabel}>{tr('Rewards', 'Ganjaran')}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{detail.vouchers}</Text>
-                  <Text style={styles.statLabel}>Vouchers</Text>
+                  <Text style={styles.statLabel}>{tr('Vouchers', 'Baucar')}</Text>
                 </View>
               </View>
 
-              <Text style={styles.sectionLabel}>Recent activity</Text>
+              <Text style={styles.sectionLabel}>{tr('Recent activity', 'Aktiviti terkini')}</Text>
               {detail.activity.length === 0 ? (
-                <Text style={styles.emptyText}>No visits recorded yet.</Text>
+                <Text style={styles.emptyText}>{tr('No visits recorded yet.', 'Belum ada lawatan direkodkan.')}</Text>
               ) : (
                 <View style={styles.activityList}>
                   {detail.activity.map((item, index) => {
@@ -283,12 +302,12 @@ export default function CustomerDetailSheet({
                         <View style={styles.activityCopy}>
                           <View style={styles.activityHeading}>
                             <Text style={styles.activityTitle} numberOfLines={1}>
-                              {TYPE_LABEL[item.type] || item.type || 'Activity'}
+                              {typeLabel(tr, item.type)}
                             </Text>
                             <Text style={styles.activityDate}>{formatShortDateFromIso(item.created)}</Text>
                           </View>
                           <Text style={styles.activityMeta} numberOfLines={2}>
-                            {impact || (isReward ? 'Reward claimed' : 'Loyalty activity')}
+                            {impact || (isReward ? tr('Reward claimed', 'Ganjaran ditebus') : tr('Loyalty activity', 'Aktiviti kesetiaan'))}
                             {' · '}{relativeDays(item.created)}
                           </Text>
                         </View>
@@ -298,7 +317,7 @@ export default function CustomerDetailSheet({
                             style={styles.editBillBtn}
                             activeOpacity={0.75}
                             accessibilityRole="button"
-                            accessibilityLabel="Edit bill amount"
+                            accessibilityLabel={tr('Edit bill amount', 'Edit jumlah bil')}
                           >
                             <Ionicons name="pencil" size={14} color={colors.black} />
                           </TouchableOpacity>
@@ -315,9 +334,9 @@ export default function CustomerDetailSheet({
 
           {editingTxn ? (
             <View style={styles.billPanel}>
-              <Text style={styles.confirmTitle}>Edit bill amount</Text>
+              <Text style={styles.confirmTitle}>{tr('Edit bill amount', 'Edit jumlah bil')}</Text>
               <Text style={styles.confirmText}>
-                Correct the sale total. Stamps and points already credited stay unchanged.
+                {tr('Correct the sale total. Stamps and points already credited stay unchanged.', 'Betulkan jumlah jualan. Setem dan mata yang telah dikreditkan kekal tidak berubah.')}
               </Text>
               <TextInput
                 style={styles.billInput}
@@ -336,7 +355,7 @@ export default function CustomerDetailSheet({
                   disabled={savingBill}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.secondaryText}>Cancel</Text>
+                  <Text style={styles.secondaryText}>{tr('Cancel', 'Batal')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.dangerBtn}
@@ -347,7 +366,7 @@ export default function CustomerDetailSheet({
                   {savingBill ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.dangerText}>Save bill</Text>
+                    <Text style={styles.dangerText}>{tr('Save bill', 'Simpan bil')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -356,14 +375,14 @@ export default function CustomerDetailSheet({
 
           {confirming ? (
             <View style={styles.confirmPanel}>
-              <Text style={styles.confirmTitle}>Remove this customer?</Text>
-              <Text style={styles.confirmText}>They will be removed from this store only. Their other stores stay unchanged.</Text>
+              <Text style={styles.confirmTitle}>{tr('Remove this customer?', 'Alih keluar pelanggan ini?')}</Text>
+              <Text style={styles.confirmText}>{tr('They will be removed from this store only. Their other stores stay unchanged.', 'Mereka hanya akan dialih keluar dari kedai ini. Kedai lain tidak berubah.')}</Text>
               <View style={styles.confirmActions}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setConfirming(false)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Cancel removal">
-                  <Text style={styles.secondaryText}>Cancel</Text>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setConfirming(false)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={tr('Cancel removal', 'Batal alih keluar')}>
+                  <Text style={styles.secondaryText}>{tr('Cancel', 'Batal')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.dangerBtn, styles.dangerBtnArmed]} onPress={remove} disabled={deleting} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Confirm remove customer">
-                  {deleting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.dangerText}>Remove customer</Text>}
+                <TouchableOpacity style={[styles.dangerBtn, styles.dangerBtnArmed]} onPress={remove} disabled={deleting} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={tr('Confirm remove customer', 'Sahkan alih keluar pelanggan')}>
+                  {deleting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.dangerText}>{tr('Remove customer', 'Alih keluar pelanggan')}</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -373,10 +392,10 @@ export default function CustomerDetailSheet({
               onPress={openChat}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel={`Chat with ${displayName}`}
+              accessibilityLabel={tr(`Chat with ${displayName}`, `Sembang dengan ${displayName}`)}
             >
               <Ionicons name="logo-whatsapp" size={15} color={colors.black} />
-              <Text style={styles.secondaryText}>Chat with customer</Text>
+              <Text style={styles.secondaryText}>{tr('Chat with customer', 'Sembang dengan pelanggan')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
