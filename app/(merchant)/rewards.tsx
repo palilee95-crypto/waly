@@ -172,6 +172,7 @@ export default function UnifiedRewardsScreen() {
     is_active: true,
   });
   const [savingBirthday, setSavingBirthday] = useState(false);
+  const [runningBirthday, setRunningBirthday] = useState(false);
   const [showAdvancedMessages, setShowAdvancedMessages] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
@@ -827,6 +828,8 @@ export default function UnifiedRewardsScreen() {
         expiry_days: expiryDays,
         send_time: birthdayForm.send_time,
         is_active: birthdayForm.is_active,
+        gift_item: selectedBirthdayItem && selectedBirthdayItem.id && !String(selectedBirthdayItem.id).startsWith('demo_') ? selectedBirthdayItem.id : '',
+        gift_item_name: selectedBirthdayItem?.name || finalTitle,
       };
 
       if (birthdayReward && birthdayReward.id) {
@@ -842,8 +845,8 @@ export default function UnifiedRewardsScreen() {
       Alert.alert(
         locale === 'en' ? 'Birthday Reward Saved' : 'Ganjaran Hari Jadi Disimpan',
         locale === 'en'
-          ? 'Your birthday reward has been saved and is now active in your Rewards Catalog!'
-          : 'Ganjaran hari jadi telah disimpan dan kini aktif dalam Katalog Ganjaran!',
+          ? 'Your birthday pass is live. It is sent automatically to verified customers and stays out of your redeemable catalogue.'
+          : 'Pas hari jadi anda telah aktif. Ia dihantar secara automatik kepada pelanggan yang disahkan dan tidak disenaraikan dalam katalog tebusan.',
         [
           { text: locale === 'en' ? 'Stay Here' : 'Kekal di Sini', style: 'cancel' },
           {
@@ -857,6 +860,27 @@ export default function UnifiedRewardsScreen() {
       Alert.alert('Error', err.message || 'Failed to save birthday reward.');
     } finally {
       setSavingBirthday(false);
+    }
+  };
+
+  const handleRunBirthdayNow = async () => {
+    if (!user?.merchant_id) return;
+    setRunningBirthday(true);
+    try {
+      const res = await pb.send<{ sent?: number; skipped?: number; failed?: number }>('/api/risev/merchant/birthdays/test', {
+        method: 'POST',
+        requestKey: null,
+      });
+      Alert.alert(
+        locale === 'en' ? 'Birthday run complete' : 'Proses hari jadi selesai',
+        locale === 'en'
+          ? `Sent ${res?.sent || 0} · Skipped ${res?.skipped || 0} · Failed ${res?.failed || 0}. Only verified customers with a birthday today (or inside the window) receive a pass.`
+          : `Dihantar ${res?.sent || 0} · Dilangkau ${res?.skipped || 0} · Gagal ${res?.failed || 0}.`
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Could not run the birthday engine.');
+    } finally {
+      setRunningBirthday(false);
     }
   };
 
@@ -7092,6 +7116,31 @@ export default function UnifiedRewardsScreen() {
                       ) : (
                         <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }}>
                           {locale === 'en' ? 'Save Changes' : 'Simpan Perubahan'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        height: 46,
+                        borderRadius: 9999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                        marginTop: 10,
+                        opacity: runningBirthday ? 0.6 : 1,
+                      }}
+                      onPress={handleRunBirthdayNow}
+                      disabled={runningBirthday}
+                      activeOpacity={0.8}
+                    >
+                      {runningBirthday ? (
+                        <ActivityIndicator size="small" color="#050505" />
+                      ) : (
+                        <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#334155' }}>
+                          {locale === 'en' ? 'Send today’s birthday passes now' : 'Hantar pas hari jadi hari ini'}
                         </Text>
                       )}
                     </TouchableOpacity>
