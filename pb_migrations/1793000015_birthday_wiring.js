@@ -80,9 +80,11 @@ migrate((app) => {
     const logs = app.findCollectionByNameOrId("birthday_logs");
     logs.listRule = "customer = @request.auth.id || merchant.owner = @request.auth.id";
     logs.viewRule = "customer = @request.auth.id || merchant.owner = @request.auth.id";
-    logs.createRule = null;
-    logs.updateRule = null;
-    logs.deleteRule = null;
+    // JSVM maps `null` to "" (public), so use an always-false rule to make
+    // these server-only. Hooks bypass API rules, so $app.save still works.
+    logs.createRule = "@request.auth.id = '__server_only__'";
+    logs.updateRule = logs.createRule;
+    logs.deleteRule = logs.createRule;
     logs.indexes = logs.indexes || [];
     let logIdField = null;
     try { logIdField = logs.fields.getByName("id"); } catch (err) {}
