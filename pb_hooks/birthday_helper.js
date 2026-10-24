@@ -1,6 +1,17 @@
 /// <reference path="../pb_data/types.d.ts" />
 // pb_hooks/birthday_helper.js
-// Daily birthday reward automation logic (In-App Vouchers / Bonus Stamps + Web Push).
+// Daily birthday reward automation (in-app voucher / bonus stamps + web push).
+//
+// Rules this file enforces:
+//  - Only verified, non-shadow customers (shadow/quick accounts never logged in).
+//  - One birthday per customer per merchant per calendar year, guarded by
+//    idx_birthday_logs_unique (customer, merchant, year).
+//  - The voucher links to a dedicated `rewards` record with reward_scope
+//    "system", so it shows the right gift and never appears as a redeemable
+//    catalogue reward.
+//  - `expiry_days` is the validity WINDOW, centred on the birthday: 3 days
+//    means issue the day before and redeem through the day after. The cron
+//    sends on the window's opening day at the configured hour (MY time).
 
 function getNowMY() {
   const now = new Date();
@@ -17,127 +28,196 @@ function generateVoucherCode() {
   return code;
 }
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+/** A day shift that keeps the MY wall-clock fields intact. */
+function addDaysMY(y, m, d, n) {
+  const dt = new Date(y, m, d + n);
+  return {
+    year: dt.getFullYear(),
+    month: dt.getMonth(),
+    day: dt.getDate(),
+  };
+}
+
+/**
+ * The reward that backs the birthday voucher. One per merchant, scope "system"
+ * so the redeemable catalogue never lists it. Safe to call repeatedly.
+ */
+function ensureBirthdayReward(config) {
+  const merchantId = config.getString("merchant");
+  if (!merchantId) throw new Error("birthday config has no merchant");
+
+  const title = config.getString("title") || "Birthday Reward";
+  const description = config.getString("description") || "";
+  const linkedId = config.getString("reward");
+
+  if (linkedId) {
+    try {
+      const linked = $app.findRecordById("rewards", linkedId);
+      let changed = false;
+      if (linked.getString("name") !== title) { linked.set("name", title); changed = true; }
+      if (linked.getString("description") !== description) { linked.set("description", description); changed = true; }
+      if (!linked.getBool("is_active")) { linked.set("is_active", true); changed = true; }
+      if (changed) $app.save(linked);
+      return linked;
+    } catch (err) {
+      // Link points at a deleted reward; fall through and recreate it.
+    }
+  }
+
+  const col = $app.findCollectionByNameOrId("rewards");
+  const reward = new Record(col);
+  reward.set("merchant", merchantId);
+  reward.set("name", title);
+  reward.set("description", description);
+  reward.set("points_cost", 1);
+  reward.set("stock", 1000000);
+  reward.set("is_active", true);
+  reward.set("reward_scope", "system");
+  reward.set("type", "free_item");
+  reward.set("discount_type", "none");
+  reward.set("applicable_items_text", config.getString("gift_item_name") || config.getString("reward_value") || title);
+  $app.save(reward);
+
+  config.set("reward", reward.id);
+  $app.save(config);
+  return reward;
+}
+
+function sendBirthdayPush(customerId, merchantName, payload, tag) {
+  try {
+    const pushHelper = require(`${__hooks}/push_notify.js`);
+    pushHelper.sendPushToUser(customerId, {
+      title: `Happy Birthday from ${merchantName}! 🎂🎉`,
+      body: payload,
+      url: "/(customer)/vouchers",
+      tag: tag,
+    });
+  } catch (pushErr) {
+    console.log("[BIRTHDAY PUSH NOTICE]", pushErr.message || pushErr);
+  }
+}
+
 function processBirthdayRewards(options) {
   options = options || {};
   const isForce = !!options.force;
   const targetMerchantId = options.merchantId || null;
 
   const myDate = getNowMY();
-  const currentYear = myDate.getFullYear();
-  const m = String(myDate.getMonth() + 1).padStart(2, "0");
-  const d = String(myDate.getDate()).padStart(2, "0");
-  const monthDay = `-${m}-${d}`;
   const currentHour = myDate.getHours();
-  const currentMinute = myDate.getMinutes();
-  const currentTime = `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`;
+  const todayY = myDate.getFullYear();
+  const todayM = myDate.getMonth();
+  const todayD = myDate.getDate();
 
-  // Find active birthday rewards
-  let rewardFilter = "is_active = true";
+  let filter = "is_active = true";
   if (targetMerchantId) {
-    rewardFilter += ` && merchant = "${targetMerchantId}"`;
+    filter += ` && merchant = "${targetMerchantId}"`;
   }
 
-  let rewards = [];
+  let configs = [];
   try {
-    rewards = $app.findRecordsByFilter(
-      "birthday_rewards",
-      rewardFilter,
-      "created",
-      500,
-      0
-    );
+    // Newest first; only the latest config per merchant is honoured so a stale
+    // duplicate cannot issue a second, different gift for the same year.
+    configs = $app.findRecordsByFilter("birthday_rewards", filter, "-created", 500, 0);
   } catch (err) {
     console.log("[BIRTHDAY RUNNER] Error fetching birthday rewards:", err.message || err);
     return { error: err.message || err };
   }
 
+  const seenMerchants = {};
   let sent = 0;
   let failed = 0;
   let skipped = 0;
 
-  for (let i = 0; i < rewards.length; i++) {
-    const reward = rewards[i];
-    const merchantId = reward.getString("merchant");
+  for (let i = 0; i < configs.length; i++) {
+    const config = configs[i];
+    const merchantId = config.getString("merchant");
     if (!merchantId) continue;
+    if (seenMerchants[merchantId]) continue;
+    seenMerchants[merchantId] = true;
 
-    // Check scheduled send_time hour unless force is enabled
-    const sendTime = reward.getString("send_time") || "09:00";
-    if (!isForce) {
-      const parts = sendTime.split(":");
-      const targetHour = parseInt(parts[0], 10) || 9;
-      if (currentHour < targetHour) {
-        continue;
-      }
+    const sendTime = config.getString("send_time") || "09:00";
+    const targetHour = parseInt(sendTime.split(":")[0], 10);
+    if (!isForce && currentHour < (isNaN(targetHour) ? 9 : targetHour)) {
+      continue;
     }
 
-    let merchantRecord = null;
     let merchantName = "Your favourite store";
     try {
-      merchantRecord = $app.findRecordById("merchants", merchantId);
-      merchantName = merchantRecord.getString("name") || merchantName;
+      merchantName = $app.findRecordById("merchants", merchantId).getString("name") || merchantName;
     } catch (mErr) {
       continue;
     }
 
-    // Find customers whose birthday matches month and day (-MM-DD) and are verified
+    let reward = null;
+    try {
+      reward = ensureBirthdayReward(config);
+    } catch (rErr) {
+      console.log("[BIRTHDAY RUNNER] Could not prepare reward:", rErr.message || rErr);
+      failed++;
+      continue;
+    }
+
+    // Window: N days centred on the birthday. N=3 issues the day before.
+    const windowDays = Math.max(1, config.getInt("expiry_days") || 3);
+    const daysBefore = Math.floor((windowDays - 1) / 2);
+    const daysAfter = windowDays - 1 - daysBefore;
+    const bday = addDaysMY(todayY, todayM, todayD, daysBefore);
+    const birthdayMD = `-${pad2(bday.month + 1)}-${pad2(bday.day)}`;
+    const birthdayYear = bday.year;
+
+    // End of the last valid day, in MY time (UTC+8) -> 15:59:59Z.
+    const expiryIso = new Date(Date.UTC(bday.year, bday.month, bday.day + daysAfter, 15, 59, 59)).toISOString();
+
     let customers = [];
     try {
       customers = $app.findRecordsByFilter(
         "users",
-        `birthday ~ "${monthDay}" && verified = true`,
+        `birthday ~ "${birthdayMD}" && verified = true`,
         "created",
         500,
         0
       );
     } catch (cErr) {
-      console.log(`[BIRTHDAY RUNNER] Error querying users with birthday ~ "${monthDay}":`, cErr.message || cErr);
+      console.log(`[BIRTHDAY RUNNER] Error querying birthday ~ "${birthdayMD}":`, cErr.message || cErr);
       continue;
     }
+
+    const title = config.getString("title") || "Birthday Reward";
+    const description = config.getString("description") || `Birthday reward from ${merchantName}`;
+    const giftName = config.getString("gift_item_name") || config.getString("reward_value") || title;
+    const rewardType = config.getString("reward_type") || "voucher_code";
 
     for (let c = 0; c < customers.length; c++) {
       const customer = customers[c];
       const customerId = customer.id;
-      const bdayRaw = customer.getString("birthday") || "";
+      const bdayRaw = (customer.getString("birthday") || "").substring(0, 10);
       const email = customer.getString("email") || "";
 
-      // Strict verification gate: Only verified accounts are eligible for birthday rewards
-      if (!customer.getBool("verified")) {
+      if (!customer.getBool("verified")) { skipped++; continue; }
+      if (!bdayRaw.endsWith(birthdayMD)) { skipped++; continue; }
+      // Shadow/quick accounts never completed signup, so their placeholder
+      // birthday must never earn a reward.
+      if (email.startsWith("shadow_") || email.startsWith("quick_") || email.endsWith("@risev.app")) {
         skipped++;
         continue;
       }
 
-      // Strict validation on month and day
-      const cleanBday = bdayRaw.substring(0, 10);
-      if (!cleanBday.endsWith(monthDay)) {
-        skipped++;
-        continue;
-      }
-
-      // Exclude placeholder 2000-01-01 sentinels and shadow accounts
-      const isShadow = email.startsWith("shadow_") || email.startsWith("quick_") || email.endsWith("@risev.app");
-      if (cleanBday === "2000-01-01" || isShadow) {
-        skipped++;
-        continue;
-      }
-
-      // Check if already rewarded this calendar year for this merchant
-      let existingLogs = [];
+      let existing = [];
       try {
-        existingLogs = $app.findRecordsByFilter(
+        existing = $app.findRecordsByFilter(
           "birthday_logs",
-          `customer = "${customerId}" && merchant = "${merchantId}" && year = ${currentYear}`,
+          `customer = "${customerId}" && merchant = "${merchantId}" && year = ${birthdayYear}`,
           "created",
           1,
           0
         );
       } catch (lErr) {}
+      if (existing && existing.length > 0) { skipped++; continue; }
 
-      if (existingLogs && existingLogs.length > 0) {
-        skipped++;
-        continue;
-      }
-
-      // Verify customer has loyalty card relationship with this merchant
       let cards = [];
       try {
         cards = $app.findRecordsByFilter(
@@ -148,35 +228,20 @@ function processBirthdayRewards(options) {
           0
         );
       } catch (cardErr) {}
-
-      if (!cards || cards.length === 0) {
-        skipped++;
-        continue;
-      }
+      if (!cards || cards.length === 0) { skipped++; continue; }
       const card = cards[0];
-
-      const rewardType = reward.getString("reward_type") || "voucher_code";
-      const rewardValue = reward.getString("reward_value") || "";
-      const title = reward.getString("title") || "Birthday Reward";
-      const description = reward.getString("description") || `Birthday reward from ${merchantName}`;
-      const expiryDays = reward.getInt("expiry_days") || 7;
-      const expiryDate = new Date(myDate.getTime() + expiryDays * 86400000);
-      const expiryIso = expiryDate.toISOString();
 
       let voucherId = null;
       let voucherCode = null;
 
       try {
         if (rewardType === "stamps") {
-          // --- BONUS STAMPS REWARD ---
-          const numStamps = parseInt(rewardValue, 10) || 1;
+          const numStamps = parseInt(config.getString("reward_value"), 10) || 1;
           const currentStamps = parseInt(card.get("stamps_collected") || 0, 10);
-          const totalStamps = currentStamps + numStamps;
-          card.set("stamps_collected", totalStamps);
+          card.set("stamps_collected", currentStamps + numStamps);
           card.set("last_activity", new Date().toISOString().replace("T", " ").substring(0, 19));
           $app.save(card);
 
-          // Record earn transaction
           const txnCol = $app.findCollectionByNameOrId("transactions");
           const txn = new Record(txnCol);
           txn.set("id", $security.randomString(15).toLowerCase());
@@ -193,7 +258,6 @@ function processBirthdayRewards(options) {
           }));
           $app.save(txn);
         } else {
-          // --- DIGITAL VOUCHER CODE REWARD ---
           voucherCode = generateVoucherCode();
           const voucherCol = $app.findCollectionByNameOrId("vouchers");
           const voucher = new Record(voucherCol);
@@ -202,89 +266,41 @@ function processBirthdayRewards(options) {
           voucher.set("code", voucherCode);
           voucher.set("status", "active");
           voucher.set("expires_at", expiryIso);
-
-          // Link merchant catalog reward if one exists, or provision a backing reward record
-          let rewardId = null;
-          try {
-            const catalogRewards = $app.findRecordsByFilter(
-              "rewards",
-              `merchant = "${merchantId}"`,
-              "-created",
-              1,
-              0
-            );
-            if (catalogRewards.length > 0) {
-              rewardId = catalogRewards[0].id;
-            } else {
-              const rewardsCol = $app.findCollectionByNameOrId("rewards");
-              const r = new Record(rewardsCol);
-              r.set("merchant", merchantId);
-              r.set("name", title || "Birthday Reward");
-              r.set("description", description || `Birthday reward from ${merchantName}`);
-              r.set("points_cost", 1);
-              r.set("stock", 1000000);
-              r.set("is_active", true);
-              r.set("reward_scope", "system");
-              r.set("type", rewardType === "discount_percent" ? "discount" : "free_item");
-              r.set("discount_value", parseFloat(rewardValue) || 0);
-              $app.save(r);
-              rewardId = r.id;
-            }
-          } catch (rErr) {
-            console.log("[BIRTHDAY RUNNER] Reward link error:", rErr.message || rErr);
-          }
-
-          if (rewardId) {
-            voucher.set("reward", rewardId);
-          }
-
+          voucher.set("reward", reward.id);
           voucher.set("metadata", JSON.stringify({
             merchant_id: merchantId,
             merchant_name: merchantName,
+            reward_id: reward.id,
             title: title,
             description: description,
-            reward_type: rewardType,
-            reward_value: rewardValue,
-            source: "birthday_reward"
+            reward_type: "voucher_code",
+            discount_type: "none",
+            discount_value: "",
+            applicable_items_text: giftName,
+            discount_scope: "all",
+            source: "birthday_reward",
+            birthday_year: birthdayYear,
+            valid_until: expiryIso
           }));
           $app.save(voucher);
           voucherId = voucher.id;
         }
 
-        // Create birthday log entry
         const logCol = $app.findCollectionByNameOrId("birthday_logs");
         const log = new Record(logCol);
         log.set("id", $security.randomString(15).toLowerCase());
         log.set("customer", customerId);
         log.set("merchant", merchantId);
-        log.set("reward", reward.id);
-        if (voucherId) {
-          log.set("voucher", voucherId);
-        }
-        log.set("year", currentYear);
+        log.set("reward", config.id);
+        if (voucherId) log.set("voucher", voucherId);
+        log.set("year", birthdayYear);
         log.set("status", "sent");
         $app.save(log);
 
-        // Send Push Notification
-        try {
-          const pushHelper = require(`${__hooks}/push_notify.js`);
-          const pushTitle = `Happy Birthday from ${merchantName}! 🎂🎉`;
-          let pushBody = "";
-          if (rewardType === "stamps") {
-            const numStamps = parseInt(rewardValue, 10) || 1;
-            pushBody = `We gifted you ${numStamps} bonus stamp${numStamps > 1 ? "s" : ""} to celebrate your special day!`;
-          } else {
-            pushBody = `Special treat for you: ${title}. Tap to view your voucher code (${voucherCode})!`;
-          }
-          pushHelper.sendPushToUser(customerId, {
-            title: pushTitle,
-            body: pushBody,
-            url: rewardType === "stamps" ? "/(customer)" : "/(customer)/vouchers",
-            tag: `birthday-${merchantId}-${currentYear}`
-          });
-        } catch (pushErr) {
-          console.log("[BIRTHDAY PUSH NOTICE]", pushErr.message || pushErr);
-        }
+        const pushBody = rewardType === "stamps"
+          ? `We gifted you ${parseInt(config.getString("reward_value"), 10) || 1} bonus stamps to celebrate your special day!`
+          : `${title} is waiting in your wallet${voucherCode ? ` (code ${voucherCode})` : ""}. Valid until ${expiryIso.substring(0, 10)}.`;
+        sendBirthdayPush(customerId, merchantName, pushBody, `birthday-${merchantId}-${birthdayYear}`);
 
         sent++;
       } catch (procErr) {
@@ -295,16 +311,16 @@ function processBirthdayRewards(options) {
   }
 
   return {
-    date: `${myDate.getFullYear()}-${m}-${d}`,
-    time: currentTime,
+    date: `${todayY}-${pad2(todayM + 1)}-${pad2(todayD)}`,
     sent: sent,
     failed: failed,
-    skipped: skipped
+    skipped: skipped,
   };
 }
 
 module.exports = {
   getNowMY,
   generateVoucherCode,
+  ensureBirthdayReward,
   processBirthdayRewards,
 };
