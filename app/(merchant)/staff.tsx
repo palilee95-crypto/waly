@@ -770,7 +770,6 @@ export default function StaffManagementScreen() {
       if (rawPerms) {
         setPermissionsState({
           can_view_analytics: !!rawPerms.can_view_analytics,
-          can_view_marketing: !!rawPerms.can_view_marketing,
           can_manage_rewards: !!rawPerms.can_manage_rewards,
           can_manage_customers: !!rawPerms.can_manage_customers,
           can_edit_store_profile: !!rawPerms.can_edit_store_profile,
@@ -2852,25 +2851,6 @@ export default function StaffManagementScreen() {
 
                     <View style={styles.groupedDivider} />
 
-                    {/* WhatsApp & Marketing */}
-                    <View style={styles.permSwitchRow}>
-                      <View style={[styles.groupedIconCircle, { backgroundColor: '#DCFCE7' }]}>
-                        <Ionicons name="logo-whatsapp" size={18} color="#16A34A" />
-                      </View>
-                      <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.groupedRowTitle}>Marketing & Broadcasts</Text>
-                        <Text style={styles.groupedRowSubtitle}>Allow sending WhatsApp promotions and campaign blasts</Text>
-                      </View>
-                      <Switch
-                        value={permissionsState.can_view_marketing ?? false}
-                        onValueChange={(val) => handleTogglePermission('can_view_marketing', val)}
-                        trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
-                        thumbColor={permissionsState.can_view_marketing ? '#050505' : '#FFFFFF'}
-                      />
-                    </View>
-
-                    <View style={styles.groupedDivider} />
-
                     {/* Sales & Analytics */}
                     <View style={styles.permSwitchRow}>
                       <View style={[styles.groupedIconCircle, { backgroundColor: '#F1F5F9' }]}>
@@ -4746,32 +4726,7 @@ export default function StaffManagementScreen() {
 
               <View style={styles.permDivider} />
 
-              {/* 2. WhatsApp Marketing */}
-              <View style={styles.permRow}>
-                <View style={[styles.permIconBg, { backgroundColor: '#DCFCE7' }]}>
-                  <Ionicons name="logo-whatsapp" size={18} color="#16A34A" />
-                </View>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={styles.permTitle}>
-                    {locale === 'en' ? 'WhatsApp Blasts & Campaigns' : 'Hebahan WhatsApp & Kempen'}
-                  </Text>
-                  <Text style={styles.permSubtitle}>
-                    {locale === 'en'
-                      ? 'Allow staff to send broadcast messages, create templates, and trigger automations.'
-                      : 'Benarkan staf menghantar mesej hebahan, cipta templat, dan memulakan automasi.'}
-                  </Text>
-                </View>
-                <Switch
-                  value={permissionsState.can_view_marketing ?? false}
-                  onValueChange={(val) => handleTogglePermission('can_view_marketing', val)}
-                  trackColor={{ false: '#CBD5E1', true: '#FFC700' }}
-                  thumbColor={permissionsState.can_view_marketing ? '#050505' : '#FFFFFF'}
-                />
-              </View>
-
-              <View style={styles.permDivider} />
-
-              {/* 3. Loyalty Programs & Rewards */}
+              {/* 2. Loyalty Programs & Rewards */}
               <View style={styles.permRow}>
                 <View style={[styles.permIconBg, { backgroundColor: '#FEF3C7' }]}>
                   <Ionicons name="gift" size={18} color="#D97706" />
