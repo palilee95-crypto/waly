@@ -2133,7 +2133,7 @@ export default function BookingsScreen() {
                               ) : (
                                 <>
                                   <Ionicons name="checkmark-done" size={16} color="#000" />
-                                  <Text style={styles.btnPrimaryActionText}>Complete Booking</Text>
+                                  <Text style={styles.btnPrimaryActionText} numberOfLines={1}>Complete Booking</Text>
                                 </>
                               )}
                             </TouchableOpacity>
@@ -2141,7 +2141,7 @@ export default function BookingsScreen() {
 
                           {b.status === 'booked' && (
                             <>
-                              {b.booking_date === localToday ? (
+                              {b.booking_date === localToday && (
                                 <TouchableOpacity
                                   style={styles.btnPrimaryAction}
                                   onPress={() => handleUpdateStatus(b.id, 'arrived')}
@@ -2153,15 +2153,10 @@ export default function BookingsScreen() {
                                   ) : (
                                     <>
                                       <Ionicons name="location" size={16} color="#000" />
-                                      <Text style={styles.btnPrimaryActionText}>Mark Arrived</Text>
+                                      <Text style={styles.btnPrimaryActionText} numberOfLines={1}>Mark Arrived</Text>
                                     </>
                                   )}
                                 </TouchableOpacity>
-                              ) : (
-                                <View style={[styles.btnSecondaryAction, { flex: 1 }]}>
-                                  <Ionicons name="calendar-outline" size={15} color="#64748B" />
-                                  <Text style={[styles.btnSecondaryActionText, { color: '#64748B' }]}>Arrives {b.booking_date}</Text>
-                                </View>
                               )}
 
                               <TouchableOpacity
@@ -2171,7 +2166,7 @@ export default function BookingsScreen() {
                                 activeOpacity={0.85}
                               >
                                 <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
-                                <Text style={styles.btnDangerActionText}>No Show</Text>
+                                <Text style={styles.btnDangerActionText} numberOfLines={1}>No Show</Text>
                               </TouchableOpacity>
                             </>
                           )}
@@ -2184,7 +2179,7 @@ export default function BookingsScreen() {
                                 activeOpacity={0.85}
                               >
                                 <Ionicons name="logo-whatsapp" size={16} color="#16A34A" />
-                                <Text style={[styles.btnSecondaryActionText, { color: '#16A34A' }]}>Reschedule WA</Text>
+                                <Text style={[styles.btnSecondaryActionText, { color: '#16A34A' }]} numberOfLines={1}>Reschedule WA</Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
@@ -2194,7 +2189,7 @@ export default function BookingsScreen() {
                                 activeOpacity={0.85}
                               >
                                 <Ionicons name="refresh-outline" size={15} color="#050505" />
-                                <Text style={styles.btnSecondaryActionText}>Reopen</Text>
+                                <Text style={styles.btnSecondaryActionText} numberOfLines={1}>Reopen</Text>
                               </TouchableOpacity>
                             </>
                           )}
@@ -2206,7 +2201,7 @@ export default function BookingsScreen() {
                               activeOpacity={0.85}
                             >
                               <Ionicons name="logo-whatsapp" size={16} color="#000" />
-                              <Text style={styles.btnSecondaryActionText}>WhatsApp</Text>
+                              <Text style={styles.btnSecondaryActionText} numberOfLines={1}>WhatsApp</Text>
                             </TouchableOpacity>
                           )}
 
@@ -2217,7 +2212,7 @@ export default function BookingsScreen() {
                               activeOpacity={0.85}
                             >
                               <Ionicons name="calendar-outline" size={16} color="#000" />
-                              <Text style={styles.btnSecondaryActionText}>Edit</Text>
+                              <Text style={styles.btnSecondaryActionText} numberOfLines={1}>Edit</Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -4772,56 +4767,65 @@ const styles = StyleSheet.create({
 
   bookingActionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    marginTop: 2,
   },
   btnPrimaryAction: {
-    flex: 1.4,
+    flexBasis: '100%',
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#FFC700',
-    paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
+    paddingHorizontal: 12,
   },
   btnPrimaryActionText: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: '#000000',
   },
   btnSecondaryAction: {
     flex: 1,
+    minWidth: 0,
+    height: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 10,
+    borderColor: '#E8EDF3',
     borderRadius: 12,
+    paddingHorizontal: 8,
   },
   btnSecondaryActionText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#050505',
+    color: '#334155',
+    flexShrink: 1,
   },
   btnDangerAction: {
-    paddingHorizontal: 12,
+    flex: 1,
+    minWidth: 0,
+    height: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#FEF2F2',
+    gap: 5,
+    backgroundColor: '#FFF1F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingVertical: 10,
+    borderColor: '#FECDD3',
     borderRadius: 12,
+    paddingHorizontal: 8,
   },
   btnDangerActionText: {
     fontSize: 11,
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#DC2626',
+    flexShrink: 1,
   },
 
   // Next Appointments

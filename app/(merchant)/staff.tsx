@@ -1393,7 +1393,7 @@ export default function StaffManagementScreen() {
                 <View style={{ flex: 1, marginLeft: 16 }}>
                   <Text style={styles.editHeroName}>{editName || editingMember?.name || 'Staff'}</Text>
                   <Text style={styles.editHeroSubtitle}>
-                    {editRoleTitle || 'Provider'} • {editingMember?.branch_name || 'Scoop creamy (HQ)'}
+                    {editRoleTitle || 'Provider'} • {editingMember?.branch_name || 'All Branches (HQ)'}
                   </Text>
                   <View style={styles.editHeroStatusRow}>
                     <View style={[
@@ -1571,13 +1571,13 @@ export default function StaffManagementScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.editItemRowLabel}>Assigned Branch</Text>
-                    <Text style={styles.editItemRowVal}>{editingMember?.branch_name || 'Scoop creamy (HQ)'}</Text>
+                    <Text style={styles.editItemRowVal}>{editingMember?.branch_name || 'All Branches (HQ)'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </TouchableOpacity>
                 {isEditBranchPickerOpen && (
                   <View style={styles.editDropdownMenu}>
-                    {['Scoop creamy (HQ)', 'Branch Bangsar', 'Branch Subang', 'All Branches'].map((branch) => (
+                    {branchList.map((branch) => (
                       <TouchableOpacity
                         key={branch}
                         style={styles.editDropdownMenuItem}
@@ -2454,7 +2454,7 @@ export default function StaffManagementScreen() {
               </View>
 
               <Text style={styles.heroRoleText}>
-                {selectedStaffForDetails.role_title || 'Provider'}  •  {selectedStaffForDetails.branch_name || 'Scoop creamy (HQ)'}
+                {selectedStaffForDetails.role_title || 'Provider'}  •  {selectedStaffForDetails.branch_name || 'All Branches (HQ)'}
               </Text>
 
               <View style={styles.heroPhoneRow}>
@@ -2646,7 +2646,7 @@ export default function StaffManagementScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.groupedRowTitle}>Assigned Branches</Text>
                     <Text style={styles.groupedRowSubtitle}>
-                      {selectedStaffForDetails.branch_name || 'Scoop creamy (HQ)'}
+                      {selectedStaffForDetails.branch_name || 'All Branches (HQ)'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -3351,7 +3351,7 @@ export default function StaffManagementScreen() {
                       <View style={styles.memberInfoCol}>
                         <Text style={styles.memberNameText}>{member.name}</Text>
                         <Text style={styles.memberRoleSubtitle}>
-                          {member.role_title || 'Provider'}  •  {member.branch_name || 'Scoop creamy (HQ)'}
+                          {member.role_title || 'Provider'}  •  {member.branch_name || 'All Branches (HQ)'}
                         </Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                           <View 
