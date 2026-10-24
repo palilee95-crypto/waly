@@ -220,6 +220,39 @@ onRecordCreate((e) => {
   const slotEndMins = startMins + totalDurationMinutes + bufferMinutes;
   const actualServiceEndMins = startMins + totalDurationMinutes;
 
+  // 3b. Opening hours: a booking cannot land on a closed day, start before the
+  // shop opens, or run past closing time. Merchants with no configured hours are
+  // left alone (hoursForDate reports `unset`).
+  try {
+    const availability = require(`${__hooks}/booking_availability.js`);
+    let hours = null;
+    try {
+      const locations = $app.findRecordsByFilter("store_locations", "merchant = '" + merchantId + "'", "-created", 1, 0);
+      if (locations.length > 0) {
+        const rawHours = locations[0].getString("hours");
+        if (rawHours && rawHours !== "null") hours = JSON.parse(rawHours);
+      }
+    } catch (hoursLookupErr) {
+      hours = null;
+    }
+    if (hours && bookingDate && availability.isValidIsoDate(bookingDate)) {
+      const day = availability.hoursForDate(hours, bookingDate);
+      if (!availability.fitsOpeningHours(day, startMins, totalDurationMinutes)) {
+        if (day.closed) {
+          throw new BadRequestError("The store is closed on " + bookingDate + ". Please choose another date.");
+        }
+        throw new BadRequestError(
+          "The store is open from " + availability.formatMinutes(day.openMinutes) + " to " +
+          availability.formatMinutes(day.closeMinutes % 1440) +
+          " on this date, and this service would not fit. Please choose another time."
+        );
+      }
+    }
+  } catch (hoursErr) {
+    if (hoursErr instanceof BadRequestError) throw hoursErr;
+    console.log("[BOOKING HOURS CHECK NOTE]", hoursErr.message || hoursErr);
+  }
+
   if (!rec.getString("end_time")) {
     rec.set("end_time", formatMinutesToTime(actualServiceEndMins));
   }
@@ -663,6 +696,36 @@ routerAdd("POST", "/api/risev/merchant/booking-reschedule", (e) => {
     const duration = availability.durationMinutes(booking);
     const serviceEndMinutes = startMinutes + duration;
     const slotEndMinutes = serviceEndMinutes + TURNAROUND_MINUTES;
+
+    // Opening hours apply to reschedules too, otherwise a booking can be moved
+    // onto a closed day through this route.
+    try {
+      let hours = null;
+      try {
+        const locations = $app.findRecordsByFilter("store_locations", "merchant = '" + merchantId + "'", "-created", 1, 0);
+        if (locations.length > 0) {
+          const rawHours = locations[0].getString("hours");
+          if (rawHours && rawHours !== "null") hours = JSON.parse(rawHours);
+        }
+      } catch (hoursLookupErr) {
+        hours = null;
+      }
+      if (hours) {
+        const day = availability.hoursForDate(hours, bookingDate);
+        if (!availability.fitsOpeningHours(day, startMinutes, duration)) {
+          if (day.closed) {
+            return e.json(409, { code: "BOOKING_CLOSED", message: "The store is closed on that date." });
+          }
+          return e.json(409, {
+            code: "BOOKING_OUTSIDE_HOURS",
+            message: "The store is open from " + availability.formatMinutes(day.openMinutes) + " to " +
+              availability.formatMinutes(day.closeMinutes % 1440) + " on that date.",
+          });
+        }
+      }
+    } catch (hoursErr) {
+      console.log("[BOOKING RESCHEDULE] hours check failed:", hoursErr.message || hoursErr);
+    }
 
     let conflict = null;
     try {
