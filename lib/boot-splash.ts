@@ -1,5 +1,6 @@
 const BOOT_ID = 'risev-boot';
 const FADE_MS = 320;
+const RETRY_KEY = 'risev-boot-retry';
 
 let hidden = false;
 let prefetchDone = false;
@@ -18,6 +19,11 @@ export function hideBootSplash() {
     return;
   }
   hidden = true;
+  // A successful boot means the stale-shell retry worked; arm it again for the
+  // next deploy instead of leaving the reload path disabled for the session.
+  try {
+    window.sessionStorage.removeItem(RETRY_KEY);
+  } catch {}
   document.documentElement.setAttribute('data-risev-boot', 'done');
   window.setTimeout(() => el.remove(), FADE_MS);
 }
