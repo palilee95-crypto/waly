@@ -27,7 +27,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { handleSmartBack } from '@/lib/navigation';
-import { ALL_TIME_SLOTS, isSlotInPast } from '@/lib/bookingSlots';
+import { ALL_TIME_SLOTS, fitsOpeningHours, formatMinutesLabel, hoursForDate, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
 import { openBookingCheckout } from '@/lib/openBookingCheckout';
 import * as ImagePicker from 'expo-image-picker';
 import BookingAccessModal from './_components/BookingAccessModal';
@@ -178,6 +178,8 @@ export default function BookingsScreen() {
   const [rescheduleStaffId, setRescheduleStaffId] = useState('');
   const [rescheduleBusy, setRescheduleBusy] = useState(false);
   const [rescheduleError, setRescheduleError] = useState('');
+  // Opening hours, so the sheet cannot offer a slot the server will reject.
+  const [storeHours, setStoreHours] = useState<any>(null);
 
   // Services State
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -928,6 +930,14 @@ export default function BookingsScreen() {
       setRescheduleError('Choose a date and time.');
       return;
     }
+    if (rescheduleSlotBlocked(rescheduleTime)) {
+      setRescheduleError(
+        rescheduleDay.closed
+          ? 'The store is closed on that date.'
+          : 'That time is outside the store’s opening hours.'
+      );
+      return;
+    }
     setRescheduleBusy(true);
     setRescheduleError('');
     try {
@@ -1003,6 +1013,42 @@ export default function BookingsScreen() {
     }
     return list;
   }, []);
+
+  useEffect(() => {
+    const merchantId = user?.merchant_id;
+    if (!merchantId) return;
+    let active = true;
+    pb.collection('store_locations')
+      .getFirstListItem(`merchant = "${merchantId}"`, { requestKey: null })
+      .then(rec => { if (active) setStoreHours((rec as any).hours || null); })
+      .catch(() => { if (active) setStoreHours(null); });
+    return () => { active = false; };
+  }, [user?.merchant_id]);
+
+  // Duration of the appointment being moved, so "fits before closing" is judged
+  // against the real service rather than a default half hour.
+  const rescheduleDuration = useMemo(() => {
+    const raw = (rescheduleTarget as any)?.items_summary;
+    let items: any[] = [];
+    if (Array.isArray(raw)) items = raw;
+    else if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) items = parsed;
+      } catch {}
+    }
+    const total = items.reduce((sum, item) => sum + (parseInt(item?.duration_minutes, 10) || 0), 0);
+    return total > 0 ? total : 30;
+  }, [rescheduleTarget]);
+
+  const rescheduleDay = useMemo(
+    () => hoursForDate(storeHours, rescheduleDate || ''),
+    [storeHours, rescheduleDate]
+  );
+  const rescheduleSlotBlocked = (slot: string) =>
+    !rescheduleDate ||
+    isSlotInPast(slot, rescheduleDate) ||
+    !fitsOpeningHours(rescheduleDay, parseSlotToMinutes(slot), rescheduleDuration);
 
   const handleCustomerWhatsApp = (b: BookingItem) => {
     let rawPhone = (b.customer_phone || '').replace(/[^0-9]/g, '');
@@ -3883,11 +3929,15 @@ export default function BookingsScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
                 {rescheduleDates.map(dt => {
                   const selected = rescheduleDate === dt.iso;
+                  const dtHours = hoursForDate(storeHours, dt.iso);
+                  const closed = !dtHours.unset && dtHours.closed;
                   return (
                     <TouchableOpacity
                       key={dt.iso}
+                      disabled={closed}
                       onPress={() => setRescheduleDate(dt.iso)}
-                      activeOpacity={0.85}
+                      activeOpacity={closed ? 1 : 0.85}
+                      accessibilityLabel={closed ? `${dt.day} ${dt.num} — store closed` : `${dt.day} ${dt.num}`}
                       style={{
                         width: 58,
                         borderRadius: 16,
@@ -3896,26 +3946,36 @@ export default function BookingsScreen() {
                         backgroundColor: selected ? '#000000' : '#F8FAFC',
                         borderWidth: 1,
                         borderColor: selected ? '#000000' : '#E2E8F0',
+                        opacity: closed && !selected ? 0.35 : 1,
                       }}
                     >
-                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#64748B' }}>{dt.day}</Text>
-                      <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: selected ? '#FFFFFF' : '#111111', marginTop: 2 }}>{dt.num}</Text>
+                      <Text style={{ fontSize: 10.5, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#64748B', textDecorationLine: closed ? 'line-through' : 'none' }}>{dt.day}</Text>
+                      <Text style={{ fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: selected ? '#FFFFFF' : '#111111', marginTop: 2, textDecorationLine: closed ? 'line-through' : 'none' }}>{dt.num}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </ScrollView>
 
               <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#64748B', letterSpacing: 0.4, marginTop: 18, marginBottom: 8 }}>TIME</Text>
+              {!rescheduleDay.unset && rescheduleDay.closed ? (
+                <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#B91C1C', marginTop: -4, marginBottom: 8 }}>
+                  The store is closed on this date.
+                </Text>
+              ) : !rescheduleDay.unset ? (
+                <Text style={{ fontSize: 11.5, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', marginTop: -4, marginBottom: 8 }}>
+                  Open {formatMinutesLabel(rescheduleDay.openMinutes)} – {formatMinutesLabel(rescheduleDay.closeMinutes % 1440)}
+                </Text>
+              ) : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {ALL_TIME_SLOTS.map(slot => {
-                  const past = isSlotInPast(slot, rescheduleDate);
+                  const blocked = rescheduleSlotBlocked(slot);
                   const selected = rescheduleTime === slot;
                   return (
                     <TouchableOpacity
                       key={slot}
-                      disabled={past}
+                      disabled={blocked}
                       onPress={() => setRescheduleTime(slot)}
-                      activeOpacity={0.85}
+                      activeOpacity={blocked ? 1 : 0.85}
                       style={{
                         width: '31.5%',
                         borderRadius: 12,
@@ -3924,10 +3984,10 @@ export default function BookingsScreen() {
                         backgroundColor: selected ? '#000000' : '#F8FAFC',
                         borderWidth: 1,
                         borderColor: selected ? '#000000' : '#E2E8F0',
-                        opacity: past ? 0.35 : 1,
+                        opacity: blocked ? 0.35 : 1,
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#111111' }}>{slot}</Text>
+                      <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: selected ? '#FFFFFF' : '#111111', textDecorationLine: blocked ? 'line-through' : 'none' }}>{slot}</Text>
                     </TouchableOpacity>
                   );
                 })}
