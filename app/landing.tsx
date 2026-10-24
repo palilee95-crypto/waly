@@ -3,22 +3,24 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, useWindowDimensions, S
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/context/AuthContext';
+import { useTr } from '@/lib/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import Slider from '@react-native-community/slider';
 
 const LOGO_IMG = require('../assets/risev logo.png');
 
 function HowItWorksSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   return (
     <View style={[styles.hiwSection, isMobile && { paddingHorizontal: 16 }]}>
       
       {/* Heading */}
       <View style={styles.hiwHeader}>
         <View style={styles.heroTag}>
-          <Text style={styles.heroTagText}>HOW IT WORKS</Text>
+          <Text style={styles.heroTagText}>{tr("HOW IT WORKS", "CARA IA BERFUNGSI")}</Text>
         </View>
         <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile, { marginTop: 24 }]}>
-          One <Text style={{ color: '#FFC700' }}>Tap</Text>. Your Customer Is In.
+          One <Text style={{ color: '#FFC700' }}>{tr("Tap", "Ketik")}</Text>. Your Customer Is In.
         </Text>
         <Text style={[styles.heroSub, isMobile && styles.heroSubMobile, { maxWidth: 500 }]}>
           No app. No forms. No complicated setup.{'\n'}
@@ -42,8 +44,8 @@ function HowItWorksSection({ isMobile }: { isMobile: boolean }) {
               <Text style={styles.hiwStepNumText}>1</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.hiwStepTitle}>They Tap</Text>
-              <Text style={styles.hiwStepDesc}>Customer taps the Risev stand with their phone.</Text>
+              <Text style={styles.hiwStepTitle}>{tr("They Tap", "Mereka Ketik")}</Text>
+              <Text style={styles.hiwStepDesc}>{tr("Customer taps the Risev stand with their phone.", "Pelanggan mengetik stand Risev dengan telefon mereka.")}</Text>
             </View>
           </View>
         </View>
@@ -68,8 +70,8 @@ function HowItWorksSection({ isMobile }: { isMobile: boolean }) {
               <Text style={styles.hiwStepNumText}>2</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.hiwStepTitle}>They Join</Text>
-              <Text style={styles.hiwStepDesc}>Their details are captured instantly. No typing, no hassle.</Text>
+              <Text style={styles.hiwStepTitle}>{tr("They Join", "Mereka Sertai")}</Text>
+              <Text style={styles.hiwStepDesc}>{tr("Their details are captured instantly. No typing, no hassle.", "Butiran mereka dirakam serta-merta. Tiada menaip, tiada kerumitan.")}</Text>
             </View>
           </View>
         </View>
@@ -94,8 +96,8 @@ function HowItWorksSection({ isMobile }: { isMobile: boolean }) {
               <Text style={styles.hiwStepNumText}>3</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.hiwStepTitle}>You Capture</Text>
-              <Text style={styles.hiwStepDesc}>Their loyalty profile is added to your system & ready for engagement.</Text>
+              <Text style={styles.hiwStepTitle}>{tr("You Capture", "Anda Rakam")}</Text>
+              <Text style={styles.hiwStepDesc}>{tr("Their loyalty profile is added to your system & ready for engagement.", "Profil kesetiaan mereka ditambah ke sistem anda & sedia untuk interaksi.")}</Text>
             </View>
           </View>
         </View>
@@ -106,6 +108,7 @@ function HowItWorksSection({ isMobile }: { isMobile: boolean }) {
 }
 
 function LossCalculator({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   const [customersPerDay, setCustomersPerDay] = React.useState(50);
   const [averageSpend, setAverageSpend] = React.useState(100);
 
@@ -115,12 +118,12 @@ function LossCalculator({ isMobile }: { isMobile: boolean }) {
 
   return (
     <View style={[styles.statsCard, isMobile && ({ width: '100%', flex: 'none' } as any)]}>
-      <Text style={[styles.statsCardTitle, { marginBottom: 32 }]}>CALCULATE YOUR LOSS</Text>
+      <Text style={[styles.statsCardTitle, { marginBottom: 32 }]}>{tr("CALCULATE YOUR LOSS", "KIRA KERUGIAN ANDA")}</Text>
       
       {/* Customers Slider */}
       <View style={{ marginBottom: 24 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text style={{ color: '#9CA3AF', fontFamily: 'Outfit_500Medium', fontSize: 14 }}>Customers per day</Text>
+          <Text style={{ color: '#9CA3AF', fontFamily: 'Outfit_500Medium', fontSize: 14 }}>{tr("Customers per day", "Pelanggan sehari")}</Text>
           <Text style={{ color: '#FFFFFF', fontFamily: 'Outfit_700Bold', fontSize: 16 }}>{customersPerDay}</Text>
         </View>
         <Slider
@@ -139,7 +142,7 @@ function LossCalculator({ isMobile }: { isMobile: boolean }) {
       {/* Spend Slider */}
       <View style={{ marginBottom: 32 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text style={{ color: '#9CA3AF', fontFamily: 'Outfit_500Medium', fontSize: 14 }}>Avg spend per customer</Text>
+          <Text style={{ color: '#9CA3AF', fontFamily: 'Outfit_500Medium', fontSize: 14 }}>{tr("Avg spend per customer", "Purata belanja setiap pelanggan")}</Text>
           <Text style={{ color: '#FFFFFF', fontFamily: 'Outfit_700Bold', fontSize: 16 }}>RM{averageSpend}</Text>
         </View>
         <Slider
@@ -159,7 +162,7 @@ function LossCalculator({ isMobile }: { isMobile: boolean }) {
 
       {/* Results */}
       <View style={{ marginTop: 16 }}>
-        <Text style={{ color: '#9CA3AF', fontFamily: 'Outfit_500Medium', fontSize: 14, marginBottom: 8 }}>Lost Monthly Revenue</Text>
+        <Text style={{ color: '#9CA3AF', fontFamily: 'Outfit_500Medium', fontSize: 14, marginBottom: 8 }}>{tr("Lost Monthly Revenue", "Hasil Bulanan Hilang")}</Text>
         <Text style={{ color: '#EF4444', fontFamily: 'Outfit_800ExtraBold', fontSize: 36, letterSpacing: -1 }}>
           RM{lostMonthlyRevenue.toLocaleString()}
         </Text>
@@ -172,15 +175,16 @@ function LossCalculator({ isMobile }: { isMobile: boolean }) {
 }
 
 function RetentionGapSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   return (
     <View style={styles.retentionSection}>
       {/* Header */}
       <View style={styles.retentionHeader}>
         <View style={styles.heroTag}>
-          <Text style={styles.heroTagText}>THE RETENTION GAP</Text>
+          <Text style={styles.heroTagText}>{tr("THE RETENTION GAP", "JURANG PENGELAKAN")}</Text>
         </View>
         <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile, { marginTop: 24 }]}>
-          They Buy. They Leave. You <Text style={{ color: '#FFC700' }}>Lose</Text> Them.
+          They Buy. They Leave. You <Text style={{ color: '#FFC700' }}>{tr("Lose", "Hilang")}</Text> Them.
         </Text>
         <Text style={[styles.heroSub, isMobile && styles.heroSubMobile, { maxWidth: 600 }]}>
           Getting customers through the door is only half the battle. Without their contact details, you can’t follow up, reward them, or give them a reason to return.
@@ -226,9 +230,9 @@ function RetentionGapSection({ isMobile }: { isMobile: boolean }) {
           />
           {/* Overlay text */}
           <View style={styles.retentionVisualOverlay}>
-            <Text style={styles.retentionVisualText}>No data.</Text>
-            <Text style={styles.retentionVisualText}>No connection.</Text>
-            <Text style={styles.retentionVisualText}>No reason to <Text style={{ color: '#FFC700' }}>come back</Text>.</Text>
+            <Text style={styles.retentionVisualText}>{tr("No data.", "Tiada data.")}</Text>
+            <Text style={styles.retentionVisualText}>{tr("No connection.", "Tiada hubungan.")}</Text>
+            <Text style={styles.retentionVisualText}>{tr("No reason to", "Tiada sebab untuk")}<Text style={{ color: '#FFC700' }}>come back</Text>.</Text>
           </View>
         </View>
 
@@ -247,6 +251,7 @@ function RetentionGapSection({ isMobile }: { isMobile: boolean }) {
 }
 
 function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   const [activeStep, setActiveStep] = React.useState(0);
   const { width } = useWindowDimensions();
   const scrollRef = React.useRef<ScrollView>(null);
@@ -343,10 +348,10 @@ function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
     <View style={styles.meetSection} ref={containerRef} nativeID="how-it-works">
       <View style={styles.meetHeader}>
         <View style={styles.heroTag}>
-          <Text style={styles.heroTagText}>MEET RISEV</Text>
+          <Text style={styles.heroTagText}>{tr("MEET RISEV", "KENALI RISEV")}</Text>
         </View>
         <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile, { marginTop: 24 }]}>
-          What If Your Customers <Text style={{ color: '#FFC700' }}>Never Became Strangers Again?</Text>
+          What If Your Customers <Text style={{ color: '#FFC700' }}>{tr("Never Became Strangers Again?", "Tidak Pernah Menjadi Orang Asing Semula?")}</Text>
         </Text>
         <Text style={[styles.heroSub, isMobile && styles.heroSubMobile, { maxWidth: 700 }]}>
           Risev turns every customer visit into a relationship you can keep — capturing customers, rewarding them, and bringing them back automatically.
@@ -419,7 +424,7 @@ function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
           One tap turns a <Text style={{ color: '#FFC700' }}>transaction</Text> into a <Text style={{ color: '#FFC700' }}>relationship</Text>.
         </Text>
         <TouchableOpacity>
-          <Text style={{ fontFamily: 'Outfit_700Bold', fontSize: 16, color: '#4B5563' }}>See How It Works →</Text>
+          <Text style={{ fontFamily: 'Outfit_700Bold', fontSize: 16, color: '#4B5563' }}>{tr("See How It Works →", "Lihat Cara Ia Berfungsi →")}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -427,6 +432,7 @@ function MeetRisevSection({ isMobile }: { isMobile: boolean }) {
 }
 
 function TransitionBlock() {
+  const tr = useTr();
   return (
     <View style={styles.transitionBlock}>
       <Text style={styles.transitionText}>
@@ -438,6 +444,7 @@ function TransitionBlock() {
 }
 
 function PricingSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   const [billing, setBilling] = React.useState<'monthly'|'yearly'>('monthly');
   const [activePlan, setActivePlan] = React.useState('growth');
 
@@ -473,10 +480,10 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
     <View style={styles.pricingSection} nativeID="pricing">
       <View style={styles.pricingHeader}>
         <View style={styles.heroTag}>
-          <Text style={styles.heroTagText}>PRICING</Text>
+          <Text style={styles.heroTagText}>{tr("PRICING", "HARGA")}</Text>
         </View>
         <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile, { marginTop: 24 }]}>
-          Start Turning Customers Into <Text style={{ color: '#FFC700' }}>Regulars.</Text>
+          Start Turning Customers Into <Text style={{ color: '#FFC700' }}>{tr("Regulars.", "Pelanggan Tetap.")}</Text>
         </Text>
         <Text style={[styles.heroSub, isMobile && styles.heroSubMobile, { maxWidth: 600 }]}>
           Everything you need to capture customers, build loyalty, and bring them back.
@@ -489,14 +496,14 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
           <View style={{ alignItems: 'center', marginBottom: 32 }}>
             <View style={styles.billingToggleWrapper}>
               <TouchableOpacity onPress={() => setBilling('monthly')} style={[styles.billingToggleBtn, billing === 'monthly' && styles.billingToggleBtnActive]}>
-                <Text style={[styles.billingToggleText, billing === 'monthly' && styles.billingToggleTextActive]}>Monthly</Text>
+                <Text style={[styles.billingToggleText, billing === 'monthly' && styles.billingToggleTextActive]}>{tr("Monthly", "Bulanan")}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setBilling('yearly')} style={[styles.billingToggleBtn, billing === 'yearly' && styles.billingToggleBtnActive]}>
-                <View style={styles.saveBadge}><Text style={styles.saveBadgeText}>Save 20%</Text></View>
-                <Text style={[styles.billingToggleText, billing === 'yearly' && styles.billingToggleTextActive]}>Yearly</Text>
+                <View style={styles.saveBadge}><Text style={styles.saveBadgeText}>{tr("Save 20%", "Jimat 20%")}</Text></View>
+                <Text style={[styles.billingToggleText, billing === 'yearly' && styles.billingToggleTextActive]}>{tr("Yearly", "Tahunan")}</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.billingSubText}>Save more with yearly billing</Text>
+            <Text style={styles.billingSubText}>{tr("Save more with yearly billing", "Jimat lebih dengan bil tahunan")}</Text>
           </View>
 
           {/* Accordion Cards */}
@@ -560,7 +567,7 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
                        <TouchableOpacity style={styles.accordionBtn}>
                          <Text style={styles.accordionBtnText}>{p.price === 'Custom' ? 'Contact Sales →' : 'Get Started →'}</Text>
                        </TouchableOpacity>
-                       <Text style={styles.accordionNoCC}>No credit card required</Text>
+                       <Text style={styles.accordionNoCC}>{tr("No credit card required", "Tiada kad kredit diperlukan")}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -573,37 +580,37 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
         
         {/* STARTER */}
         <View style={[styles.pricingCard, isMobile && { order: 2, marginBottom: 24 } as any]}>
-          <Text style={styles.pricingTier}>STARTER</Text>
+          <Text style={styles.pricingTier}>{tr("STARTER", "PERMULA")}</Text>
           <Text style={styles.pricingPrice}>RM79<Text style={styles.pricingPeriod}> / month</Text></Text>
-          <Text style={styles.pricingDesc}>For businesses getting started with customer retention.</Text>
+          <Text style={styles.pricingDesc}>{tr("For businesses getting started with customer retention.", "Untuk perniagaan yang baru bermula dengan pengekalan pelanggan.")}</Text>
           <View style={styles.pricingFeatures}>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Risev NFC Stand</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Customer database</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Loyalty program</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Basic WhatsApp automation</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Customer dashboard</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Risev NFC Stand", "Stand NFC Risev")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Customer database", "Pangkalan data pelanggan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Loyalty program", "Program kesetiaan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Basic WhatsApp automation", "Automasi WhatsApp asas")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Customer dashboard", "Papan pemuka pelanggan")}</Text></View>
           </View>
           <TouchableOpacity style={styles.pricingBtnSecondary}>
-            <Text style={styles.pricingBtnTextSecondary}>Get Started →</Text>
+            <Text style={styles.pricingBtnTextSecondary}>{tr("Get Started →", "Mula Sekarang →")}</Text>
           </TouchableOpacity>
         </View>
 
         {/* GROWTH (Most Popular) */}
         <View style={[styles.pricingCard, styles.pricingCardPopular, isMobile && { order: 1, marginBottom: 24 } as any]}>
-          <View style={styles.popularBadge}><Text style={styles.popularBadgeText}>MOST POPULAR</Text></View>
-          <Text style={styles.pricingTier}>GROWTH</Text>
+          <View style={styles.popularBadge}><Text style={styles.popularBadgeText}>{tr("MOST POPULAR", "PALING POPULAR")}</Text></View>
+          <Text style={styles.pricingTier}>{tr("GROWTH", "PERTUMBUHAN")}</Text>
           <Text style={styles.pricingPrice}>RM99<Text style={styles.pricingPeriod}> / month</Text></Text>
-          <Text style={styles.pricingDesc}>For businesses ready to grow repeat sales.</Text>
+          <Text style={styles.pricingDesc}>{tr("For businesses ready to grow repeat sales.", "Untuk perniagaan yang sedia mengembangkan jualan berulang.")}</Text>
           <View style={styles.pricingFeatures}>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Everything in Starter</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Advanced loyalty</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>WhatsApp automation</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Customer segmentation</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Campaigns</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Analytics</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Everything in Starter", "Semua dalam Permula")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Advanced loyalty", "Kesetiaan lanjutan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("WhatsApp automation", "Automasi WhatsApp")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Customer segmentation", "Segmentasi pelanggan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Campaigns", "Kempen")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Analytics", "Analitik")}</Text></View>
           </View>
           <TouchableOpacity style={styles.pricingBtnPrimary}>
-            <Text style={styles.pricingBtnTextPrimary}>Get Started →</Text>
+            <Text style={styles.pricingBtnTextPrimary}>{tr("Get Started →", "Mula Sekarang →")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -611,29 +618,29 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
         <View style={[styles.pricingCard, isMobile && { order: 3 } as any]}>
           <Text style={styles.pricingTier}>PRO</Text>
           <Text style={styles.pricingPrice}>RM349<Text style={styles.pricingPeriod}> / month</Text></Text>
-          <Text style={styles.pricingDesc}>For businesses ready to scale customer retention.</Text>
+          <Text style={styles.pricingDesc}>{tr("For businesses ready to scale customer retention.", "Untuk perniagaan yang sedia meningkatkan pengekalan pelanggan.")}</Text>
           <View style={styles.pricingFeatures}>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Everything in Growth</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Advanced automation</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Advanced analytics</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Multiple campaigns</Text></View>
-            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>Priority support</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Everything in Growth", "Semua dalam Pertumbuhan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Advanced automation", "Automasi lanjutan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Advanced analytics", "Analitik lanjutan")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Multiple campaigns", "Pelbagai kempen")}</Text></View>
+            <View style={styles.pricingFeature}><Feather name="check" size={20} color="#FFC700"/><Text style={styles.pricingFeatureText}>{tr("Priority support", "Sokongan keutamaan")}</Text></View>
           </View>
           <TouchableOpacity style={styles.pricingBtnSecondary}>
-            <Text style={styles.pricingBtnTextSecondary}>Get Started →</Text>
+            <Text style={styles.pricingBtnTextSecondary}>{tr("Get Started →", "Mula Sekarang →")}</Text>
           </TouchableOpacity>
         </View>
 
         </View>
       )}
 
-      <Text style={styles.trustLine}>No complicated contracts. Start simple. Upgrade when you’re ready.</Text>
+      <Text style={styles.trustLine}>{tr('No complicated contracts. Start simple. Upgrade when you’re ready.', 'Tiada kontrak rumit. Mula dengan mudah. Naik taraf bila anda sedia.')}</Text>
 
       {/* Conversion Strip */}
       <View style={styles.conversionStrip}>
-        <Text style={styles.conversionStripText}>Ready to stop losing customers after their first visit?</Text>
+        <Text style={styles.conversionStripText}>{tr("Ready to stop losing customers after their first visit?", "Sedia berhenti kehilangan pelanggan selepas lawatan pertama?")}</Text>
         <TouchableOpacity style={styles.conversionStripBtn}>
-          <Text style={styles.conversionStripBtnText}>Get Your Risev Stand →</Text>
+          <Text style={styles.conversionStripBtnText}>{tr("Get Your Risev Stand →", "Dapatkan Stand Risev Anda →")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -642,6 +649,7 @@ function PricingSection({ isMobile }: { isMobile: boolean }) {
 }
 
 function HoverInteractiveCard({ children, style }: { children: React.ReactNode, style: any }) {
+  const tr = useTr();
   const [isHovered, setIsHovered] = React.useState(false);
   return (
     <Pressable
@@ -667,6 +675,7 @@ function HoverInteractiveCard({ children, style }: { children: React.ReactNode, 
 }
 
 function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   const { width } = useWindowDimensions();
   const cardWidth = width - 48;
 
@@ -674,13 +683,13 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
     <HoverInteractiveCard style={[styles.wygHoverCard, isMobile && { width: cardWidth, flexShrink: 0, marginRight: 16 }]}>
       <View style={styles.wygHoverVisual}>
         <View style={styles.mockNfcStandLarge}>
-          <Text style={{color: '#FFC700', fontFamily: 'Outfit_700Bold', fontSize: 24}}>TAP HERE</Text>
+          <Text style={{color: '#FFC700', fontFamily: 'Outfit_700Bold', fontSize: 24}}>{tr("TAP HERE", "KETIK DI SINI")}</Text>
         </View>
       </View>
       <View style={styles.wygHoverTextContent}>
-        <Text style={styles.wygCardTitle}>RISEV NFC STAND</Text>
-        <Text style={styles.wygCardDesc}>Your physical customer touchpoint.</Text>
-        <Text style={styles.wygCardSub}>Customers simply tap their phone to get started.</Text>
+        <Text style={styles.wygCardTitle}>{tr("RISEV NFC STAND", "STAND NFC RISEV")}</Text>
+        <Text style={styles.wygCardDesc}>{tr("Your physical customer touchpoint.", "Titik sentuh pelanggan fizikal anda.")}</Text>
+        <Text style={styles.wygCardSub}>{tr("Customers simply tap their phone to get started.", "Pelanggan hanya mengetik telefon untuk bermula.")}</Text>
       </View>
     </HoverInteractiveCard>
   );
@@ -690,20 +699,20 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
       <View style={styles.wygHoverVisual}>
         <View style={styles.mockDashboardUILarge}>
           <View style={styles.mockDashboardHeader}>
-            <Text style={styles.mockUITitle}>CRM Dashboard</Text>
+            <Text style={styles.mockUITitle}>{tr("CRM Dashboard", "Papan Pemuka CRM")}</Text>
             <View style={{flexDirection: 'row', gap: 8}}>
               <View style={styles.mockStatBox}><Text style={styles.mockStatBoxText}>+12 Today</Text></View>
               <View style={styles.mockStatBox}><Text style={styles.mockStatBoxText}>154 Total</Text></View>
             </View>
           </View>
-          <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Aiman</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>Just now</Text></View>
+          <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Aiman</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>{tr("Just now", "Baru sahaja")}</Text></View>
           <View style={styles.mockCRMRowLarge}><Feather name="user" size={16}/><Text style={styles.mockCRMTextLarge}>Sarah</Text><Text style={{marginLeft: 'auto', fontSize: 10, color: '#9CA3AF'}}>2 hrs ago</Text></View>
         </View>
       </View>
       <View style={styles.wygHoverTextContent}>
-        <Text style={styles.wygCardTitle}>CUSTOMER SYSTEM</Text>
-        <Text style={styles.wygCardDesc}>Build your own customer database.</Text>
-        <Text style={styles.wygCardSub}>See customers, loyalty activity, visits, and rewards in one place.</Text>
+        <Text style={styles.wygCardTitle}>{tr("CUSTOMER SYSTEM", "SISTEM PELANGGAN")}</Text>
+        <Text style={styles.wygCardDesc}>{tr("Build your own customer database.", "Bina pangkalan data pelanggan anda sendiri.")}</Text>
+        <Text style={styles.wygCardSub}>{tr("See customers, loyalty activity, visits, and rewards in one place.", "Lihat pelanggan, aktiviti kesetiaan, lawatan, dan ganjaran di satu tempat.")}</Text>
       </View>
     </HoverInteractiveCard>
   );
@@ -713,14 +722,14 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
       <View style={styles.wygHoverVisual}>
          <View style={styles.mockChatUILarge}>
           <View style={styles.chatBubbleLarge}>
-            <Text style={styles.chatTextLarge}>Hey Aiman 👋 You’re one visit away from your next reward.</Text>
+            <Text style={styles.chatTextLarge}>{tr('Hey Aiman 👋 You’re one visit away from your next reward.', 'Hai Aiman 👋 Anda hanya satu lawatan lagi daripada ganjaran seterusnya.')}</Text>
           </View>
         </View>
       </View>
       <View style={styles.wygHoverTextContent}>
-        <Text style={styles.wygCardTitle}>WHATSAPP AUTOMATION</Text>
-        <Text style={styles.wygCardDesc}>Bring customers back automatically.</Text>
-        <Text style={styles.wygCardSub}>Stay connected without manually following up.</Text>
+        <Text style={styles.wygCardTitle}>{tr("WHATSAPP AUTOMATION", "AUTOMASI WHATSAPP")}</Text>
+        <Text style={styles.wygCardDesc}>{tr("Bring customers back automatically.", "Bawa pelanggan kembali secara automatik.")}</Text>
+        <Text style={styles.wygCardSub}>{tr("Stay connected without manually following up.", "Kekal berhubung tanpa susulan manual.")}</Text>
       </View>
     </HoverInteractiveCard>
   );
@@ -729,10 +738,10 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
     <View style={styles.wygSection} nativeID="features">
       <View style={styles.wygHeader}>
         <View style={styles.heroTag}>
-          <Text style={styles.heroTagText}>WHAT YOU GET</Text>
+          <Text style={styles.heroTagText}>{tr("WHAT YOU GET", "APA YANG ANDA DAPAT")}</Text>
         </View>
         <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile, { marginTop: 24, maxWidth: 800 }]}>
-          Everything You Need to Keep Customers <Text style={{ color: '#FFC700' }}>Coming Back.</Text>
+          Everything You Need to Keep Customers <Text style={{ color: '#FFC700' }}>{tr("Coming Back.", "Kembali.")}</Text>
         </Text>
         <Text style={[styles.heroSub, isMobile && styles.heroSubMobile, { maxWidth: 600 }]}>
           One simple system to capture customers, build loyalty, and bring them back.
@@ -768,9 +777,9 @@ function WhatYouGetSection({ isMobile }: { isMobile: boolean }) {
         </Text>
         
         <View style={[styles.wygTrustRow, isMobile && { flexDirection: 'column', gap: 16 }]}>
-          <View style={styles.wygTrustItem}><Feather name="check-circle" size={20} color="#000000"/><Text style={styles.wygTrustText}>No app required</Text></View>
-          <View style={styles.wygTrustItem}><Feather name="check-circle" size={20} color="#000000"/><Text style={styles.wygTrustText}>Setup in minutes</Text></View>
-          <View style={styles.wygTrustItem}><Feather name="check-circle" size={20} color="#000000"/><Text style={styles.wygTrustText}>Built for repeat customers</Text></View>
+          <View style={styles.wygTrustItem}><Feather name="check-circle" size={20} color="#000000"/><Text style={styles.wygTrustText}>{tr("No app required", "Tiada aplikasi diperlukan")}</Text></View>
+          <View style={styles.wygTrustItem}><Feather name="check-circle" size={20} color="#000000"/><Text style={styles.wygTrustText}>{tr("Setup in minutes", "Sediakan dalam beberapa minit")}</Text></View>
+          <View style={styles.wygTrustItem}><Feather name="check-circle" size={20} color="#000000"/><Text style={styles.wygTrustText}>{tr("Built for repeat customers", "Dibina untuk pelanggan berulang")}</Text></View>
         </View>
       </View>
 
@@ -788,13 +797,14 @@ const FAQS = [
 ];
 
 function FaqSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   const [openIndex, setOpenIndex] = React.useState<number | null>(0);
 
   return (
     <View style={styles.faqSection} nativeID="faq">
       <View style={styles.faqHeader}>
         <View style={styles.heroTag}>
-          <Text style={styles.heroTagText}>FAQ</Text>
+          <Text style={styles.heroTagText}>{tr("FAQ", "SOALAN LAZIM")}</Text>
         </View>
         <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile, { marginTop: 24 }]}>
           Questions? We’ve Got You.
@@ -839,9 +849,9 @@ function FaqSection({ isMobile }: { isMobile: boolean }) {
       </View>
 
       <View style={styles.faqFooter}>
-        <Text style={styles.faqFooterText}>Still have questions? Our team is here to help.</Text>
+        <Text style={styles.faqFooterText}>{tr("Still have questions? Our team is here to help.", "Masih ada soalan? Pasukan kami sedia membantu.")}</Text>
         <TouchableOpacity>
-          <Text style={styles.faqFooterLink}>Talk to us →</Text>
+          <Text style={styles.faqFooterLink}>{tr("Talk to us →", "Hubungi kami →")}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -851,6 +861,7 @@ function FaqSection({ isMobile }: { isMobile: boolean }) {
 
 
 function FooterSection({ isMobile }: { isMobile: boolean }) {
+  const tr = useTr();
   const FooterLink = ({ text }: { text: string }) => (
     <TouchableOpacity style={{ marginBottom: 12 }}>
       <Text style={styles.footerLinkText}>{text}</Text>
@@ -895,7 +906,7 @@ function FooterSection({ isMobile }: { isMobile: boolean }) {
           Start building your customer base with Risev.
         </Text>
         <TouchableOpacity style={styles.footerCtaButton}>
-          <Text style={styles.footerCtaButtonText}>Get Your Risev Stand →</Text>
+          <Text style={styles.footerCtaButtonText}>{tr("Get Your Risev Stand →", "Dapatkan Stand Risev Anda →")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -917,10 +928,10 @@ function FooterSection({ isMobile }: { isMobile: boolean }) {
 
         {/* Right: Nav Columns */}
         <View style={[styles.footerNavGroup, isMobile && { flexDirection: 'column' }]}>
-          <FooterCol title="PRODUCT" links={['How It Works', 'Features', 'Pricing', 'FAQ']} />
-          <FooterCol title="COMPANY" links={['About Risev', 'Contact', 'Login']} />
-          <FooterCol title="RESOURCES" links={['Help Center', 'WhatsApp', 'Support']} />
-          <FooterCol title="LEGAL" links={['Privacy Policy', 'Terms & Conditions', 'Refund Policy']} />
+          <FooterCol title={tr("PRODUCT", "PRODUK")} links={['How It Works', 'Features', 'Pricing', 'FAQ']} />
+          <FooterCol title={tr("COMPANY", "SYARIKAT")} links={['About Risev', 'Contact', 'Login']} />
+          <FooterCol title={tr("RESOURCES", "SUMBER")} links={['Help Center', 'WhatsApp', 'Support']} />
+          <FooterCol title={tr("LEGAL", "UNDANG-UNDANG")} links={['Privacy Policy', 'Terms & Conditions', 'Refund Policy']} />
         </View>
 
       </View>
@@ -930,7 +941,7 @@ function FooterSection({ isMobile }: { isMobile: boolean }) {
       {/* Bottom Bar */}
       <View style={[styles.footerBottomBar, isMobile && { flexDirection: 'column', gap: 16 }]}>
         <Text style={[styles.footerBottomText, isMobile && { textAlign: 'center' }]}>© 2026 Risev. All rights reserved.</Text>
-        <Text style={[styles.footerBottomText, isMobile && { textAlign: 'center' }]}>Made for businesses that want customers to come back.</Text>
+        <Text style={[styles.footerBottomText, isMobile && { textAlign: 'center' }]}>{tr("Made for businesses that want customers to come back.", "Dibina untuk perniagaan yang mahu pelanggan kembali.")}</Text>
       </View>
 
     </View>
@@ -941,6 +952,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, activeRole } = useAuth();
   const { width } = useWindowDimensions();
+  const tr = useTr();
   const isMobile = width < 1024;
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
   if (isLoading) {
@@ -1071,7 +1083,7 @@ export default function LandingPage() {
                   setTimeout(() => scrollToSection('pricing'), 100);
                 }}
               >
-                <Text style={styles.ctaText}>Get Your Stand</Text>
+                <Text style={styles.ctaText}>{tr("Get Your Stand", "Dapatkan Stand Anda")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -1100,12 +1112,12 @@ export default function LandingPage() {
           
           {/* Tag */}
           <View style={styles.heroTag}>
-            <Text style={styles.heroTagText}>NFC Loyalty System</Text>
+            <Text style={styles.heroTagText}>{tr("NFC Loyalty System", "Sistem Kesetiaan NFC")}</Text>
           </View>
 
           {/* Headline */}
           <Text style={[styles.heroHeadline, isMobile && styles.heroHeadlineMobile]}>
-            Just <Text style={{ color: '#FFC700' }}>One Tap</Text> to Keep{'\n'}Them Coming Back.
+            Just <Text style={{ color: '#FFC700' }}>{tr("One Tap", "Satu Ketikan")}</Text> to Keep{'\n'}Them Coming Back.
           </Text>
 
           {/* Sub-headline */}
@@ -1119,13 +1131,13 @@ export default function LandingPage() {
               style={[styles.heroPrimaryBtn, isMobile && styles.heroBtnMobile]}
               onPress={() => scrollToSection('pricing')}
             >
-              <Text style={[styles.heroPrimaryBtnText, isMobile && styles.heroBtnTextMobile]}>Get Your Stand</Text>
+              <Text style={[styles.heroPrimaryBtnText, isMobile && styles.heroBtnTextMobile]}>{tr("Get Your Stand", "Dapatkan Stand Anda")}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.heroSecondaryBtn, isMobile && styles.heroBtnMobile]}
               onPress={() => scrollToSection('pricing')}
             >
-              <Text style={[styles.heroSecondaryBtnText, isMobile && styles.heroBtnTextMobile]}>View Pricing</Text>
+              <Text style={[styles.heroSecondaryBtnText, isMobile && styles.heroBtnTextMobile]}>{tr("View Pricing", "Lihat Harga")}</Text>
             </TouchableOpacity>
           </View>
 

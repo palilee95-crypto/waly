@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTr } from '@/lib/i18n';
 import {
   View,
   Text,
@@ -277,6 +278,7 @@ export default function CustomerBookingPwaScreen() {
   const { slug, phone: queryPhone, name: queryName, ref: queryRef, pass: queryPass } = useLocalSearchParams<{ slug: string; phone?: string; name?: string; ref?: string; pass?: string }>();
   const router = useRouter();
   const { locale } = useLanguage();
+  const tr = useTr();
 
   // Dynamic upcoming dates from today
   const upcomingDates = useMemo(() => {
@@ -1774,44 +1776,44 @@ export default function CustomerBookingPwaScreen() {
       setCurrentStep(1);
     } else if (currentStep === 1) {
       if (selectedServices.length === 0) {
-        Alert.alert('Select Service', 'Please select at least one service to continue.');
+        Alert.alert(tr('Select Service', 'Pilih Perkhidmatan'), tr('Please select at least one service to continue.', 'Sila pilih sekurang-kurangnya satu perkhidmatan untuk meneruskan.'));
         return;
       }
       setCurrentStep(2);
     } else if (currentStep === 2) {
       if (!dayHours.unset && dayHours.closed) {
-        Alert.alert('Closed', 'The store is closed on this day. Please choose another date.');
+        Alert.alert(tr('Closed', 'Tutup'), tr('The store is closed on this day. Please choose another date.', 'Kedai tutup pada hari ini. Sila pilih tarikh lain.'));
         return;
       }
       if (isSlotInPast(selectedTime, selectedIsoDate)) {
-        Alert.alert('Slot Unavailable', 'The selected time slot has already passed. Please choose an upcoming time or another date.');
+        Alert.alert(tr('Slot Unavailable', 'Slot Tidak Tersedia'), tr('The selected time slot has already passed. Please choose an upcoming time or another date.', 'Slot masa yang dipilih telah berlalu. Sila pilih masa yang akan datang atau tarikh lain.'));
         return;
       }
       if (!slotFitsHours(selectedTime)) {
         Alert.alert(
-          'Outside opening hours',
-          'The store is open ' + formatMinutesLabel(dayHours.openMinutes) + ' – ' +
-          formatMinutesLabel(dayHours.closeMinutes % 1440) + ' on this day. Please choose another time.'
+          tr('Outside opening hours', 'Di luar waktu operasi'),
+          tr('The store is open ', 'Kedai dibuka ') + formatMinutesLabel(dayHours.openMinutes) + ' – ' +
+          formatMinutesLabel(dayHours.closeMinutes % 1440) + tr(' on this day. Please choose another time.', ' pada hari ini. Sila pilih masa lain.')
         );
         return;
       }
       if (slotIsTaken(selectedTime)) {
-        Alert.alert('Slot Unavailable', 'Your provider is already booked for that time. Please choose another slot.');
+        Alert.alert(tr('Slot Unavailable', 'Slot Tidak Tersedia'), tr('Your provider is already booked for that time. Please choose another slot.', 'Penyedia anda sudah ditempah untuk masa itu. Sila pilih slot lain.'));
         return;
       }
       setCurrentStep(3);
     } else if (currentStep === 3) {
       const digits = customerPhone.replace(/[^\d]/g, '');
       if (digits.length < 9 || digits.length > 12) {
-        Alert.alert('Phone Number', 'Please enter a valid WhatsApp number to confirm your booking.');
+        Alert.alert(tr('Phone Number', 'Nombor Telefon'), tr('Please enter a valid WhatsApp number to confirm your booking.', 'Sila masukkan nombor WhatsApp yang sah untuk mengesahkan tempahan anda.'));
         return;
       }
       if (lookupStatus === 'checking') {
-        Alert.alert('Checking Number', 'Please wait a moment while we check this number.');
+        Alert.alert(tr('Checking Number', 'Menyemak Nombor'), tr('Please wait a moment while we check this number.', 'Sila tunggu sebentar sementara kami menyemak nombor ini.'));
         return;
       }
       if (!customerName.trim()) {
-        Alert.alert('Your Name', 'We do not have this number yet. Please enter your name to confirm your booking.');
+        Alert.alert(tr('Your Name', 'Nama Anda'), tr('We do not have this number yet. Please enter your name to confirm your booking.', 'Kami belum mempunyai nombor ini. Sila masukkan nama anda untuk mengesahkan tempahan.'));
         return;
       }
 
@@ -1887,7 +1889,7 @@ export default function CustomerBookingPwaScreen() {
           }).catch(() => {});
         }
       } catch (err: any) {
-        Alert.alert('Error', err?.message || 'Failed to process booking. Please try again.');
+        Alert.alert(tr('Error', 'Ralat'), err?.message || tr('Failed to process booking. Please try again.', 'Gagal memproses tempahan. Sila cuba lagi.'));
       } finally {
         setIsSubmitting(false);
       }
@@ -1928,7 +1930,7 @@ export default function CustomerBookingPwaScreen() {
       <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
         <View style={[styles.brandInfoCard, { width: '100%', alignItems: 'center', padding: 32 }]}>
           <Ionicons name="storefront-outline" size={48} color="#94A3B8" style={{ alignSelf: 'center', marginBottom: 12 }} />
-          <Text style={[styles.brandNameText, { textAlign: 'center', fontSize: 18 }]}>Store Not Found</Text>
+          <Text style={[styles.brandNameText, { textAlign: 'center', fontSize: 18 }]}>{tr("Store Not Found", "Kedai Tidak Ditemui")}</Text>
           <Text style={[styles.brandSubtitleText, { textAlign: 'center', marginTop: 6 }]}>
             The booking page for "{slug}" does not exist or may have been renamed.
           </Text>
@@ -1936,7 +1938,7 @@ export default function CustomerBookingPwaScreen() {
             style={[styles.btnFullYellowBook, { backgroundColor: liveBrandColor || merchant?.pwa_brand_color || '#FFC700', marginTop: 24, paddingHorizontal: 24 }]}
             onPress={() => router.push('/')}
           >
-            <Text style={[styles.btnFullYellowBookText, { color: getContrastColor(liveBrandColor || merchant?.pwa_brand_color || '#FFC700') }]}>Go to Risev Home</Text>
+            <Text style={[styles.btnFullYellowBookText, { color: getContrastColor(liveBrandColor || merchant?.pwa_brand_color || '#FFC700') }]}>{tr("Go to Risev Home", "Pergi ke Laman Utama Risev")}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -2589,7 +2591,7 @@ export default function CustomerBookingPwaScreen() {
                     Popular Items
                   </Text>
                   <TouchableOpacity onPress={() => setCurrentStep(1)} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>See all</Text>
+                    <Text style={{ fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#64748B' }}>{tr("See all", "Lihat semua")}</Text>
                     <Ionicons name="chevron-forward" size={13} color="#64748B" />
                   </TouchableOpacity>
                 </View>
@@ -3030,7 +3032,7 @@ export default function CustomerBookingPwaScreen() {
               <>
                 <View style={styles.staffHeaderRow}>
                   <View>
-                    <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>Choose Staff</Text>
+                    <Text style={[styles.staffSectionTitle, { color: themeStyles.textPrimaryColor }]}>{tr("Choose Staff", "Pilih Kakitangan")}</Text>
                     <Text style={[styles.staffSectionSub, { color: themeStyles.textSecondaryColor }]}>
                       {staffList.length === 0 ? 'Appointment will be handled by store team.' : "Select who you'd like for your appointment."}
                     </Text>
@@ -3041,7 +3043,7 @@ export default function CustomerBookingPwaScreen() {
                       onPress={() => setShowStaffPicker(!showStaffPicker)}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.btnSeeAllStaffText, { color: themeStyles.textPrimaryColor }]}>See All</Text>
+                      <Text style={[styles.btnSeeAllStaffText, { color: themeStyles.textPrimaryColor }]}>{tr("See All", "Lihat Semua")}</Text>
                       <Ionicons name="chevron-forward" size={13} color={themeStyles.textSecondaryColor} />
                     </TouchableOpacity>
                   )}
@@ -3084,7 +3086,7 @@ export default function CustomerBookingPwaScreen() {
                       <View style={[styles.earliestSlotChip, themeStyles.neumorphicInset]}>
                         <Ionicons name="flash" size={12} color="#EF4444" />
                         <View style={{ marginLeft: 4 }}>
-                          <Text style={[styles.earliestLabelText, { color: themeStyles.textSecondaryColor }]}>Earliest slot</Text>
+                          <Text style={[styles.earliestLabelText, { color: themeStyles.textSecondaryColor }]}>{tr("Earliest slot", "Slot terawal")}</Text>
                           <Text style={[styles.earliestTimeText, { color: themeStyles.textPrimaryColor }]}>{earliestAvailableSlot}</Text>
                         </View>
                       </View>
@@ -3162,7 +3164,7 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Date Picker Header */}
             <View style={styles.datePickerHeaderRow}>
-              <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>Select Date</Text>
+              <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>{tr("Select Date", "Pilih Tarikh")}</Text>
               <Text style={[styles.monthYearTitle, { color: themeStyles.textSecondaryColor }]}>
                 {upcomingDates.find(d => d.iso === selectedIsoDate)?.monthName || 'Upcoming'}{' '}
                 {upcomingDates.find(d => d.iso === selectedIsoDate)?.year || new Date().getFullYear()}
@@ -3196,7 +3198,7 @@ export default function CustomerBookingPwaScreen() {
             </ScrollView>
 
             {/* Time Period Filter Segment */}
-            <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>Select Time</Text>
+            <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>{tr("Select Time", "Pilih Masa")}</Text>
             {!dayHours.unset && !dayHours.closed ? (
               <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: themeStyles.textSecondaryColor, marginTop: -2, marginBottom: 10 }}>
                 {locale === 'ms' ? 'Waktu operasi' : 'Open'} {formatMinutesLabel(dayHours.openMinutes)} – {formatMinutesLabel(dayHours.closeMinutes % 1440)}
@@ -3408,12 +3410,12 @@ export default function CustomerBookingPwaScreen() {
 
             {selectedServices.some(s => s.item_type === 'catering') && (
               <View style={styles.inputFieldGroup}>
-                <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Event Venue Address & Setup Time 🎪</Text>
+                <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>{tr("Event Venue Address & Setup Time 🎪", "Alamat Tempat Acara & Masa Persediaan 🎪")}</Text>
                 <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
                   <Ionicons name="location-outline" size={18} color={themeStyles.textSecondaryColor} />
                   <TextInput
                     style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
-                    placeholder="e.g. Dewan Gemilang, Jitra • Setup by 11:30 AM"
+                    placeholder={tr("e.g. Dewan Gemilang, Jitra • Setup by 11:30 AM", "cth. Dewan Gemilang, Jitra • Siap sebelum 11:30 AM")}
                     placeholderTextColor={themeStyles.textMutedColor}
                     value={eventVenue}
                     onChangeText={setEventVenue}
@@ -3423,12 +3425,12 @@ export default function CustomerBookingPwaScreen() {
             )}
 
             <View style={styles.inputFieldGroup}>
-              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>Add Note (Optional)</Text>
+              <Text style={[styles.inputFieldLabel, { color: themeStyles.textPrimaryColor }]}>{tr("Add Note (Optional)", "Tambah Nota (Pilihan)")}</Text>
               <View style={[styles.inputWithIconBox, themeStyles.neumorphicInset]}>
                 <Ionicons name="chatbox-outline" size={18} color={themeStyles.textSecondaryColor} />
                 <TextInput
                   style={[styles.inputTextInner, { color: themeStyles.textPrimaryColor }]}
-                  placeholder="Any special request?"
+                  placeholder={tr("Any special request?", "Sebarang permintaan khas?")}
                   placeholderTextColor={themeStyles.textMutedColor}
                   value={customerNotes}
                   onChangeText={setCustomerNotes}
@@ -3438,17 +3440,17 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Selection Summary Box */}
             <View style={[styles.summaryRecapCard, themeStyles.neumorphicCard]}>
-              <Text style={[styles.summaryRecapTitle, { color: themeStyles.textPrimaryColor }]}>Booking Details</Text>
+              <Text style={[styles.summaryRecapTitle, { color: themeStyles.textPrimaryColor }]}>{tr("Booking Details", "Butiran Tempahan")}</Text>
               <View style={styles.recapItemRow}>
-                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Services:</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>{tr("Services:", "Perkhidmatan:")}</Text>
                 <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedServices.map(s => s.name).join(', ')}</Text>
               </View>
               <View style={styles.recapItemRow}>
-                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Branch:</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>{tr("Branch:", "Cawangan:")}</Text>
                 <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedBranch?.name || 'Bangi Sentral'}</Text>
               </View>
               <View style={styles.recapItemRow}>
-                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Provider:</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>{tr("Provider:", "Penyedia:")}</Text>
                 <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>
                   {!showStaffSelection
                     ? (merchant?.store_name ? `${merchant.store_name} Team` : 'Store Team')
@@ -3456,7 +3458,7 @@ export default function CustomerBookingPwaScreen() {
                 </Text>
               </View>
               <View style={styles.recapItemRow}>
-                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>Date & Time:</Text>
+                <Text style={[styles.recapItemLabel, { color: themeStyles.textSecondaryColor }]}>{tr("Date & Time:", "Tarikh & Masa:")}</Text>
                 <Text style={[styles.recapItemVal, { color: themeStyles.textPrimaryColor }]}>{selectedDate} @ {selectedTime}</Text>
               </View>
             </View>
@@ -3944,7 +3946,7 @@ export default function CustomerBookingPwaScreen() {
             onPress={() => setCurrentStep(1)}
             activeOpacity={0.85}
           >
-            <Text style={styles.btnFullYellowBookText}>Book Appointment</Text>
+            <Text style={styles.btnFullYellowBookText}>{tr("Book Appointment", "Tempah Temujanji")}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -4070,7 +4072,7 @@ export default function CustomerBookingPwaScreen() {
                   <Ionicons name="time" size={20} color={themeStyles.activeBtnText} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>Operating Hours</Text>
+                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>{tr("Operating Hours", "Waktu Operasi")}</Text>
                   <Text style={[styles.loyaltyModalSub, { color: themeStyles.textSecondaryColor }]}>{merchant?.store_name || 'Store'} Schedule</Text>
                 </View>
               </View>
@@ -4124,7 +4126,7 @@ export default function CustomerBookingPwaScreen() {
                       </Text>
                       {item.isToday && (
                         <View style={{ backgroundColor: activeBrandColor || '#10B981', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: themeStyles.contrastColor }}>Today</Text>
+                          <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: themeStyles.contrastColor }}>{tr("Today", "Hari Ini")}</Text>
                         </View>
                       )}
                     </View>
@@ -4146,7 +4148,7 @@ export default function CustomerBookingPwaScreen() {
               onPress={() => setShowHoursModal(false)}
               activeOpacity={0.85}
             >
-              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>Close Schedule</Text>
+              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>{tr("Close Schedule", "Tutup Jadual")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -4173,7 +4175,7 @@ export default function CustomerBookingPwaScreen() {
                   <Ionicons name="ribbon" size={20} color={themeStyles.activeBtnText} />
                 </View>
                 <View>
-                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>VIP Loyalty Stamp Card</Text>
+                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>{tr("VIP Loyalty Stamp Card", "Kad Setem Kesetiaan VIP")}</Text>
                   <Text style={[styles.loyaltyModalSub, { color: themeStyles.textSecondaryColor }]}>{merchant?.store_name || 'Scoop Creamy'} Rewards</Text>
                 </View>
               </View>
@@ -4192,7 +4194,7 @@ export default function CustomerBookingPwaScreen() {
               
               {/* Member Tag */}
               <View style={styles.loyaltyBoardHeader}>
-                <Text style={[styles.loyaltyBoardMemberTag, { color: themeStyles.textSecondaryColor }]}>MEMBER CARD</Text>
+                <Text style={[styles.loyaltyBoardMemberTag, { color: themeStyles.textSecondaryColor }]}>{tr("MEMBER CARD", "KAD AHLI")}</Text>
                 <Text style={[styles.loyaltyBoardCode, { color: themeStyles.priceColor }]}>#8849-RISEV</Text>
               </View>
 
@@ -4248,7 +4250,7 @@ export default function CustomerBookingPwaScreen() {
               onPress={() => setShowLoyaltyModal(false)}
               activeOpacity={0.85}
             >
-              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>Close Loyalty Card</Text>
+              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>{tr("Close Loyalty Card", "Tutup Kad Kesetiaan")}</Text>
             </TouchableOpacity>
 
           </View>
@@ -4276,7 +4278,7 @@ export default function CustomerBookingPwaScreen() {
                   <Ionicons name="ticket" size={20} color={themeStyles.activeBtnText} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>Store Vouchers</Text>
+                  <Text style={[styles.loyaltyModalTitle, { color: themeStyles.textPrimaryColor }]}>{tr("Store Vouchers", "Baucar Kedai")}</Text>
                   <Text style={[styles.loyaltyModalSub, { color: themeStyles.textSecondaryColor }]}>{merchant?.store_name || 'Scoop Creamy'} Rewards</Text>
                 </View>
               </View>
@@ -4388,7 +4390,7 @@ export default function CustomerBookingPwaScreen() {
                         onPress={() => setSelectedVoucherForQR(item)}
                         activeOpacity={0.85}
                       >
-                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>Use Now</Text>
+                        <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{tr("Use Now", "Guna Sekarang")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -4402,7 +4404,7 @@ export default function CustomerBookingPwaScreen() {
               onPress={() => setShowVouchersModal(false)}
               activeOpacity={0.85}
             >
-              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>Close Vouchers</Text>
+              <Text style={[styles.btnFullYellowBookText, { color: themeStyles.activeBtnText }]}>{tr("Close Vouchers", "Tutup Baucar")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -4416,7 +4418,7 @@ export default function CustomerBookingPwaScreen() {
             <View style={styles.passSheetHeader}>
               <TouchableOpacity
                 onPress={() => setShowPassSheet(false)}
-                accessibilityLabel="Close appointment pass"
+                accessibilityLabel={tr("Close appointment pass", "Tutup pas temujanji")}
                 hitSlop={8}
                 style={styles.passSheetClose}
               >
@@ -4454,17 +4456,17 @@ export default function CustomerBookingPwaScreen() {
                     onPress={savePass}
                     disabled={passLoading || passIsDemo}
                     accessibilityRole="button"
-                    accessibilityLabel="Save appointment pass PDF"
+                    accessibilityLabel={tr("Save appointment pass PDF", "Simpan PDF pas temujanji")}
                     style={[styles.passGhost, (passLoading || passIsDemo) && styles.passDisabled]}
                   >
                     <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                    <Text style={styles.passGhostText}>Save PDF</Text>
+                    <Text style={styles.passGhostText}>{tr("Save PDF", "Simpan PDF")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleSharePass}
                     disabled={passLoading || passIsDemo}
                     accessibilityRole="button"
-                    accessibilityLabel="Share appointment pass to WhatsApp"
+                    accessibilityLabel={tr("Share appointment pass to WhatsApp", "Kongsi pas temujanji ke WhatsApp")}
                     style={[styles.passGhost, (passLoading || passIsDemo) && styles.passDisabled]}
                   >
                     <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
@@ -4495,7 +4497,7 @@ export default function CustomerBookingPwaScreen() {
           {selectedVoucherForQR && (
             <View style={{ backgroundColor: '#FFFFFF', borderRadius: 24, width: '100%', maxWidth: 330, padding: 24, alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>Redeem Voucher</Text>
+                <Text style={{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A' }}>{tr("Redeem Voucher", "Tebus Baucar")}</Text>
                 <TouchableOpacity onPress={() => setSelectedVoucherForQR(null)}>
                   <Ionicons name="close" size={22} color="#0F172A" />
                 </TouchableOpacity>
@@ -4512,9 +4514,9 @@ export default function CustomerBookingPwaScreen() {
                 />
               </View>
 
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 1 }}>SERIAL CODE</Text>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#64748B', letterSpacing: 1 }}>{tr("SERIAL CODE", "KOD SIRI")}</Text>
               <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#0F172A', marginTop: 2, marginBottom: 12 }}>{selectedVoucherForQR.serialNo}</Text>
-              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center' }}>Show this QR code to merchant staff at store counter to redeem your reward.</Text>
+              <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#94A3B8', textAlign: 'center' }}>{tr("Show this QR code to merchant staff at store counter to redeem your reward.", "Tunjukkan kod QR ini kepada kakitangan peniaga di kaunter untuk menebus ganjaran anda.")}</Text>
             </View>
           )}
         </View>
@@ -4605,7 +4607,7 @@ export default function CustomerBookingPwaScreen() {
                     </Text>
                     <TextInput
                       style={styles.reviewFeedbackInput}
-                      placeholder="Share your thoughts or suggestions..."
+                      placeholder={tr("Share your thoughts or suggestions...", "Kongsi pendapat atau cadangan anda...")}
                       placeholderTextColor="#64748B"
                       multiline={true}
                       numberOfLines={3}
@@ -4622,7 +4624,7 @@ export default function CustomerBookingPwaScreen() {
                       {isSubmittingReview ? (
                         <ActivityIndicator size="small" color="#050505" />
                       ) : (
-                        <Text style={styles.reviewSubmitBtnText}>Send Private Feedback</Text>
+                        <Text style={styles.reviewSubmitBtnText}>{tr("Send Private Feedback", "Hantar Maklum Balas Peribadi")}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -4632,7 +4634,7 @@ export default function CustomerBookingPwaScreen() {
                 {reviewRating === 5 && (
                   <View style={[styles.review5StarRedirecting, { backgroundColor: 'rgba(251, 188, 4, 0.1)', borderColor: 'rgba(251, 188, 4, 0.25)', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }]}>
                     <ActivityIndicator size="small" color="#FBBC04" style={{ marginRight: 10 }} />
-                    <Text style={[styles.review5StarText, { color: '#FBBC04' }]}>Opening Google Review...</Text>
+                    <Text style={[styles.review5StarText, { color: '#FBBC04' }]}>{tr("Opening Google Review...", "Membuka Ulasan Google...")}</Text>
                   </View>
                 )}
               </>
@@ -4645,7 +4647,7 @@ export default function CustomerBookingPwaScreen() {
                 onPress={() => setShowReviewModal(false)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.reviewSkipText}>Maybe later</Text>
+                <Text style={styles.reviewSkipText}>{tr("Maybe later", "Mungkin nanti")}</Text>
               </TouchableOpacity>
             )}
 
@@ -4656,7 +4658,7 @@ export default function CustomerBookingPwaScreen() {
                 onPress={() => setShowReviewModal(false)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.reviewSubmitBtnText}>Done</Text>
+                <Text style={styles.reviewSubmitBtnText}>{tr("Done", "Selesai")}</Text>
               </TouchableOpacity>
             )}
           </BlurView>

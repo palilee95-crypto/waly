@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTr } from '@/lib/i18n';
 import {
   View,
   Text,
@@ -189,6 +190,7 @@ export default function CustomerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const [loyaltyCards, setLoyaltyCards] = useState<LoyaltyCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -781,18 +783,18 @@ export default function CustomerDashboard() {
       setHasMarkedArrived(true);
       setUpcomingBooking((prev: any) => prev ? { ...prev, status: 'arrived' } : null);
       Alert.alert(
-        res?.already ? 'Already Checked In 📍' : 'Arrival Confirmed! 📍',
-        'The store counter has been notified of your arrival.'
+        res?.already ? tr('Already Checked In 📍', 'Sudah Daftar Masuk 📍') : tr('Arrival Confirmed! 📍', 'Ketibaan Disahkan! 📍'),
+        tr('The store counter has been notified of your arrival.', 'Kaunter kedai telah dimaklumkan tentang ketibaan anda.')
       );
     } catch (err: any) {
       console.warn('Arrival update err:', err);
       const code = err?.response?.code || '';
       const message = code === 'BOOKING_NOT_TODAY'
-        ? 'You can only check in on the day of your appointment.'
+        ? tr('You can only check in on the day of your appointment.', 'Anda hanya boleh daftar masuk pada hari temujanji anda.')
         : code === 'BOOKING_NOT_ACTIVE'
-        ? 'This booking can no longer be checked in.'
-        : 'Could not update arrival status right now. Please inform the store staff at the counter.';
-      Alert.alert('Notice', message);
+        ? tr('This booking can no longer be checked in.', 'Tempahan ini tidak boleh didaftar masuk lagi.')
+        : tr('Could not update arrival status right now. Please inform the store staff at the counter.', 'Tidak dapat mengemas kini status ketibaan sekarang. Sila maklumkan kepada kakitangan kedai di kaunter.');
+      Alert.alert(tr('Notice', 'Perhatian'), message);
     } finally {
       setMarkingArrivedLoading(false);
     }
@@ -1255,17 +1257,17 @@ export default function CustomerDashboard() {
   })();
 
   const saveCustomerPass = async () => {
-    if (!appointmentPassData?.passUrl) return Alert.alert('Pass unavailable', 'The booking link is not available yet.');
+    if (!appointmentPassData?.passUrl) return Alert.alert(tr('Pass unavailable', 'Pas tidak tersedia'), tr('The booking link is not available yet.', 'Pautan tempahan belum tersedia.'));
     try { await saveAppointmentPass(appointmentPassData); }
-    catch { Alert.alert('Could not save pass', 'Please try again.'); }
+    catch { Alert.alert(tr('Could not save pass', 'Tidak dapat menyimpan pas'), tr('Please try again.', 'Sila cuba lagi.')); }
   };
 
   const shareCustomerPass = async () => {
-    if (!appointmentPassData?.passUrl) return Alert.alert('Pass unavailable', 'The booking link is not available yet.');
+    if (!appointmentPassData?.passUrl) return Alert.alert(tr('Pass unavailable', 'Pas tidak tersedia'), tr('The booking link is not available yet.', 'Pautan tempahan belum tersedia.'));
     try {
       const result = await shareAppointmentPass(appointmentPassData);
-      if (result === 'copied') Alert.alert('Pass link copied', 'Paste it into WhatsApp or anywhere else.');
-    } catch { Alert.alert('Could not share the pass', 'Please try again.'); }
+      if (result === 'copied') Alert.alert(tr('Pass link copied', 'Pautan pas disalin'), tr('Paste it into WhatsApp or anywhere else.', 'Tampal ke WhatsApp atau di mana-mana sahaja.'));
+    } catch { Alert.alert(tr('Could not share the pass', 'Tidak dapat berkongsi pas'), tr('Please try again.', 'Sila cuba lagi.')); }
   };
 
   const defaultCard: LoyaltyCardItem = {
@@ -1373,13 +1375,13 @@ export default function CustomerDashboard() {
                   <Ionicons name="notifications" size={18} color="#D97706" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.notifBannerTitle}>Peringatan Temujanji & Ganjaran 🔔</Text>
+                  <Text style={styles.notifBannerTitle}>{tr('Appointment & Reward Reminders 🔔', 'Peringatan Temujanji & Ganjaran 🔔')}</Text>
                   <Text style={styles.notifBannerSub}>
-                    Dapatkan alert 2 jam & 30 minit sebelum slot temujanji anda.
+                    {tr('Get alerts 2 hours and 30 minutes before your appointment slot.', 'Dapatkan alert 2 jam & 30 minit sebelum slot temujanji anda.')}
                   </Text>
                 </View>
                 <View style={styles.notifBannerActionPill}>
-                  <Text style={styles.notifBannerActionText}>Aktifkan</Text>
+                  <Text style={styles.notifBannerActionText}>{tr('Enable', 'Aktifkan')}</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -1585,13 +1587,13 @@ export default function CustomerDashboard() {
                 <View style={styles.sectionContainer}>
                   <View style={styles.sectionHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.sectionTitle}>Picked for you</Text>
+                      <Text style={styles.sectionTitle}>{tr("Picked for you", "Dipilih untuk anda")}</Text>
                       <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E' }}>FOR YOU</Text>
+                        <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#854D0E' }}>{tr("FOR YOU", "UNTUK ANDA")}</Text>
                       </View>
                     </View>
                     <TouchableOpacity onPress={() => router.push({ pathname: '/(customer)/explore', params: { sort: 'for_you' } })}>
-                      <Text style={styles.sectionLink}>View all &gt;</Text>
+                      <Text style={styles.sectionLink}>{tr("View all &gt;", "Lihat semua &gt;")}</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -1808,13 +1810,13 @@ export default function CustomerDashboard() {
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.sectionTitle}>Favorite stores</Text>
+                  <Text style={styles.sectionTitle}>{tr("Favorite stores", "Kedai kegemaran")}</Text>
                   <View style={styles.favCountBadge}>
                     <Text style={styles.favCountBadgeText}>{favorites.length}/5</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
-                  <Text style={styles.sectionLink}>Explore all &gt;</Text>
+                  <Text style={styles.sectionLink}>{tr("Explore all &gt;", "Teroka semua &gt;")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -1888,11 +1890,11 @@ export default function CustomerDashboard() {
                               <View style={styles.newBadgesRow}>
                                 <View style={styles.proNeuRewardPill}>
                                   <Ionicons name="gift-outline" size={11.5} color="#92400E" />
-                                  <Text style={styles.proNeuRewardPillText} numberOfLines={1}>Rewards</Text>
+                                  <Text style={styles.proNeuRewardPillText} numberOfLines={1}>{tr("Rewards", "Ganjaran")}</Text>
                                 </View>
                                 <View style={styles.proNeuBookingPill}>
                                   <Ionicons name="calendar-outline" size={11.5} color="#0F172A" />
-                                  <Text style={styles.proNeuBookingPillText} numberOfLines={1}>Booking</Text>
+                                  <Text style={styles.proNeuBookingPillText} numberOfLines={1}>{tr("Booking", "Tempahan")}</Text>
                                 </View>
                               </View>
                             </View>
@@ -1900,7 +1902,7 @@ export default function CustomerDashboard() {
 
                           <View style={styles.proNeuFooterBar}>
                             <View style={styles.fullFooterPriceCol}>
-                              <Text style={styles.footerFromLabel}>From</Text>
+                              <Text style={styles.footerFromLabel}>{tr("From", "Dari")}</Text>
                               <Text style={styles.fullFooterPriceText}>RM{item.minPrice || 10}</Text>
                             </View>
 
@@ -1909,7 +1911,7 @@ export default function CustomerDashboard() {
                             <View style={styles.fullFooterSlotCol}>
                               <Ionicons name="time-outline" size={15} color="#64748B" />
                               <View style={{ flex: 1 }}>
-                                <Text style={styles.footerSlotLabel}>Next available</Text>
+                                <Text style={styles.footerSlotLabel}>{tr("Next available", "Seterusnya tersedia")}</Text>
                                 <Text style={styles.fullFooterSlotText} numberOfLines={1}>{item.nextAvailable || 'Today 5:15 PM'}</Text>
                               </View>
                             </View>
@@ -1922,7 +1924,7 @@ export default function CustomerDashboard() {
                               }}
                               activeOpacity={0.85}
                             >
-                              <Text style={styles.proSleekBookCtaText}>Book now</Text>
+                              <Text style={styles.proSleekBookCtaText}>{tr("Book now", "Tempah sekarang")}</Text>
                               <Ionicons name="chevron-forward" size={13} color="#F59E0B" />
                             </TouchableOpacity>
                           </View>
@@ -1985,7 +1987,7 @@ export default function CustomerDashboard() {
                             <View style={styles.newBadgesRow}>
                               <View style={styles.standardRewardPill}>
                                 <Ionicons name="gift-outline" size={12} color="#92400E" />
-                                <Text style={styles.standardRewardPillText} numberOfLines={1}>Rewards</Text>
+                                <Text style={styles.standardRewardPillText} numberOfLines={1}>{tr("Rewards", "Ganjaran")}</Text>
                               </View>
                             </View>
                           </View>
@@ -1993,7 +1995,7 @@ export default function CustomerDashboard() {
 
                         <View style={styles.standardFooterBar}>
                           <View style={styles.fullFooterPriceCol}>
-                            <Text style={styles.footerFromLabel}>From</Text>
+                            <Text style={styles.footerFromLabel}>{tr("From", "Dari")}</Text>
                             <Text style={styles.fullFooterPriceText}>RM{item.minPrice || 8}</Text>
                           </View>
 
@@ -2009,7 +2011,7 @@ export default function CustomerDashboard() {
                             }}
                             activeOpacity={0.85}
                           >
-                            <Text style={styles.standardViewStoreText}>View Store</Text>
+                            <Text style={styles.standardViewStoreText}>{tr("View Store", "Lihat Kedai")}</Text>
                             <Ionicons name="chevron-forward" size={14} color="#0F172A" />
                           </TouchableOpacity>
                         </View>
@@ -2021,8 +2023,8 @@ export default function CustomerDashboard() {
                 <View style={styles.emptyFavoritesBox}>
                   <Ionicons name="heart-outline" size={24} color="#F59E0B" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.emptyFavoritesTitle}>No Favorite Stores Yet</Text>
-                    <Text style={styles.emptyFavoritesSub}>Tap the ❤️ icon on any store to save up to 5 favorites here for quick access!</Text>
+                    <Text style={styles.emptyFavoritesTitle}>{tr("No Favorite Stores Yet", "Belum Ada Kedai Kegemaran")}</Text>
+                    <Text style={styles.emptyFavoritesSub}>{tr("Tap the ❤️ icon on any store to save up to 5 favorites here for quick access!", "Ketik ikon ❤️ pada mana-mana kedai untuk menyimpan sehingga 5 kegemaran di sini untuk akses pantas!")}</Text>
                   </View>
                 </View>
               )}
@@ -2031,9 +2033,9 @@ export default function CustomerDashboard() {
             {/* 🎁 5. "YOUR NEXT REWARD" / LOYALTY CARD SECTION */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Your next reward</Text>
+                <Text style={styles.sectionTitle}>{tr("Your next reward", "Ganjaran seterusnya anda")}</Text>
                 <TouchableOpacity onPress={() => router.push('/(customer)/my-cards')}>
-                  <Text style={styles.sectionLink}>View all &gt;</Text>
+                  <Text style={styles.sectionLink}>{tr("View all &gt;", "Lihat semua &gt;")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2051,9 +2053,9 @@ export default function CustomerDashboard() {
             {/* 📅 6. "UPCOMING BOOKING" SECTION */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Upcoming booking</Text>
+                <Text style={styles.sectionTitle}>{tr("Upcoming booking", "Tempahan akan datang")}</Text>
                 <TouchableOpacity onPress={() => router.push('/(customer)/bookings' as any)}>
-                  <Text style={styles.sectionLink}>View all &gt;</Text>
+                  <Text style={styles.sectionLink}>{tr("View all &gt;", "Lihat semua &gt;")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2099,7 +2101,7 @@ export default function CustomerDashboard() {
                 <View style={styles.bookingRightCol}>
                   <View style={styles.confirmedBadge}>
                     <Ionicons name="checkmark-circle" size={13} color="#16A34A" />
-                    <Text style={styles.confirmedBadgeText}>Confirmed</Text>
+                    <Text style={styles.confirmedBadgeText}>{tr("Confirmed", "Disahkan")}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </View>
@@ -2110,13 +2112,13 @@ export default function CustomerDashboard() {
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.sectionTitle}>Popular near you</Text>
+                  <Text style={styles.sectionTitle}>{tr("Popular near you", "Popular berdekatan anda")}</Text>
                   <View style={styles.topBadgeTag}>
-                    <Text style={styles.topBadgeTagText}>Top 5</Text>
+                    <Text style={styles.topBadgeTagText}>{tr("Top 5", "5 Teratas")}</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => router.push('/(customer)/explore')}>
-                  <Text style={styles.sectionLink}>See all &gt;</Text>
+                  <Text style={styles.sectionLink}>{tr("See all &gt;", "Lihat semua &gt;")}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2203,7 +2205,7 @@ export default function CustomerDashboard() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: '#1A1400', borderWidth: 1, borderColor: '#332900' }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: '#FFFFFF' }]}>Your RISEV Card</Text>
+              <Text style={[styles.modalTitle, { color: '#FFFFFF' }]}>{tr("Your RISEV Card", "Kad RISEV Anda")}</Text>
               <TouchableOpacity onPress={() => setQrModalVisible(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
@@ -2218,7 +2220,7 @@ export default function CustomerDashboard() {
               />
             </View>
 
-            <Text style={[styles.phoneLabel, { color: '#94A3B8', marginTop: 10 }]}>MEMBER ID</Text>
+            <Text style={[styles.phoneLabel, { color: '#94A3B8', marginTop: 10 }]}>{tr("MEMBER ID", "ID AHLI")}</Text>
             <Text style={[styles.phoneValue, { color: '#FFC700', fontSize: 20, letterSpacing: 2, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>{user?.phone || '+60 11-2345678'}</Text>
             <Text style={[styles.scanNotice, { color: '#64748B' }]}>
               Present this card to the store staff to collect stamps or redeem reward vouchers.
@@ -2233,7 +2235,7 @@ export default function CustomerDashboard() {
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setAppointmentPassModalVisible(false)} />
           <View style={{ width: '100%', maxWidth: 390, maxHeight: '92%', backgroundColor: PASS_SHEET_SURFACE, borderRadius: 28, paddingTop: 8, paddingBottom: 14, overflow: 'hidden' }}>
             <View style={{ paddingHorizontal: 12, alignItems: 'flex-end' }}>
-              <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel="Close appointment pass" hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <TouchableOpacity onPress={() => setAppointmentPassModalVisible(false)} accessibilityLabel={tr("Close appointment pass", "Tutup pas temujanji")} hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                 <Ionicons name="close" size={19} color="#0F172A" />
               </TouchableOpacity>
             </View>
@@ -2246,11 +2248,11 @@ export default function CustomerDashboard() {
             <View style={{ paddingHorizontal: 12, gap: 8, marginTop: 10 }}>
               {isBookingMissed ? (
                 <View style={{ gap: 8 }}>
-                  <Text style={{ color: '#0F172A', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, textAlign: 'center' }}>This appointment time has passed.</Text>
+                  <Text style={{ color: '#0F172A', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, textAlign: 'center' }}>{tr("This appointment time has passed.", "Masa temujanji ini telah berlalu.")}</Text>
                   <TouchableOpacity onPress={handleRescheduleBooking} style={{ backgroundColor: '#FFC700', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}>
-                    <Text style={{ color: '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>Choose another time</Text>
+                    <Text style={{ color: '#111111', fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{tr("Choose another time", "Pilih masa lain")}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={handleDismissMissedBooking} style={{ paddingVertical: 9, alignItems: 'center' }}><Text style={{ color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>Dismiss pass</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={handleDismissMissedBooking} style={{ paddingVertical: 9, alignItems: 'center' }}><Text style={{ color: '#475569', fontFamily: 'PlusJakartaSans_600SemiBold' }}>{tr("Dismiss pass", "Tutup pas")}</Text></TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity onPress={handleMarkArrived} disabled={hasMarkedArrived || markingArrivedLoading} style={{ backgroundColor: hasMarkedArrived ? '#15803D' : '#FFC700', borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -2259,11 +2261,11 @@ export default function CustomerDashboard() {
                 </TouchableOpacity>
               )}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 1 }}>
-                <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Save appointment pass PDF" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
+                <TouchableOpacity onPress={saveCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel={tr("Save appointment pass PDF", "Simpan PDF pas temujanji")} style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
                   <Ionicons name="download-outline" size={16} color="#0F172A" />
-                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', fontSize: 12 }}>Save PDF</Text>
+                  <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', fontSize: 12 }}>{tr("Save PDF", "Simpan PDF")}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel="Share appointment pass to WhatsApp" style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
+                <TouchableOpacity onPress={shareCustomerPass} disabled={!appointmentPassData?.passUrl} accessibilityRole="button" accessibilityLabel={tr("Share appointment pass to WhatsApp", "Kongsi pas temujanji ke WhatsApp")} style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: appointmentPassData?.passUrl ? 1 : 0.4 }}>
                   <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
                   <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#0F172A', fontSize: 12 }}>WhatsApp</Text>
                 </TouchableOpacity>
@@ -2306,7 +2308,7 @@ export default function CustomerDashboard() {
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 12, gap: 6, opacity: 0.8 }}>
                     <Ionicons name="swap-horizontal" size={14} color="#6B7280" />
-                    <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#6B7280' }}>Tap card to flip</Text>
+                    <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: '#6B7280' }}>{tr("Tap card to flip", "Ketik kad untuk selak")}</Text>
                   </View>
                 </View>
 
@@ -2314,12 +2316,12 @@ export default function CustomerDashboard() {
                 {selectedCard.enable_points !== false && (
                   <View style={styles.pointsTierCard}>
                     <View style={styles.pointsTierInfo}>
-                      <Text style={styles.pointsTierTitle}>Points Balance</Text>
+                      <Text style={styles.pointsTierTitle}>{tr("Points Balance", "Baki Mata")}</Text>
                       <Text style={styles.pointsTierValue}>{selectedCard.points} PTS</Text>
                     </View>
                     <View style={[styles.tierBadge, { backgroundColor: '#FFC700' }]}>
                       <Ionicons name="sparkles" size={13} color="#1A1400" />
-                      <Text style={[styles.tierBadgeText, { color: '#1A1400' }]}>VIP MEMBER</Text>
+                      <Text style={[styles.tierBadgeText, { color: '#1A1400' }]}>{tr("VIP MEMBER", "AHLI VIP")}</Text>
                     </View>
                   </View>
                 )}
@@ -2342,14 +2344,14 @@ export default function CustomerDashboard() {
                 {/* Points Catalog Section (Hidden in Stamps-Only Mode) */}
                 {selectedCard.enable_points !== false && (
                   <View style={styles.catalogSection}>
-                    <Text style={styles.catalogTitle}>Points Catalog</Text>
-                    <Text style={styles.catalogSubtitle}>Spend points earned at this merchant to redeem rewards:</Text>
+                    <Text style={styles.catalogTitle}>{tr("Points Catalog", "Katalog Mata")}</Text>
+                    <Text style={styles.catalogSubtitle}>{tr("Spend points earned at this merchant to redeem rewards:", "Gunakan mata yang diperoleh di peniaga ini untuk menebus ganjaran:")}</Text>
                     
                     {loadingRewards ? (
                       <ActivityIndicator color="#000000" style={{ marginVertical: 20 }} />
                     ) : merchantRewards.length === 0 ? (
                       <View style={styles.emptyCatalogCard}>
-                        <Text style={styles.emptyCatalogText}>No catalog rewards available at this shop.</Text>
+                        <Text style={styles.emptyCatalogText}>{tr("No catalog rewards available at this shop.", "Tiada ganjaran katalog tersedia di kedai ini.")}</Text>
                       </View>
                     ) : (
                       <View style={styles.catalogList}>
@@ -2370,7 +2372,7 @@ export default function CustomerDashboard() {
                               disabled={selectedCard.points < reward.points_cost}
                               onPress={() => handleRedeemReward(reward)}
                             >
-                              <Text style={styles.redeemBtnText}>Redeem</Text>
+                              <Text style={styles.redeemBtnText}>{tr("Redeem", "Tebus")}</Text>
                             </TouchableOpacity>
                           </View>
                         ))}
@@ -2389,7 +2391,7 @@ export default function CustomerDashboard() {
                 }}
               >
                 <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.modalScanBtnText}>Show QR to Scan</Text>
+                <Text style={styles.modalScanBtnText}>{tr("Show QR to Scan", "Tunjuk QR untuk Imbas")}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -2413,7 +2415,7 @@ export default function CustomerDashboard() {
                 <View style={[styles.confirmIconBg, { backgroundColor: '#EF4444' }]}>
                   <Ionicons name="warning" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.confirmTitle}>Redemption Failed</Text>
+                <Text style={styles.confirmTitle}>{tr("Redemption Failed", "Penebusan Gagal")}</Text>
                 <Text style={styles.confirmText}>{redemptionError}</Text>
                 
                 <TouchableOpacity
@@ -2423,7 +2425,7 @@ export default function CustomerDashboard() {
                     setRedemptionConfirmVisible(false);
                   }}
                 >
-                  <Text style={styles.errorCloseText}>Close</Text>
+                  <Text style={styles.errorCloseText}>{tr("Close", "Tutup")}</Text>
                 </TouchableOpacity>
               </View>
             ) : !redemptionSuccessVisible ? (
@@ -2432,7 +2434,7 @@ export default function CustomerDashboard() {
                 <View style={styles.confirmIconBg}>
                   <Ionicons name="gift" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.confirmTitle}>Confirm Redemption</Text>
+                <Text style={styles.confirmTitle}>{tr("Confirm Redemption", "Sahkan Penebusan")}</Text>
                 <Text style={styles.confirmText}>
                   Are you sure you want to redeem "{selectedRewardToRedeem?.name}" for {selectedRewardToRedeem?.points_cost} points?
                 </Text>
@@ -2443,7 +2445,7 @@ export default function CustomerDashboard() {
                     disabled={redeemingInProgress}
                     onPress={() => setRedemptionConfirmVisible(false)}
                   >
-                    <Text style={styles.cancelActionText}>Cancel</Text>
+                    <Text style={styles.cancelActionText}>{tr("Cancel", "Batal")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.confirmActionBtn}
@@ -2453,7 +2455,7 @@ export default function CustomerDashboard() {
                     {redeemingInProgress ? (
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
-                      <Text style={styles.confirmActionText}>Redeem</Text>
+                      <Text style={styles.confirmActionText}>{tr("Redeem", "Tebus")}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -2464,7 +2466,7 @@ export default function CustomerDashboard() {
                 <View style={[styles.confirmIconBg, { backgroundColor: '#10B981' }]}>
                   <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.confirmTitle}>Redemption Successful!</Text>
+                <Text style={styles.confirmTitle}>{tr("Redemption Successful!", "Penebusan Berjaya!")}</Text>
                 <Text style={styles.confirmText}>
                   Your voucher has been generated successfully. You can find it under the Vouchers tab!
                 </Text>
@@ -2474,13 +2476,13 @@ export default function CustomerDashboard() {
                     style={styles.successDoneBtn}
                     onPress={handleRedemptionSuccessDone}
                   >
-                    <Text style={styles.successDoneText}>Done</Text>
+                    <Text style={styles.successDoneText}>{tr("Done", "Selesai")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.successViewVouchersBtn}
                     onPress={handleRedemptionSuccessViewVouchers}
                   >
-                    <Text style={styles.successViewVouchersText}>View Vouchers</Text>
+                    <Text style={styles.successViewVouchersText}>{tr("View Vouchers", "Lihat Baucar")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2499,7 +2501,7 @@ export default function CustomerDashboard() {
         <View style={[styles.detailOverlay, isDesktop && { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={[styles.detailContent, { height: '80%' }, isDesktop && { maxWidth: 500, width: '90%', borderRadius: 32 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.detailModalTitle}>My Notifications</Text>
+              <Text style={styles.detailModalTitle}>{tr("My Notifications", "Pemberitahuan Saya")}</Text>
               <TouchableOpacity onPress={handleCloseNotifications} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color="#0b1c30" />
               </TouchableOpacity>

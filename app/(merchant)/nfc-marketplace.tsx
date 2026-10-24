@@ -29,6 +29,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { useTr } from '@/lib/i18n';
 import { pb } from '@/lib/pocketbase';
 
 interface PackageOption {
@@ -95,6 +96,7 @@ const PACKAGES: PackageOption[] = [
 export default function NfcPaywallScreen() {
   const router = useRouter();
   const { user, refreshSession, switchRole } = useAuth();
+  const tr = useTr();
 
   // State
   const [selectedPackageId, setSelectedPackageId] = useState<string>('duo');
@@ -269,7 +271,7 @@ export default function NfcPaywallScreen() {
         setStandCodeInput('');
         await refreshSession();
         await switchRole('merchant');
-        Alert.alert('Stand Activated! 🎉', 'Your NFC Stand & Merchant account are now active.', [
+        Alert.alert(tr("Stand Activated! 🎉", "Stand Diaktifkan! 🎉"), 'Your NFC Stand & Merchant account are now active.', [
           { text: 'Go to Dashboard', onPress: () => router.replace('/(merchant)') }
         ]);
       } else {
@@ -292,7 +294,7 @@ export default function NfcPaywallScreen() {
 
   const handleCheckout = async () => {
     if (!recipientName.trim() || !whatsappPhone.trim() || !addressLine1.trim() || !postcode.trim() || !city.trim() || !state.trim()) {
-      Alert.alert('Perhatian', 'Sila lengkapkan semua butiran penghantaran (Nama, No Telefon, Alamat, Poskod, Bandar & Negeri).');
+      Alert.alert(tr('Attention', 'Perhatian'), tr('Please complete all shipping details (Name, Phone, Address, Postcode, City & State).', 'Sila lengkapkan semua butiran penghantaran (Nama, No Telefon, Alamat, Poskod, Bandar & Negeri).'));
       return;
     }
 
@@ -423,7 +425,7 @@ export default function NfcPaywallScreen() {
           {/* Fulfillment Status Progress Box */}
           <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#222225', marginBottom: 20 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Shipment Status</Text>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr("Shipment Status", "Status Penghantaran")}</Text>
               <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: existingOrder.fulfillment_status === 'shipped' ? 'rgba(139, 92, 246, 0.2)' : existingOrder.fulfillment_status === 'delivered' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.15)' }}>
                 <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: existingOrder.fulfillment_status === 'shipped' ? '#A78BFA' : existingOrder.fulfillment_status === 'delivered' ? '#34D399' : '#F59E0B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   {existingOrder.fulfillment_status || 'PROCESSING'}
@@ -434,7 +436,7 @@ export default function NfcPaywallScreen() {
             {/* Courier & Tracking info */}
             {existingOrder.tracking_number ? (
               <View style={{ backgroundColor: '#18181B', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#27272A' }}>
-                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#A1A1AA' }}>Courier Partner</Text>
+                <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#A1A1AA' }}>{tr("Courier Partner", "Rakan Kurier")}</Text>
                 <Text style={{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 2 }}>
                   {existingOrder.courier_name || 'Courier Express'}
                 </Text>
@@ -450,7 +452,7 @@ export default function NfcPaywallScreen() {
                       else Linking.openURL(url);
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>Track Live 🌐</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' }}>{tr("Track Live 🌐", "Jejak Langsung 🌐")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -467,7 +469,7 @@ export default function NfcPaywallScreen() {
 
             {/* Destination Address */}
             <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 16 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delivery To</Text>
+              <Text style={{ fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr("Delivery To", "Penghantaran Ke")}</Text>
               <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', marginTop: 6 }}>{existingOrder.recipient_name} <Text style={{ color: '#94A3B8', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12 }}>({existingOrder.whatsapp_phone})</Text></Text>
               <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#A1A1AA', marginTop: 4, lineHeight: 18 }}>
                 {existingOrder.full_address || `${existingOrder.address_line1}, ${existingOrder.postcode} ${existingOrder.city}`}
@@ -511,7 +513,7 @@ export default function NfcPaywallScreen() {
             onPress={() => setShowOrderNewPurchase(true)}
           >
             <Text style={{ fontSize: 12.5, fontFamily: 'PlusJakartaSans_600SemiBold', color: '#A1A1AA' }}>
-              Need more stands for extra branches? <Text style={{ color: '#FFC700', textDecorationLine: 'underline' }}>Order Another Bundle</Text>
+              Need more stands for extra branches? <Text style={{ color: '#FFC700', textDecorationLine: 'underline' }}>{tr("Order Another Bundle", "Pesan Bundel Lain")}</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -547,10 +549,10 @@ export default function NfcPaywallScreen() {
               resizeMode="contain" 
             />
             <View style={styles.proBadge}>
-              <Text style={styles.proBadgeText}>NFC BUNDLE</Text>
+              <Text style={styles.proBadgeText}>{tr("NFC BUNDLE", "BUNDEL NFC")}</Text>
             </View>
           </View>
-          <Text style={styles.mainTitle}>Turn walk-ins into regulars.</Text>
+          <Text style={styles.mainTitle}>{tr("Turn walk-ins into regulars.", "Tukar pelawat sekali kepada pelanggan tetap.")}</Text>
           <Text style={styles.subtitle}>
             Pair this physical NFC counter stand to your store to start collecting customer visits and loyalty stamps instantly.
           </Text>
@@ -559,11 +561,11 @@ export default function NfcPaywallScreen() {
           <View style={styles.trustBadgeRow}>
             <View style={styles.trustBadge}>
               <Ionicons name="people" size={13} color="#000000" />
-              <Text style={styles.trustBadgeText}>Lifetime Customer Quota</Text>
+              <Text style={styles.trustBadgeText}>{tr("Lifetime Customer Quota", "Kuota Pelanggan Seumur Hidup")}</Text>
             </View>
             <View style={styles.trustBadge}>
               <Ionicons name="shield-checkmark" size={13} color="#15803D" />
-              <Text style={styles.trustBadgeText}>Zero Monthly Fees</Text>
+              <Text style={styles.trustBadgeText}>{tr("Zero Monthly Fees", "Tiada Yuran Bulanan")}</Text>
             </View>
           </View>
         </View>
@@ -606,7 +608,7 @@ export default function NfcPaywallScreen() {
                 {isRedeemingCode ? (
                   <ActivityIndicator size="small" color="#000000" />
                 ) : (
-                  <Text style={styles.redeemBtnText}>Redeem</Text>
+                  <Text style={styles.redeemBtnText}>{tr("Redeem", "Tebus")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -632,7 +634,7 @@ export default function NfcPaywallScreen() {
             }}
             activeOpacity={0.88}
           >
-            <Text style={styles.curiosityBtnText}>Don't have a stand? Get Your Stand Now 🎁</Text>
+            <Text style={styles.curiosityBtnText}>{tr("Don't have a stand? Get Your Stand Now 🎁", "Tiada stand? Dapatkan Stand Anda Sekarang 🎁")}</Text>
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
               <Ionicons name="arrow-down-circle" size={18} color="#FFCC00" />
             </Animated.View>
@@ -657,11 +659,11 @@ export default function NfcPaywallScreen() {
           <View style={styles.trustBadgeRow}>
             <View style={styles.trustBadge}>
               <Ionicons name="sparkles" size={14} color="#FFD700" />
-              <Text style={styles.trustBadgeText}>One-Time Payment</Text>
+              <Text style={styles.trustBadgeText}>{tr("One-Time Payment", "Bayaran Sekali Sahaja")}</Text>
             </View>
             <View style={styles.trustBadge}>
               <Ionicons name="shield-checkmark" size={14} color="#FFD700" />
-              <Text style={styles.trustBadgeText}>No Monthly Fees</Text>
+              <Text style={styles.trustBadgeText}>{tr("No Monthly Fees", "Tiada Yuran Bulanan")}</Text>
             </View>
           </View>
 
@@ -676,7 +678,7 @@ export default function NfcPaywallScreen() {
               >
                 {pkg.isPopular && (
                   <View style={styles.recommendedBadge}>
-                    <Text style={styles.recommendedBadgeText}>RECOMMENDED</Text>
+                    <Text style={styles.recommendedBadgeText}>{tr("RECOMMENDED", "DISYORKAN")}</Text>
                   </View>
                 )}
                 <View style={styles.pkgRow}>
@@ -721,10 +723,10 @@ export default function NfcPaywallScreen() {
           >
             <Ionicons name="information-circle" size={18} color="#64748B" style={{ marginTop: 2 }} />
             <Text style={styles.disclaimerText}>
-              <Text style={{ color: '#E2E8F0', fontFamily: 'PlusJakartaSans_700Bold' }}>Optional Add-ons: </Text>
+              <Text style={{ color: '#E2E8F0', fontFamily: 'PlusJakartaSans_700Bold' }}>{tr("Optional Add-ons:", "Tambahan Pilihan:")}</Text>
               WhatsApp Automation, Additional Branches, and Extra Database Quota can be added later via your dashboard if needed.
               {' '}
-              <Text style={{ color: '#FFCC00', fontFamily: 'PlusJakartaSans_700Bold' }}>Add customer slots →</Text>
+              <Text style={{ color: '#FFCC00', fontFamily: 'PlusJakartaSans_700Bold' }}>{tr("Add customer slots →", "Tambah slot pelanggan →")}</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -743,13 +745,13 @@ export default function NfcPaywallScreen() {
           style={styles.helpSupportRow}
         >
           <Ionicons name="help-circle-outline" size={16} color="#000000" />
-          <Text style={styles.helpSupportText}>Need help setting up or ordering? Chat with us</Text>
+          <Text style={styles.helpSupportText}>{tr("Need help setting up or ordering? Chat with us", "Perlukan bantuan persediaan atau pesanan? Sembang dengan kami")}</Text>
         </TouchableOpacity>
 
         <View style={styles.footerLinks}>
-          <Text style={styles.footerLinkText}>How it works</Text>
-          <Text style={styles.footerLinkText}>Restore Purchase</Text>
-          <Text style={styles.footerLinkText}>Privacy Policy</Text>
+          <Text style={styles.footerLinkText}>{tr("How it works", "Cara ia berfungsi")}</Text>
+          <Text style={styles.footerLinkText}>{tr("Restore Purchase", "Pulihkan Pembelian")}</Text>
+          <Text style={styles.footerLinkText}>{tr("Privacy Policy", "Dasar Privasi")}</Text>
         </View>
 
       </ScrollView>
@@ -769,7 +771,7 @@ export default function NfcPaywallScreen() {
               style={styles.massiveBtn}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Text style={styles.massiveBtnText}>Order Smart Stand Now</Text>
+                <Text style={styles.massiveBtnText}>{tr("Order Smart Stand Now", "Pesan Smart Stand Sekarang")}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#000000" />
               </View>
             </LinearGradient>
@@ -786,7 +788,7 @@ export default function NfcPaywallScreen() {
           
           <View style={styles.sheetCard}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Shipping Details</Text>
+              <Text style={styles.sheetTitle}>{tr("Shipping Details", "Butiran Penghantaran")}</Text>
               <TouchableOpacity onPress={() => setShowCheckoutSheet(false)} style={styles.sheetCloseBtn}>
                 <Ionicons name="close" size={24} color="#94A3B8" />
               </TouchableOpacity>
@@ -795,18 +797,18 @@ export default function NfcPaywallScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
               
               <View style={styles.formField}>
-                <Text style={styles.inputLabel}>Recipient Name</Text>
+                <Text style={styles.inputLabel}>{tr("Recipient Name", "Nama Penerima")}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={recipientName}
                   onChangeText={setRecipientName}
-                  placeholder="Full Name"
+                  placeholder={tr("Full Name", "Nama Penuh")}
                   placeholderTextColor="#475569"
                 />
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.inputLabel}>WhatsApp Number</Text>
+                <Text style={styles.inputLabel}>{tr("WhatsApp Number", "Nombor WhatsApp")}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={whatsappPhone}
@@ -819,24 +821,24 @@ export default function NfcPaywallScreen() {
 
               {/* Address Line 1 */}
               <View style={styles.formField}>
-                <Text style={styles.inputLabel}>Street Address (Line 1)</Text>
+                <Text style={styles.inputLabel}>{tr("Street Address (Line 1)", "Alamat Jalan (Baris 1)")}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={addressLine1}
                   onChangeText={setAddressLine1}
-                  placeholder="House / Unit No, Building, Street Name"
+                  placeholder={tr("House / Unit No, Building, Street Name", "No Rumah / Unit, Bangunan, Nama Jalan")}
                   placeholderTextColor="#475569"
                 />
               </View>
 
               {/* Address Line 2 */}
               <View style={styles.formField}>
-                <Text style={styles.inputLabel}>Unit / Area (Line 2 - Optional)</Text>
+                <Text style={styles.inputLabel}>{tr("Unit / Area (Line 2 - Optional)", "Unit / Kawasan (Baris 2 - Pilihan)")}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={addressLine2}
                   onChangeText={setAddressLine2}
-                  placeholder="Floor, Taman, Apartment, Landmark"
+                  placeholder={tr("Floor, Taman, Apartment, Landmark", "Tingkat, Taman, Apartmen, Mercu Tanda")}
                   placeholderTextColor="#475569"
                 />
               </View>
@@ -844,7 +846,7 @@ export default function NfcPaywallScreen() {
               {/* Postcode & City (2 Columns) */}
               <View style={styles.rowInputs}>
                 <View style={[styles.formField, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>Postcode</Text>
+                  <Text style={styles.inputLabel}>{tr("Postcode", "Poskod")}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={postcode}
@@ -857,12 +859,12 @@ export default function NfcPaywallScreen() {
                 </View>
 
                 <View style={[styles.formField, { flex: 1.4 }]}>
-                  <Text style={styles.inputLabel}>City</Text>
+                  <Text style={styles.inputLabel}>{tr("City", "Bandar")}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={city}
                     onChangeText={setCity}
-                    placeholder="e.g. Kuala Lumpur"
+                    placeholder={tr("e.g. Kuala Lumpur", "cth. Kuala Lumpur")}
                     placeholderTextColor="#475569"
                   />
                 </View>
@@ -870,23 +872,23 @@ export default function NfcPaywallScreen() {
 
               {/* State */}
               <View style={styles.formField}>
-                <Text style={styles.inputLabel}>State</Text>
+                <Text style={styles.inputLabel}>{tr("State", "Negeri")}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={state}
                   onChangeText={setState}
-                  placeholder="e.g. Selangor / WP Kuala Lumpur"
+                  placeholder={tr("e.g. Selangor / WP Kuala Lumpur", "cth. Selangor / WP Kuala Lumpur")}
                   placeholderTextColor="#475569"
                 />
               </View>
 
-              <Text style={[styles.inputLabel, { marginTop: 10, marginBottom: 8 }]}>Payment Method</Text>
+              <Text style={[styles.inputLabel, { marginTop: 10, marginBottom: 8 }]}>{tr("Payment Method", "Kaedah Pembayaran")}</Text>
               <View style={styles.paymentGrid}>
                 {['fpx', 'card', 'whatsapp'].map((method) => {
                   const isActive = paymentMethod === method;
                   let icon = "business-outline";
-                  let label = "FPX Online";
-                  if (method === 'card') { icon = "card-outline"; label = "Card"; }
+                  let label = tr("FPX Online", "FPX Dalam Talian");
+                  if (method === 'card') { icon = "card-outline"; label = tr("Card", "Kad"); }
                   if (method === 'whatsapp') { icon = "logo-whatsapp"; label = "WhatsApp"; }
                   
                   return (
@@ -935,8 +937,8 @@ export default function NfcPaywallScreen() {
             <View style={styles.successIconCircle}>
               <Ionicons name="checkmark-sharp" size={32} color="#000" />
             </View>
-            <Text style={styles.successTitle}>Order Placed!</Text>
-            <Text style={styles.successSub}>Thank you. Your smart stand will be shipped out within 24 hours.</Text>
+            <Text style={styles.successTitle}>{tr("Order Placed!", "Pesanan Dihantar!")}</Text>
+            <Text style={styles.successSub}>{tr("Thank you. Your smart stand will be shipped out within 24 hours.", "Terima kasih. Smart stand anda akan dihantar dalam masa 24 jam.")}</Text>
             <TouchableOpacity
               style={styles.finalPayBtn}
               onPress={() => {
@@ -944,7 +946,7 @@ export default function NfcPaywallScreen() {
                 router.back();
               }}
             >
-              <Text style={styles.finalPayBtnText}>Back to Home</Text>
+              <Text style={styles.finalPayBtnText}>{tr("Back to Home", "Kembali ke Utama")}</Text>
             </TouchableOpacity>
           </View>
         </View>

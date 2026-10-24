@@ -58,7 +58,8 @@
     "test:e2e:give": "playwright test tests/e2e/02-merchant-give.spec.ts",
     "test:e2e:rewards": "playwright test tests/e2e/03-merchant-rewards.spec.ts",
     "test:e2e:staff": "playwright test tests/e2e/04-merchant-staff.spec.ts",
-    "test:e2e:customer": "playwright test tests/e2e/05-customer-flows.spec.ts"
+    "test:e2e:customer": "playwright test tests/e2e/05-customer-flows.spec.ts",
+    "i18n:audit": "node scripts/i18n-audit.mjs"
   },
   "private": true
 }

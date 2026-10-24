@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTr } from '@/lib/i18n';
 import {
   View,
   Text,
@@ -163,6 +164,7 @@ const buildBookingCartLines = (booking: any): any[] => {
 export default function NfcClaimModal() {
   const { user } = useAuth();
   const { locale } = useLanguage();
+  const tr = useTr();
   const merchantId = user?.merchant_id;
 
   const [claim, setClaim] = useState<any>(null);
@@ -1321,29 +1323,29 @@ export default function NfcClaimModal() {
 
               <View style={styles.summaryBox}>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Customer</Text>
+                  <Text style={styles.summaryLabel}>{tr("Customer", "Pelanggan")}</Text>
                   <Text style={styles.summaryValue}>{getCleanCustomerName(claim.customer_name)}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Phone</Text>
+                  <Text style={styles.summaryLabel}>{tr("Phone", "Telefon")}</Text>
                   <Text style={styles.summaryValue}>{claim.customer_phone}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Bill Amount</Text>
+                  <Text style={styles.summaryLabel}>{tr("Bill Amount", "Jumlah Bil")}</Text>
                   <Text style={styles.summaryValue}>RM {netTotalAmount.toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Handled by</Text>
+                  <Text style={styles.summaryLabel}>{tr("Handled by", "Dikendalikan oleh")}</Text>
                   <Text style={[styles.summaryValue, { color: '#0F172A', fontFamily: 'PlusJakartaSans_700Bold' }]}>
                     {user?.name || 'Staff'}
                   </Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Stamps Added</Text>
+                  <Text style={styles.summaryLabel}>{tr("Stamps Added", "Setem Ditambah")}</Text>
                   <View style={styles.stampPillBadge}>
                     <Ionicons name="ribbon" size={12} color="#10B981" />
                     <Text style={styles.summaryValueStamps}>+{stampAmount} stamps</Text>
@@ -1352,7 +1354,7 @@ export default function NfcClaimModal() {
               </View>
 
               <TouchableOpacity style={styles.doneBtn} onPress={handleClose} activeOpacity={0.8}>
-                <Text style={styles.doneBtnText}>Done</Text>
+                <Text style={styles.doneBtnText}>{tr("Done", "Selesai")}</Text>
               </TouchableOpacity>
             </View>
           ) : (isProPlan || claim.manual_pos) ? (
@@ -1432,10 +1434,10 @@ export default function NfcClaimModal() {
                         activeOpacity={0.8}
                       >
                         <Ionicons name="chevron-back" size={18} color="#1D1D1F" />
-                        <Text style={styles.pickerBackText}>Back</Text>
+                        <Text style={styles.pickerBackText}>{tr("Back", "Kembali")}</Text>
                       </TouchableOpacity>
                       <View style={{ flex: 1, alignItems: 'center' }}>
-                        <Text style={styles.pickerTitle}>Edit Order & Add Items</Text>
+                        <Text style={styles.pickerTitle}>{tr("Edit Order & Add Items", "Edit Pesanan & Tambah Item")}</Text>
                         <Text style={styles.pickerSubTitle} numberOfLines={1}>
                           {getCleanCustomerName(claim.customer_name)} · {claim.customer_phone}
                         </Text>
@@ -1445,7 +1447,7 @@ export default function NfcClaimModal() {
                         onPress={() => setIsCatalogPickerOpen(false)}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.pickerDoneText}>Done</Text>
+                        <Text style={styles.pickerDoneText}>{tr("Done", "Selesai")}</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -1454,7 +1456,7 @@ export default function NfcClaimModal() {
                       <Ionicons name="search-outline" size={16} color="#86868B" />
                       <TextInput
                         style={styles.pickerSearchInput}
-                        placeholder="Search products or services..."
+                        placeholder={tr("Search products or services...", "Cari produk atau perkhidmatan...")}
                         placeholderTextColor="#86868B"
                         value={pickerSearchQuery}
                         onChangeText={setPickerSearchQuery}
@@ -1507,7 +1509,7 @@ export default function NfcClaimModal() {
                           activeOpacity={0.8}
                         >
                           <Ionicons name="add-circle-outline" size={18} color="#1D1D1F" />
-                          <Text style={styles.pickerCustomTitle}>Add Custom Charge / Line Item</Text>
+                          <Text style={styles.pickerCustomTitle}>{tr("Add Custom Charge / Line Item", "Tambah Caj Tersuai / Item Baris")}</Text>
                           <Ionicons name={isAddingCustom ? 'chevron-up' : 'chevron-down'} size={16} color="#86868B" style={{ marginLeft: 'auto' }} />
                         </TouchableOpacity>
 
@@ -1515,7 +1517,7 @@ export default function NfcClaimModal() {
                           <View style={{ gap: 8, marginTop: 10 }}>
                             <TextInput
                               style={styles.pickerCustomInput}
-                              placeholder="Item Name (e.g. Delivery Fee, Ice Bag)"
+                              placeholder={tr("Item Name (e.g. Delivery Fee, Ice Bag)", "Nama Item (cth. Caj Penghantaran, Beg Ais)")}
                               placeholderTextColor="#86868B"
                               value={customItemTitle}
                               onChangeText={setCustomItemTitle}
@@ -1523,7 +1525,7 @@ export default function NfcClaimModal() {
                             <View style={{ flexDirection: 'row', gap: 8 }}>
                               <TextInput
                                 style={[styles.pickerCustomInput, { flex: 1 }]}
-                                placeholder="Price (RM)"
+                                placeholder={tr("Price (RM)", "Harga (RM)")}
                                 placeholderTextColor="#86868B"
                                 keyboardType="decimal-pad"
                                 value={customItemPrice}
@@ -1590,7 +1592,7 @@ export default function NfcClaimModal() {
                               ) : (
                                 <TouchableOpacity style={styles.pickerAddBtn} onPress={() => handleAddItem(item)} activeOpacity={0.8}>
                                   <Ionicons name="add" size={14} color="#1D1D1F" />
-                                  <Text style={styles.pickerAddBtnText}>Add</Text>
+                                  <Text style={styles.pickerAddBtnText}>{tr("Add", "Tambah")}</Text>
                                 </TouchableOpacity>
                               )}
                             </View>
@@ -1630,7 +1632,7 @@ export default function NfcClaimModal() {
                       >
                         <Ionicons name="chevron-back" size={20} color="#1D1D1F" />
                       </TouchableOpacity>
-                      <Text style={styles.payTitle}>Payment</Text>
+                      <Text style={styles.payTitle}>{tr("Payment", "Pembayaran")}</Text>
                       <View style={{ width: 28 }} />
                     </View>
 
@@ -1658,7 +1660,7 @@ export default function NfcClaimModal() {
 
                       {/* Total Amount Banner */}
                       <View style={styles.payTotalBanner}>
-                        <Text style={styles.payTotalLabel}>Total Amount</Text>
+                        <Text style={styles.payTotalLabel}>{tr("Total Amount", "Jumlah Keseluruhan")}</Text>
                         <Text style={styles.payTotalValue}>
                           RM {netTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
@@ -1666,7 +1668,7 @@ export default function NfcClaimModal() {
 
                       {/* Payment Methods Section */}
                       <View style={{ gap: 8 }}>
-                        <Text style={styles.paySectionHeading}>Select Payment Method</Text>
+                        <Text style={styles.paySectionHeading}>{tr("Select Payment Method", "Pilih Kaedah Pembayaran")}</Text>
 
                         {/* Option 1: QR Payment */}
                         <TouchableOpacity
@@ -1681,7 +1683,7 @@ export default function NfcClaimModal() {
                             <Ionicons name="qr-code-outline" size={20} color="#1D1D1F" />
                           </View>
                           <View style={{ flex: 1, paddingRight: 4 }}>
-                            <Text style={styles.payMethodTitle}>QR Payment</Text>
+                            <Text style={styles.payMethodTitle}>{tr("QR Payment", "Pembayaran QR")}</Text>
                             <Text style={styles.payMethodSub}>DuitNow, TNG eWallet, GrabPay</Text>
                           </View>
                           <View style={styles.duitnowBadgeBox}>
@@ -1703,7 +1705,7 @@ export default function NfcClaimModal() {
                             <Ionicons name="card-outline" size={20} color="#1D1D1F" />
                           </View>
                           <View style={{ flex: 1, paddingRight: 4 }}>
-                            <Text style={styles.payMethodTitle}>Card Payment</Text>
+                            <Text style={styles.payMethodTitle}>{tr("Card Payment", "Pembayaran Kad")}</Text>
                             <Text style={styles.payMethodSub}>Visa, Mastercard, MyDebit</Text>
                           </View>
                           <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -1725,8 +1727,8 @@ export default function NfcClaimModal() {
                             <Ionicons name="cash-outline" size={20} color="#059669" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.payMethodTitle}>Cash</Text>
-                            <Text style={styles.payMethodSub}>Counter cash settlement</Text>
+                            <Text style={styles.payMethodTitle}>{tr("Cash", "Tunai")}</Text>
+                            <Text style={styles.payMethodSub}>{tr("Counter cash settlement", "Pembayaran tunai di kaunter")}</Text>
                           </View>
                         </TouchableOpacity>
 
@@ -1743,18 +1745,18 @@ export default function NfcClaimModal() {
                             <Ionicons name="business-outline" size={20} color="#1D1D1F" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.payMethodTitle}>Bank Transfer</Text>
-                            <Text style={styles.payMethodSub}>Direct online transfer</Text>
+                            <Text style={styles.payMethodTitle}>{tr("Bank Transfer", "Pindahan Bank")}</Text>
+                            <Text style={styles.payMethodSub}>{tr("Direct online transfer", "Pindahan dalam talian terus")}</Text>
                           </View>
                         </TouchableOpacity>
                       </View>
 
                       {/* Optional Payment Reference Field */}
                       <View style={{ gap: 6, marginTop: 4 }}>
-                        <Text style={styles.payRefLabel}>Payment Reference (Optional)</Text>
+                        <Text style={styles.payRefLabel}>{tr("Payment Reference (Optional)", "Rujukan Pembayaran (Pilihan)")}</Text>
                         <TextInput
                           style={styles.payRefInput}
-                          placeholder="e.g. Reference number / receipt ID"
+                          placeholder={tr("e.g. Reference number / receipt ID", "cth. Nombor rujukan / ID resit")}
                           placeholderTextColor="#86868B"
                           value={paymentReference}
                           onChangeText={setPaymentReference}
@@ -1775,7 +1777,7 @@ export default function NfcClaimModal() {
                         ) : (
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                             <Ionicons name="lock-closed" size={16} color="#FFFFFF" />
-                            <Text style={styles.payConfirmBtnText}>Confirm Payment</Text>
+                            <Text style={styles.payConfirmBtnText}>{tr("Confirm Payment", "Sahkan Pembayaran")}</Text>
                           </View>
                         )}
                       </TouchableOpacity>
@@ -1795,7 +1797,7 @@ export default function NfcClaimModal() {
                   <View style={{ flexShrink: 1 }}>
                     <View style={styles.compactHeader}>
                       <Text style={styles.compactTitle}>{locale === 'ms' ? 'Pilih baucar' : 'Choose voucher'}</Text>
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to checkout" style={styles.compactIconButton} onPress={() => setIsVouchersExpanded(false)}><Ionicons name="close" size={22} color="#0F172A" /></TouchableOpacity>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr("Back to checkout", "Kembali ke pembayaran")} style={styles.compactIconButton} onPress={() => setIsVouchersExpanded(false)}><Ionicons name="close" size={22} color="#0F172A" /></TouchableOpacity>
                     </View>
                     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                       {customerVouchers.length === 0 && <Text style={styles.compactMuted}>{locale === 'ms' ? 'Tiada baucar tersedia.' : 'No vouchers available.'}</Text>}
@@ -1823,8 +1825,8 @@ export default function NfcClaimModal() {
                 <>
                   <View style={styles.compactHeader}>
                     <Text style={styles.compactTitle}>{activeBooking ? (locale === 'ms' ? 'Selesaikan tempahan' : 'Complete Booking') : (locale === 'ms' ? 'Checkout Pantas' : 'Quick Checkout')}</Text>
-                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open full POS" onPress={openFullPos} style={{ minHeight: 44, paddingHorizontal: 10, backgroundColor: '#F1F5F9', borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }}><Text style={styles.compactLink}>Full POS</Text><Ionicons name="expand-outline" size={14} color="#0F172A" /></TouchableOpacity>
-                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Minimize checkout" style={styles.compactIconButton} onPress={handleMinimize}><Ionicons name="close" size={22} color="#64748B" /></TouchableOpacity>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr("Open full POS", "Buka POS penuh")} onPress={openFullPos} style={{ minHeight: 44, paddingHorizontal: 10, backgroundColor: '#F1F5F9', borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }}><Text style={styles.compactLink}>{tr("Full POS", "POS Penuh")}</Text><Ionicons name="expand-outline" size={14} color="#0F172A" /></TouchableOpacity>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr("Minimize checkout", "Kecilkan pembayaran")} style={styles.compactIconButton} onPress={handleMinimize}><Ionicons name="close" size={22} color="#64748B" /></TouchableOpacity>
                   </View>
                   {errorMsg && <View style={styles.errorBanner}><Text style={styles.errorText}>{errorMsg}</Text></View>}
                   <ScrollView style={{ flexShrink: 1, flexGrow: 0 }} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -1834,7 +1836,7 @@ export default function NfcClaimModal() {
                         <Text style={styles.compactCustomerName} numberOfLines={1}>{getCleanCustomerName(claim.customer_name)}</Text>
                         <Text style={styles.compactMuted} numberOfLines={1}>{[claim.customer_phone, claim.session_code].filter(Boolean).join(' · ')}</Text>
                       </View>
-                      {activeBooking ? <TouchableOpacity accessibilityRole="button" onPress={handleToggleBookingStatus} style={styles.compactStatus}><Text style={styles.compactMuted}>{activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? 'In-service' : 'Booked'}</Text></TouchableOpacity> : <View style={styles.compactStatus}><Text style={styles.compactMuted}>Walk-in</Text></View>}
+                      {activeBooking ? <TouchableOpacity accessibilityRole="button" onPress={handleToggleBookingStatus} style={styles.compactStatus}><Text style={styles.compactMuted}>{activeBooking.status === 'in_service' || activeBooking.status === 'arrived' ? 'In-service' : 'Booked'}</Text></TouchableOpacity> : <View style={styles.compactStatus}><Text style={styles.compactMuted}>{tr("Walk-in", "Tanpa Temujanji")}</Text></View>}
                     </View>
                     {activeBooking ? (
                       <View style={styles.compactLine}>
@@ -1883,7 +1885,7 @@ export default function NfcClaimModal() {
                     </View>
                     <View style={styles.compactVoucherLine}>
                       <TouchableOpacity accessibilityRole="button" style={[styles.compactLine, { flex: 1, gap: 8, minHeight: 48 }]} onPress={() => setIsVouchersExpanded(true)}>
-                        <Text style={styles.compactLabel}>Voucher</Text>
+                        <Text style={styles.compactLabel}>{tr("Voucher", "Baucar")}</Text>
                         <View style={{ flex: 1, alignItems: 'flex-end' }}>
                           <Text style={styles.compactMuted} numberOfLines={1}>{appliedVoucher ? (appliedVoucher.expand?.reward?.name || appliedVoucher.title || appliedVoucher.code) : `${customerVouchers.length} ${locale === 'ms' ? 'tersedia' : 'available'}`}</Text>
                           {appliedVoucher && (getVoucherIssue(appliedVoucher)
@@ -1892,14 +1894,14 @@ export default function NfcClaimModal() {
                         </View>
                         <Ionicons name="chevron-forward" size={16} color="#64748B" />
                       </TouchableOpacity>
-                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove voucher" style={styles.compactIconButton} onPress={() => { voucherDeselectedRef.current = true; setAppliedVoucher(null); }}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
+                      {appliedVoucher && <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr("Remove voucher", "Buang baucar")} style={styles.compactIconButton} onPress={() => { voucherDeselectedRef.current = true; setAppliedVoucher(null); }}><Ionicons name="close-circle-outline" size={20} color="#64748B" /></TouchableOpacity>}
                     </View>
                     <View style={styles.compactLine}>
                       <Text style={styles.compactLabel}>{locale === 'ms' ? 'Cop diberikan' : 'Stamps to give'}</Text>
                       <View style={styles.compactStepper}>
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.max(0, (parseInt(stampAmount, 10) || 0) - 1)))}><Ionicons name="remove" size={18} color="#0F172A" /></TouchableOpacity>
-                        <TextInput accessibilityLabel="Stamps to give" value={stampAmount} onChangeText={text => setStampAmount(text.replace(/[^0-9]/g, ''))} keyboardType="number-pad" maxLength={3} style={styles.compactStampInput} />
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase stamps" style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.min(99, (parseInt(stampAmount, 10) || 1) + 1)))}><Ionicons name="add" size={18} color="#0F172A" /></TouchableOpacity>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr("Decrease stamps", "Kurangkan setem")} style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.max(0, (parseInt(stampAmount, 10) || 0) - 1)))}><Ionicons name="remove" size={18} color="#0F172A" /></TouchableOpacity>
+                        <TextInput accessibilityLabel={tr("Stamps to give", "Setem untuk diberi")} value={stampAmount} onChangeText={text => setStampAmount(text.replace(/[^0-9]/g, ''))} keyboardType="number-pad" maxLength={3} style={styles.compactStampInput} />
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr("Increase stamps", "Tambah setem")} style={styles.compactIconButton} onPress={() => setStampAmount(String(Math.min(99, (parseInt(stampAmount, 10) || 1) + 1)))}><Ionicons name="add" size={18} color="#0F172A" /></TouchableOpacity>
                       </View>
                     </View>
                     <View style={styles.compactLine}><Text style={styles.compactMuted}>{locale === 'ms' ? 'Mata diperoleh' : 'Points earned'}</Text><Text style={styles.compactLabel}>+{Math.floor(netTotalAmount / spendPerPoint).toLocaleString()}</Text></View>
@@ -1949,10 +1951,10 @@ export default function NfcClaimModal() {
                       <Ionicons name="wifi" size={22} color={merchantColor} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.title}>NFC Stamp Claim!</Text>
-                      <Text style={styles.subtitle}>Customer scanned store NFC card</Text>
+                      <Text style={styles.title}>{tr("NFC Stamp Claim!", "Tuntutan Setem NFC!")}</Text>
+                      <Text style={styles.subtitle}>{tr("Customer scanned store NFC card", "Pelanggan mengimbas kad NFC kedai")}</Text>
                     </View>
-                    <TouchableOpacity onPress={handleMinimize} style={styles.closeBtn} accessibilityLabel="Minimize">
+                    <TouchableOpacity onPress={handleMinimize} style={styles.closeBtn} accessibilityLabel={tr("Minimize", "Kecilkan")}>
                       <Ionicons name="close" size={20} color="#64748B" />
                     </TouchableOpacity>
                   </View>
@@ -1988,7 +1990,7 @@ export default function NfcClaimModal() {
                   {/* Inputs */}
                   <View style={styles.inputRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>BILL AMOUNT (RM)</Text>
+                      <Text style={styles.inputLabel}>{tr("BILL AMOUNT (RM)", "JUMLAH BIL (RM)")}</Text>
                       <View style={styles.inputContainer}>
                         <Ionicons name="cash-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
                         <TextInput
@@ -2002,7 +2004,7 @@ export default function NfcClaimModal() {
                       </View>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>STAMPS TO GIVE</Text>
+                      <Text style={styles.inputLabel}>{tr("STAMPS TO GIVE", "SETEM UNTUK DIBERI")}</Text>
                       <View style={styles.inputContainer}>
                         <Ionicons name="star-outline" size={16} color={merchantColor} style={{ marginRight: 8 }} />
                         <TextInput
@@ -2037,11 +2039,11 @@ export default function NfcClaimModal() {
                   <View style={styles.actionRow}>
                     <TouchableOpacity style={styles.declineBtn} onPress={handleDecline} disabled={isLoading} activeOpacity={0.8}>
                       <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
-                      <Text style={styles.declineBtnText}>Decline</Text>
+                      <Text style={styles.declineBtnText}>{tr("Decline", "Tolak")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.laterBtn} onPress={handleMinimize} disabled={isLoading} activeOpacity={0.8}>
                       <Ionicons name="time-outline" size={14} color="#64748B" />
-                      <Text style={styles.laterBtnText}>Later</Text>
+                      <Text style={styles.laterBtnText}>{tr("Later", "Nanti")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[styles.confirmBtn, { backgroundColor: merchantColor, borderColor: merchantColor }]} 
@@ -2052,7 +2054,7 @@ export default function NfcClaimModal() {
                       {isLoading ? (
                         <ActivityIndicator size="small" color={contrastTextColor} />
                       ) : (
-                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>Issue Stamps</Text>
+                        <Text style={[styles.confirmBtnText, { color: contrastTextColor }]}>{tr("Issue Stamps", "Berikan Setem")}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -2135,7 +2137,7 @@ export default function NfcClaimModal() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                <Text style={styles.itemActionDeleteText}>Remove from Order</Text>
+                <Text style={styles.itemActionDeleteText}>{tr("Remove from Order", "Buang dari Pesanan")}</Text>
               </TouchableOpacity>
 
               {/* Cancel Button */}
@@ -2144,7 +2146,7 @@ export default function NfcClaimModal() {
                 onPress={() => setItemActionTarget(null)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.itemActionCancelText}>Cancel</Text>
+                <Text style={styles.itemActionCancelText}>{tr("Cancel", "Batal")}</Text>
               </TouchableOpacity>
             </Pressable>
           </Pressable>

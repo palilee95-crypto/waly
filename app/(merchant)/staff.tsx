@@ -23,6 +23,7 @@ import { colors, radii } from '@/theme';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAuth, StaffPermissions, defaultStaffPermissions } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTr } from '@/lib/i18n';
 import { handleSmartBack } from '@/lib/navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -211,6 +212,7 @@ export default function StaffManagementScreen() {
   const params = useLocalSearchParams<{ tab?: string; anomaly_staff_id?: string }>();
   const { user, fetchStaffPermissions } = useAuth();
   const { t, locale } = useLanguage();
+  const tr = useTr();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -487,7 +489,7 @@ export default function StaffManagementScreen() {
     if (savingRoleTier) return;
     const titleTrimmed = roleFormTitle.trim();
     if (!titleTrimmed) {
-      Alert.alert('Role Title Required', 'Please enter a name for this role/tier.');
+      Alert.alert(tr('Role Title Required', 'Tajuk Peranan Diperlukan'), tr('Please enter a name for this role/tier.', 'Sila masukkan nama untuk peranan/tahap ini.'));
       return;
     }
 
@@ -520,7 +522,7 @@ export default function StaffManagementScreen() {
       }
 
       await saveRoles(updated);
-      Alert.alert('Saved', `Role tier "${titleTrimmed}" successfully saved!`);
+      Alert.alert(tr('Saved', 'Disimpan'), tr(`Role tier "${titleTrimmed}" successfully saved!`, `Tahap peranan "${titleTrimmed}" berjaya disimpan!`));
       if (returnToEditStaff) {
         setIsRolesPage(false);
         setIsEditingStaffPage(true);
@@ -1266,7 +1268,7 @@ export default function StaffManagementScreen() {
       try {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Permission to access photo gallery is required.');
+          Alert.alert(tr('Permission Denied', 'Kebenaran Ditolak'), tr('Permission to access photo gallery is required.', 'Kebenaran untuk mengakses galeri foto diperlukan.'));
           return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -1286,7 +1288,7 @@ export default function StaffManagementScreen() {
           });
         }
       } catch (err: any) {
-        Alert.alert('Error', 'Failed to pick image from library.');
+        Alert.alert(tr('Error', 'Ralat'), tr('Failed to pick image from library.', 'Gagal memilih imej daripada galeri.'));
       }
     }
   };
@@ -1375,8 +1377,8 @@ export default function StaffManagementScreen() {
       fetchStaff();
     } catch (err: any) {
       console.warn('Failed to save staff edit:', err);
-      const msg = err?.data?.message || err?.response?.message || err?.message || 'Failed to update staff profile.';
-      Alert.alert('Error', msg);
+      const msg = err?.data?.message || err?.response?.message || err?.message || tr('Failed to update staff profile.', 'Gagal mengemas kini profil kakitangan.');
+      Alert.alert(tr('Error', 'Ralat'), msg);
     } finally {
       setIsSavingStaff(false);
     }
@@ -1399,8 +1401,8 @@ export default function StaffManagementScreen() {
                 <Ionicons name="arrow-back" size={20} color="#0F172A" />
               </TouchableOpacity>
               <View>
-                <Text style={styles.fullPageHeaderTitle}>Edit Staff</Text>
-                <Text style={styles.fullPageHeaderSub}>Personal profile & assignment</Text>
+                <Text style={styles.fullPageHeaderTitle}>{tr("Edit Staff", "Edit Kakitangan")}</Text>
+                <Text style={styles.fullPageHeaderSub}>{tr("Personal profile & assignment", "Profil peribadi & tugasan")}</Text>
               </View>
             </View>
 
@@ -1436,7 +1438,7 @@ export default function StaffManagementScreen() {
                       { backgroundColor: editingMember?.attendance_status === 'on_leave' ? '#F59E0B' : '#10B981' }
                     ]} />
                     <Text style={styles.editStatusText}>
-                      {editingMember?.attendance_status === 'on_leave' ? 'On Leave' : 'Active'}
+                      {editingMember?.attendance_status === 'on_leave' ? tr('On Leave', 'Bercuti') : tr('Active', 'Aktif')}
                     </Text>
                   </View>
 
@@ -1446,22 +1448,22 @@ export default function StaffManagementScreen() {
                     activeOpacity={0.8}
                   >
                     <Ionicons name="camera-outline" size={14} color="#0F172A" />
-                    <Text style={styles.editChangePhotoText}>Change Photo</Text>
+                    <Text style={styles.editChangePhotoText}>{tr("Change Photo", "Tukar Foto")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Section: Basic Information */}
-              <Text style={styles.editSectionTitle}>Basic Information</Text>
+              <Text style={styles.editSectionTitle}>{tr("Basic Information", "Maklumat Asas")}</Text>
               <View style={styles.editGroupedBox}>
                 {/* Full Name */}
                 <View style={styles.editInputWrapper}>
-                  <Text style={styles.editMiniLabel}>Full Name</Text>
+                  <Text style={styles.editMiniLabel}>{tr("Full Name", "Nama Penuh")}</Text>
                   <TextInput
                     style={styles.editTextInput}
                     value={editName}
                     onChangeText={setEditName}
-                    placeholder="e.g. Hashiff"
+                    placeholder={tr('e.g. Hashiff', 'cth. Hashiff')}
                     placeholderTextColor="#94A3B8"
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
@@ -1469,7 +1471,7 @@ export default function StaffManagementScreen() {
 
                 {/* Phone Number */}
                 <View style={[styles.editInputWrapper, { marginTop: 14 }]}>
-                  <Text style={styles.editMiniLabel}>Phone Number</Text>
+                  <Text style={styles.editMiniLabel}>{tr("Phone Number", "Nombor Telefon")}</Text>
                   <TextInput
                     style={styles.editTextInput}
                     value={editPhone}
@@ -1483,7 +1485,7 @@ export default function StaffManagementScreen() {
 
                 {/* Email Address */}
                 <View style={[styles.editInputWrapper, { marginTop: 14 }]}>
-                  <Text style={styles.editMiniLabel}>Email Address</Text>
+                  <Text style={styles.editMiniLabel}>{tr("Email Address", "Alamat E-mel")}</Text>
                   <TextInput
                     style={styles.editTextInput}
                     value={editEmail}
@@ -1498,7 +1500,7 @@ export default function StaffManagementScreen() {
 
                 {/* Display Title Dropdown */}
                 <View style={[styles.editInputWrapper, { marginTop: 14 }]}>
-                  <Text style={styles.editMiniLabel}>Display Title</Text>
+                  <Text style={styles.editMiniLabel}>{tr("Display Title", "Tajuk Paparan")}</Text>
                   <TouchableOpacity 
                     style={styles.editDropdownSelect}
                     onPress={() => setIsEditRolePickerOpen(!isEditRolePickerOpen)}
@@ -1510,7 +1512,7 @@ export default function StaffManagementScreen() {
                   {isEditRolePickerOpen && (
                     <View style={styles.editDropdownMenu}>
                       <View style={styles.roleTierDropdownHeader}>
-                        <Text style={styles.roleTierDropdownHeaderText}>Pangkat & Tahap Gaji / Komisen</Text>
+                        <Text style={styles.roleTierDropdownHeaderText}>{tr("Pangkat & Tahap Gaji / Komisen", "Pangkat & Tahap Gaji / Komisen")}</Text>
                         <TouchableOpacity
                           onPress={() => {
                             setIsEditRolePickerOpen(false);
@@ -1590,7 +1592,7 @@ export default function StaffManagementScreen() {
                       <Text style={styles.rolePresetNoticeBannerText}>{roleNoticeToast}</Text>
                     </View>
                   )}
-                  <Text style={styles.editInputHint}>Selecting a tier automatically applies its default base pay & commission structure.</Text>
+                  <Text style={styles.editInputHint}>{tr("Selecting a tier automatically applies its default base pay & commission structure.", "Memilih tahap akan menggunakan gaji asas & struktur komisen lalai secara automatik.")}</Text>
                 </View>
 
                 <View style={styles.editItemDivider} />
@@ -1605,7 +1607,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="storefront-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.editItemRowLabel}>Assigned Branch</Text>
+                    <Text style={styles.editItemRowLabel}>{tr("Assigned Branch", "Cawangan Ditugaskan")}</Text>
                     <Text style={styles.editItemRowVal}>{editingMember?.branch_name || 'All Branches (HQ)'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -1643,9 +1645,9 @@ export default function StaffManagementScreen() {
                     ]} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.editItemRowLabel}>Account Status</Text>
+                    <Text style={styles.editItemRowLabel}>{tr("Account Status", "Status Akaun")}</Text>
                     <Text style={styles.editItemRowVal}>
-                      {editingMember?.attendance_status === 'on_leave' ? 'On Leave' : 'Active'}
+                      {editingMember?.attendance_status === 'on_leave' ? tr('On Leave', 'Bercuti') : tr('Active', 'Aktif')}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -1659,7 +1661,7 @@ export default function StaffManagementScreen() {
                         setIsEditStatusPickerOpen(false);
                       }}
                     >
-                      <Text style={styles.editDropdownMenuItemText}>Active (Bertugas)</Text>
+                      <Text style={styles.editDropdownMenuItemText}>{tr("Active (Bertugas)", "Aktif (Bertugas)")}</Text>
                       {editingMember?.attendance_status !== 'on_leave' && <Ionicons name="checkmark" size={16} color="#10B981" />}
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1669,7 +1671,7 @@ export default function StaffManagementScreen() {
                         setIsEditStatusPickerOpen(false);
                       }}
                     >
-                      <Text style={styles.editDropdownMenuItemText}>On Leave (Bercuti)</Text>
+                      <Text style={styles.editDropdownMenuItemText}>{tr("On Leave (Bercuti)", "Bercuti")}</Text>
                       {editingMember?.attendance_status === 'on_leave' && <Ionicons name="checkmark" size={16} color="#F59E0B" />}
                     </TouchableOpacity>
                   </View>
@@ -1683,25 +1685,21 @@ export default function StaffManagementScreen() {
                     <Ionicons name="briefcase-outline" size={18} color="#2563EB" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.editItemRowLabel}>Employment Type</Text>
+                    <Text style={styles.editItemRowLabel}>{tr("Employment Type", "Jenis Pekerjaan")}</Text>
                     <View style={[styles.compSegmentBox, { marginTop: 8 }]}>
                       <TouchableOpacity
                         style={[styles.compSegmentBtn, editEmploymentType === 'full_time' && styles.compSegmentBtnActive]}
                         onPress={() => setEditEmploymentType('full_time')}
                         activeOpacity={0.8}
                       >
-                        <Text style={[styles.compSegmentText, editEmploymentType === 'full_time' && styles.compSegmentTextActive]}>
-                          Full-Time
-                        </Text>
+                        <Text style={[styles.compSegmentText, editEmploymentType === 'full_time' && styles.compSegmentTextActive]}>{tr("Full-Time", "Sepenuh Masa")}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.compSegmentBtn, editEmploymentType === 'part_time' && styles.compSegmentBtnActive]}
                         onPress={() => setEditEmploymentType('part_time')}
                         activeOpacity={0.8}
                       >
-                        <Text style={[styles.compSegmentText, editEmploymentType === 'part_time' && styles.compSegmentTextActive]}>
-                          Part-Time
-                        </Text>
+                        <Text style={[styles.compSegmentText, editEmploymentType === 'part_time' && styles.compSegmentTextActive]}>{tr("Part-Time", "Sambilan")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1726,8 +1724,8 @@ export default function StaffManagementScreen() {
                     <Ionicons name="shield-checkmark" size={18} color="#B45309" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.editNavTitle}>Access & Permissions</Text>
-                    <Text style={styles.editNavSubtitle}>Manage what this staff member can do.</Text>
+                    <Text style={styles.editNavTitle}>{tr("Access & Permissions", "Akses & Kebenaran")}</Text>
+                    <Text style={styles.editNavSubtitle}>{tr("Manage what this staff member can do.", "Urus apa yang boleh dilakukan oleh kakitangan ini.")}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </TouchableOpacity>
@@ -1744,8 +1742,8 @@ export default function StaffManagementScreen() {
                     <Ionicons name="wallet-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.editNavTitle}>Employment & Compensation</Text>
-                    <Text style={styles.editNavSubtitle}>Work type, salary and commission.</Text>
+                    <Text style={styles.editNavTitle}>{tr("Employment & Compensation", "Pekerjaan & Pampasan")}</Text>
+                    <Text style={styles.editNavSubtitle}>{tr("Work type, salary and commission.", "Jenis kerja, gaji dan komisen.")}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </TouchableOpacity>
@@ -1763,7 +1761,7 @@ export default function StaffManagementScreen() {
                 {isSavingStaff ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.fullPageSaveBtnText}>Save Changes</Text>
+                  <Text style={styles.fullPageSaveBtnText}>{tr("Save Changes", "Simpan Perubahan")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1781,8 +1779,8 @@ export default function StaffManagementScreen() {
                 <Ionicons name="arrow-back" size={20} color="#0F172A" />
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fullPageHeaderTitle}>Employment & Compensation</Text>
-                <Text style={styles.fullPageHeaderSub}>Work type, salary and commission</Text>
+                <Text style={styles.fullPageHeaderTitle}>{tr("Employment & Compensation", "Pekerjaan & Pampasan")}</Text>
+                <Text style={styles.fullPageHeaderSub}>{tr("Work type, salary and commission", "Jenis kerja, gaji dan komisen")}</Text>
               </View>
               <View style={{ width: 20 }} />
             </View>
@@ -1822,14 +1820,14 @@ export default function StaffManagementScreen() {
                       activeOpacity={0.8}
                     >
                       <Ionicons name="refresh" size={13} color="#050505" />
-                      <Text style={styles.compTierResetBtnText}>Guna Preset</Text>
+                      <Text style={styles.compTierResetBtnText}>{tr("Guna Preset", "Guna Preset")}</Text>
                     </TouchableOpacity>
                   </View>
                 );
               })()}
 
               {/* 1. Employment Type */}
-              <Text style={styles.compSectionLabel}>Employment Type</Text>
+              <Text style={styles.compSectionLabel}>{tr("Employment Type", "Jenis Pekerjaan")}</Text>
               <View style={styles.compSegmentBox}>
                 <TouchableOpacity
                   style={[styles.compSegmentBtn, editEmploymentType === 'full_time' && styles.compSegmentBtnActive]}
@@ -1868,13 +1866,13 @@ export default function StaffManagementScreen() {
                   keyboardType="numeric"
                   {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                 />
-                <Text style={styles.compHelperText}>Leave empty if not applicable.</Text>
+                <Text style={styles.compHelperText}>{tr("Leave empty if not applicable.", "Biarkan kosong jika tidak berkenaan.")}</Text>
               </View>
 
               {/* 3. Commission Structure */}
               <View style={{ marginTop: 24 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <Text style={styles.compSectionLabel}>Commission Structure</Text>
+                  <Text style={styles.compSectionLabel}>{tr("Commission Structure", "Struktur Komisen")}</Text>
                   <Ionicons name="help-circle-outline" size={16} color="#94A3B8" />
                 </View>
 
@@ -1889,8 +1887,8 @@ export default function StaffManagementScreen() {
                       {editCommissionType === 'none' && <View style={styles.compRadioInner} />}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.compRadioTitle}>No Commission (0%)</Text>
-                      <Text style={styles.compRadioDesc}>This staff member does not receive commission.</Text>
+                      <Text style={styles.compRadioTitle}>{tr("No Commission (0%)", "Tiada Komisen (0%)")}</Text>
+                      <Text style={styles.compRadioDesc}>{tr("This staff member does not receive commission.", "Kakitangan ini tidak menerima komisen.")}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -1906,13 +1904,13 @@ export default function StaffManagementScreen() {
                       {editCommissionType === 'percentage' && <View style={styles.compRadioInner} />}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.compRadioTitle}>Percentage (%)</Text>
-                      <Text style={styles.compRadioDesc}>Receive a percentage of eligible sales.</Text>
+                      <Text style={styles.compRadioTitle}>{tr("Percentage (%)", "Peratusan (%)")}</Text>
+                      <Text style={styles.compRadioDesc}>{tr("Receive a percentage of eligible sales.", "Terima peratusan daripada jualan layak.")}</Text>
                     </View>
                   </View>
                   {editCommissionType === 'percentage' && (
                     <View style={styles.compInlineRateBox}>
-                      <Text style={styles.compInlineRateLabel}>Commission Rate (%):</Text>
+                      <Text style={styles.compInlineRateLabel}>{tr("Commission Rate (%):", "Kadar Komisen (%):")}</Text>
                       <TextInput
                         style={styles.compInlineRateInput}
                         value={editCommissionRate}
@@ -1937,13 +1935,13 @@ export default function StaffManagementScreen() {
                       {editCommissionType === 'fixed_per_job' && <View style={styles.compRadioInner} />}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.compRadioTitle}>Fixed Amount (RM)</Text>
-                      <Text style={styles.compRadioDesc}>Receive a fixed amount per eligible sale or service.</Text>
+                      <Text style={styles.compRadioTitle}>{tr("Fixed Amount (RM)", "Jumlah Tetap (RM)")}</Text>
+                      <Text style={styles.compRadioDesc}>{tr("Receive a fixed amount per eligible sale or service.", "Terima jumlah tetap bagi setiap jualan atau perkhidmatan layak.")}</Text>
                     </View>
                   </View>
                   {editCommissionType === 'fixed_per_job' && (
                     <View style={styles.compInlineRateBox}>
-                      <Text style={styles.compInlineRateLabel}>Amount per job (RM):</Text>
+                      <Text style={styles.compInlineRateLabel}>{tr("Amount per job (RM):", "Jumlah setiap kerja (RM):")}</Text>
                       <TextInput
                         style={styles.compInlineRateInput}
                         value={editCommissionRate}
@@ -1962,7 +1960,7 @@ export default function StaffManagementScreen() {
               <View style={styles.compInfoBanner}>
                 <Ionicons name="information-circle-outline" size={20} color="#0F172A" />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.compInfoBannerTitle}>Eligible Sales</Text>
+                  <Text style={styles.compInfoBannerTitle}>{tr("Eligible Sales", "Jualan Layak")}</Text>
                   <Text style={styles.compInfoBannerDesc}>
                     Commission is calculated from completed and eligible sales only. Refunds and cancelled transactions will not be included.
                   </Text>
@@ -1977,7 +1975,7 @@ export default function StaffManagementScreen() {
                 onPress={() => setEditSubScreen('main')}
                 activeOpacity={0.85}
               >
-                <Text style={styles.fullPageSaveBtnText}>Apply & Back</Text>
+                <Text style={styles.fullPageSaveBtnText}>{tr("Apply & Back", "Guna & Kembali")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2015,7 +2013,7 @@ export default function StaffManagementScreen() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="add" size={16} color="#FFFFFF" />
-                <Text style={styles.rolesFullPageHeaderAddBtnText}>New Role</Text>
+                <Text style={styles.rolesFullPageHeaderAddBtnText}>{tr("New Role", "Peranan Baharu")}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -2042,7 +2040,7 @@ export default function StaffManagementScreen() {
                         <Ionicons name="pricetags" size={18} color="#050505" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.rolesFullPageSummaryTitle}>Standardized Staff Roles</Text>
+                        <Text style={styles.rolesFullPageSummaryTitle}>{tr("Standardized Staff Roles", "Peranan Kakitangan Standard")}</Text>
                         <Text style={styles.rolesFullPageSummarySub}>
                           {customRoles.length} active role{customRoles.length === 1 ? '' : 's'} configured • {totalAssignedStaff} of {staff.length} staff currently assigned.
                         </Text>
@@ -2055,7 +2053,7 @@ export default function StaffManagementScreen() {
                         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
                           <Ionicons name="sparkles" size={20} color="#D97706" />
                           <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={styles.roleSyncBannerTitle}>Real Staff Roles Detected</Text>
+                            <Text style={styles.roleSyncBannerTitle}>{tr("Real Staff Roles Detected", "Peranan Kakitangan Sebenar Dikesan")}</Text>
                             <Text style={styles.roleSyncBannerSub}>
                               Found {uniqueUnconfigured.length} role{uniqueUnconfigured.length === 1 ? '' : 's'} in active staff ({uniqueUnconfigured.join(', ')}).
                             </Text>
@@ -2081,7 +2079,7 @@ export default function StaffManagementScreen() {
                             style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#FEE2E2' }}
                             activeOpacity={0.7}
                           >
-                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#DC2626' }}>Clear All</Text>
+                            <Text style={{ fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#DC2626' }}>{tr("Clear All", "Kosongkan Semua")}</Text>
                           </TouchableOpacity>
                         )}
                         {loadingRoles && <ActivityIndicator size="small" color="#050505" />}
@@ -2094,7 +2092,7 @@ export default function StaffManagementScreen() {
                         <View style={styles.rolesEmptyIconCircle}>
                           <Ionicons name="pricetags-outline" size={28} color="#64748B" />
                         </View>
-                        <Text style={styles.rolesEmptyTitle}>No Role Tiers Configured Yet</Text>
+                        <Text style={styles.rolesEmptyTitle}>{tr("No Role Tiers Configured Yet", "Belum Ada Tahap Peranan Dikonfigurasi")}</Text>
                         <Text style={styles.rolesEmptyDesc}>
                           Create custom roles for your business or sync roles directly from your active staff to auto-fill compensation when hiring.
                         </Text>
@@ -2105,7 +2103,7 @@ export default function StaffManagementScreen() {
                             activeOpacity={0.85}
                           >
                             <Ionicons name="add" size={16} color="#050505" />
-                            <Text style={styles.rolesEmptyCreateBtnText}>Create First Role</Text>
+                            <Text style={styles.rolesEmptyCreateBtnText}>{tr("Create First Role", "Cipta Peranan Pertama")}</Text>
                           </TouchableOpacity>
                           {staff.length > 0 && (
                             <TouchableOpacity 
@@ -2123,7 +2121,7 @@ export default function StaffManagementScreen() {
                             activeOpacity={0.85}
                           >
                             <Ionicons name="sparkles-outline" size={15} color="#64748B" />
-                            <Text style={[styles.rolesEmptyImportBtnText, { color: '#475569' }]}>Use Templates</Text>
+                            <Text style={[styles.rolesEmptyImportBtnText, { color: '#475569' }]}>{tr("Use Templates", "Guna Templat")}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -2240,7 +2238,7 @@ export default function StaffManagementScreen() {
                       <View style={styles.rolesFullPageBottomAddIconCircle}>
                         <Ionicons name="add" size={16} color="#050505" />
                       </View>
-                      <Text style={styles.rolesFullPageBottomAddBtnText}>Create New Role & Pay Tier</Text>
+                      <Text style={styles.rolesFullPageBottomAddBtnText}>{tr("Create New Role & Pay Tier", "Cipta Peranan & Tahap Gaji Baharu")}</Text>
                     </TouchableOpacity>
                   </>
                 );
@@ -2256,21 +2254,21 @@ export default function StaffManagementScreen() {
               >
                 {/* 1. Title */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.compSectionLabel}>Role / Position Title</Text>
+                  <Text style={styles.compSectionLabel}>{tr("Role / Position Title", "Tajuk Peranan / Jawatan")}</Text>
                   <TextInput
                     style={styles.roleFormInput}
                     value={roleFormTitle}
                     onChangeText={setRoleFormTitle}
-                    placeholder="e.g. Senior Barber, Barista, Crew"
+                    placeholder={tr('e.g. Senior Barber, Barista, Crew', 'cth. Tukang Gunting Kanan, Barista, Kru')}
                     placeholderTextColor="#94A3B8"
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
-                  <Text style={styles.compHelperText}>This title will appear in the staff role selector.</Text>
+                  <Text style={styles.compHelperText}>{tr("This title will appear in the staff role selector.", "Tajuk ini akan muncul dalam pemilih peranan kakitangan.")}</Text>
                 </View>
 
                 {/* 2. Employment Type */}
                 <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.compSectionLabel}>Default Employment Type</Text>
+                  <Text style={styles.compSectionLabel}>{tr("Default Employment Type", "Jenis Pekerjaan Lalai")}</Text>
                   <View style={styles.compSegmentBox}>
                     <TouchableOpacity
                       style={[styles.compSegmentBtn, roleFormType === 'full_time' && styles.compSegmentBtnActive]}
@@ -2310,13 +2308,13 @@ export default function StaffManagementScreen() {
                     keyboardType="numeric"
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
-                  <Text style={styles.compHelperText}>Default salary or wage auto-filled when assigning this tier.</Text>
+                  <Text style={styles.compHelperText}>{tr("Default salary or wage auto-filled when assigning this tier.", "Gaji atau upah lalai diisi secara automatik apabila menetapkan tahap ini.")}</Text>
                 </View>
 
                 {/* 4. Commission Model */}
                 <View style={{ marginBottom: 24 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <Text style={styles.compSectionLabel}>Default Commission Model</Text>
+                    <Text style={styles.compSectionLabel}>{tr("Default Commission Model", "Model Komisen Lalai")}</Text>
                   </View>
 
                   {/* Radio Card 1: None */}
@@ -2330,8 +2328,8 @@ export default function StaffManagementScreen() {
                         {roleFormCommType === 'none' && <View style={styles.compRadioInner} />}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.compRadioTitle}>No Commission (0%)</Text>
-                        <Text style={styles.compRadioDesc}>This role does not receive service commission.</Text>
+                        <Text style={styles.compRadioTitle}>{tr("No Commission (0%)", "Tiada Komisen (0%)")}</Text>
+                        <Text style={styles.compRadioDesc}>{tr("This role does not receive service commission.", "Peranan ini tidak menerima komisen perkhidmatan.")}</Text>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -2347,13 +2345,13 @@ export default function StaffManagementScreen() {
                         {roleFormCommType === 'percentage' && <View style={styles.compRadioInner} />}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.compRadioTitle}>Percentage of Eligible Sales (%)</Text>
-                        <Text style={styles.compRadioDesc}>Commission percentage calculated on completed services.</Text>
+                        <Text style={styles.compRadioTitle}>{tr("Percentage of Eligible Sales (%)", "Peratusan Jualan Layak (%)")}</Text>
+                        <Text style={styles.compRadioDesc}>{tr("Commission percentage calculated on completed services.", "Peratusan komisen dikira berdasarkan perkhidmatan selesai.")}</Text>
                       </View>
                     </View>
                     {roleFormCommType === 'percentage' && (
                       <View style={styles.compInlineRateBox}>
-                        <Text style={styles.compInlineRateLabel}>Commission Rate (%):</Text>
+                        <Text style={styles.compInlineRateLabel}>{tr("Commission Rate (%):", "Kadar Komisen (%):")}</Text>
                         <TextInput
                           style={styles.compInlineRateInput}
                           value={roleFormCommRate}
@@ -2378,13 +2376,13 @@ export default function StaffManagementScreen() {
                         {roleFormCommType === 'fixed_per_job' && <View style={styles.compRadioInner} />}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.compRadioTitle}>Fixed RM per Service / Job (RM)</Text>
-                        <Text style={styles.compRadioDesc}>Flat Ringgit amount paid per customer job served.</Text>
+                        <Text style={styles.compRadioTitle}>{tr("Fixed RM per Service / Job (RM)", "RM Tetap setiap Perkhidmatan / Kerja (RM)")}</Text>
+                        <Text style={styles.compRadioDesc}>{tr("Flat Ringgit amount paid per customer job served.", "Jumlah Ringgit rata dibayar bagi setiap kerja pelanggan yang dilayan.")}</Text>
                       </View>
                     </View>
                     {roleFormCommType === 'fixed_per_job' && (
                       <View style={styles.compInlineRateBox}>
-                        <Text style={styles.compInlineRateLabel}>Payout per Job (RM):</Text>
+                        <Text style={styles.compInlineRateLabel}>{tr("Payout per Job (RM):", "Bayaran setiap Kerja (RM):")}</Text>
                         <TextInput
                           style={styles.compInlineRateInput}
                           value={roleFormCommRate}
@@ -2401,12 +2399,12 @@ export default function StaffManagementScreen() {
 
                 {/* 5. Description / Notes */}
                 <View style={{ marginBottom: 30 }}>
-                  <Text style={styles.compSectionLabel}>Role Description / Notes (Optional)</Text>
+                  <Text style={styles.compSectionLabel}>{tr("Role Description / Notes (Optional)", "Keterangan Peranan / Nota (Pilihan)")}</Text>
                   <TextInput
                     style={[styles.roleFormInput, { height: 72, textAlignVertical: 'top', paddingTop: 12 }]}
                     value={roleFormDesc}
                     onChangeText={setRoleFormDesc}
-                    placeholder="e.g. Lead specialist tier with 15% service sales commission."
+                    placeholder={tr('e.g. Lead specialist tier with 15% service sales commission.', 'cth. Tahap pakar utama dengan 15% komisen jualan perkhidmatan.')}
                     placeholderTextColor="#94A3B8"
                     multiline
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
@@ -2425,7 +2423,7 @@ export default function StaffManagementScreen() {
                   {savingRoleTier ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.fullPageSaveBtnText}>Save Role Tier</Text>
+                    <Text style={styles.fullPageSaveBtnText}>{tr("Save Role Tier", "Simpan Tahap Peranan")}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -2447,7 +2445,7 @@ export default function StaffManagementScreen() {
             >
               <Ionicons name="arrow-back" size={20} color="#0F172A" />
             </TouchableOpacity>
-            <Text style={styles.detailsHeaderTitle}>Staff Details</Text>
+            <Text style={styles.detailsHeaderTitle}>{tr("Staff Details", "Butiran Kakitangan")}</Text>
             <TouchableOpacity 
               style={styles.detailsMoreBtn} 
               onPress={() => handleOpenEditStaff(selectedStaffForDetails)} 
@@ -2479,16 +2477,16 @@ export default function StaffManagementScreen() {
                 <View style={styles.heroActiveBadge}>
                   <View style={styles.heroActiveDot} />
                   <Text style={styles.heroActiveBadgeText}>
-                    {selectedStaffForDetails.attendance_status === 'on_leave' ? 'On Leave' : 'Active'}
+                    {selectedStaffForDetails.attendance_status === 'on_leave' ? tr('On Leave', 'Bercuti') : tr('Active', 'Aktif')}
                   </Text>
                 </View>
                 {selectedStaffForDetails.employment_type === 'part_time' ? (
                   <View style={[styles.heroActiveBadge, { backgroundColor: '#F1F5F9' }]}>
-                    <Text style={[styles.heroActiveBadgeText, { color: '#475569' }]}>Part-Time</Text>
+                    <Text style={[styles.heroActiveBadgeText, { color: '#475569' }]}>{tr("Part-Time", "Sambilan")}</Text>
                   </View>
                 ) : (
                   <View style={[styles.heroActiveBadge, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={[styles.heroActiveBadgeText, { color: '#2563EB' }]}>Full-Time</Text>
+                    <Text style={[styles.heroActiveBadgeText, { color: '#2563EB' }]}>{tr("Full-Time", "Sepenuh Masa")}</Text>
                   </View>
                 )}
               </View>
@@ -2518,7 +2516,7 @@ export default function StaffManagementScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="call" size={15} color="#0F172A" />
-              <Text style={styles.quickContactPillText}>Call</Text>
+              <Text style={styles.quickContactPillText}>{tr("Call", "Panggil")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -2541,7 +2539,7 @@ export default function StaffManagementScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="create-outline" size={15} color="#0F172A" />
-              <Text style={styles.quickContactPillText}>Edit Profile</Text>
+              <Text style={styles.quickContactPillText}>{tr("Edit Profile", "Edit Profil")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -2552,7 +2550,7 @@ export default function StaffManagementScreen() {
               onPress={() => setDetailsSubTab('overview')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, detailsSubTab === 'overview' && styles.tabBtnTextActive]}>Overview</Text>
+              <Text style={[styles.tabBtnText, detailsSubTab === 'overview' && styles.tabBtnTextActive]}>{tr("Overview", "Gambaran Keseluruhan")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -2560,7 +2558,7 @@ export default function StaffManagementScreen() {
               onPress={() => setDetailsSubTab('permissions')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, detailsSubTab === 'permissions' && styles.tabBtnTextActive]}>Permissions</Text>
+              <Text style={[styles.tabBtnText, detailsSubTab === 'permissions' && styles.tabBtnTextActive]}>{tr("Permissions", "Kebenaran")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -2568,7 +2566,7 @@ export default function StaffManagementScreen() {
               onPress={() => setDetailsSubTab('performance')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, detailsSubTab === 'performance' && styles.tabBtnTextActive]}>Performance</Text>
+              <Text style={[styles.tabBtnText, detailsSubTab === 'performance' && styles.tabBtnTextActive]}>{tr("Performance", "Prestasi")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -2576,7 +2574,7 @@ export default function StaffManagementScreen() {
               onPress={() => setDetailsSubTab('commission')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, detailsSubTab === 'commission' && styles.tabBtnTextActive]}>Commission</Text>
+              <Text style={[styles.tabBtnText, detailsSubTab === 'commission' && styles.tabBtnTextActive]}>{tr("Commission", "Komisen")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -2584,9 +2582,9 @@ export default function StaffManagementScreen() {
             <>
               {/* Quick Stats Section */}
               <View style={styles.quickStatsHeaderRow}>
-                <Text style={styles.quickStatsTitle}>Quick Stats</Text>
+                <Text style={styles.quickStatsTitle}>{tr("Quick Stats", "Statistik Pantas")}</Text>
                 <View style={styles.timeFilterBtn}>
-                  <Text style={styles.timeFilterText}>This Month</Text>
+                  <Text style={styles.timeFilterText}>{tr("This Month", "Bulan Ini")}</Text>
                   <Ionicons name="chevron-down" size={14} color="#64748B" />
                 </View>
               </View>
@@ -2598,7 +2596,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="ribbon-outline" size={16} color="#0F172A" />
                   </View>
                   <Text style={styles.statMetricVal}>{selectedStaffForDetails.stamps_issued ?? 0}</Text>
-                  <Text style={styles.statMetricLabel}>Stamps issued</Text>
+                  <Text style={styles.statMetricLabel}>{tr("Stamps issued", "Setem diberikan")}</Text>
                 </View>
 
                 {/* Sales Card */}
@@ -2609,7 +2607,7 @@ export default function StaffManagementScreen() {
                   <Text style={styles.statMetricVal}>
                     RM {(selectedStaffForDetails.sales_volume ?? 0).toLocaleString()}
                   </Text>
-                  <Text style={styles.statMetricLabel}>Sales handled</Text>
+                  <Text style={styles.statMetricLabel}>{tr("Sales handled", "Jualan dikendalikan")}</Text>
                 </View>
 
                 {/* Customers Card */}
@@ -2618,19 +2616,19 @@ export default function StaffManagementScreen() {
                     <Ionicons name="hourglass-outline" size={16} color="#0F172A" />
                   </View>
                   <Text style={styles.statMetricVal}>{selectedStaffForDetails.customers_served ?? 0}</Text>
-                  <Text style={styles.statMetricLabel}>Customers served</Text>
+                  <Text style={styles.statMetricLabel}>{tr("Customers served", "Pelanggan dilayan")}</Text>
                 </View>
               </View>
 
               {/* Personal & Contact Information */}
-              <Text style={styles.groupHeaderLabel}>PERSONAL & CONTACT</Text>
+              <Text style={styles.groupHeaderLabel}>{tr("PERSONAL & CONTACT", "PERIBADI & KONTAK")}</Text>
               <View style={styles.groupedSettingsBox}>
                 <View style={styles.groupedSettingsRow}>
                   <View style={[styles.groupedIconCircle, { backgroundColor: '#F1F5F9' }]}>
                     <Ionicons name="call-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Phone Number</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Phone Number", "Nombor Telefon")}</Text>
                     <Text style={styles.groupedRowSubtitle}>{selectedStaffForDetails.phone}</Text>
                   </View>
                   <TouchableOpacity 
@@ -2652,7 +2650,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="mail-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Email Address</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Email Address", "Alamat E-mel")}</Text>
                     <Text style={styles.groupedRowSubtitle}>{selectedStaffForDetails.email || '—'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -2665,14 +2663,14 @@ export default function StaffManagementScreen() {
                     <Ionicons name="pricetag-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Staff ID</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Staff ID", "ID Kakitangan")}</Text>
                     <Text style={styles.groupedRowSubtitle}>#STF-00{selectedStaffForDetails.id.slice(-4).toUpperCase()}</Text>
                   </View>
                 </View>
               </View>
 
               {/* Store & Assignment Settings */}
-              <Text style={styles.groupHeaderLabel}>STORE & ASSIGNMENTS</Text>
+              <Text style={styles.groupHeaderLabel}>{tr("STORE & ASSIGNMENTS", "KEDAI & TUGASAN")}</Text>
               <View style={styles.groupedSettingsBox}>
                 {/* Assigned Branches */}
                 <TouchableOpacity 
@@ -2684,7 +2682,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="storefront-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Assigned Branches</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Assigned Branches", "Cawangan Ditugaskan")}</Text>
                     <Text style={styles.groupedRowSubtitle}>
                       {selectedStaffForDetails.branch_name || 'All Branches (HQ)'}
                     </Text>
@@ -2704,7 +2702,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="person-outline" size={18} color="#0F172A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Staff Role</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Staff Role", "Peranan Kakitangan")}</Text>
                     <Text style={styles.groupedRowSubtitle}>
                       {selectedStaffForDetails.role_title || 'Provider'}
                     </Text>
@@ -2724,7 +2722,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="briefcase-outline" size={18} color="#2563EB" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Employment Type</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Employment Type", "Jenis Pekerjaan")}</Text>
                     <Text style={styles.groupedRowSubtitle}>
                       {selectedStaffForDetails.employment_type === 'part_time' ? 'Part-Time' : 'Full-Time'}
                     </Text>
@@ -2744,9 +2742,9 @@ export default function StaffManagementScreen() {
                     <View style={styles.onDutyDot} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Account Status</Text>
+                    <Text style={styles.groupedRowTitle}>{tr("Account Status", "Status Akaun")}</Text>
                     <Text style={styles.groupedRowSubtitle}>
-                      {selectedStaffForDetails.attendance_status === 'on_leave' ? 'On Leave' : 'Active'}
+                      {selectedStaffForDetails.attendance_status === 'on_leave' ? tr('On Leave', 'Bercuti') : tr('Active', 'Aktif')}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -2761,7 +2759,7 @@ export default function StaffManagementScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                <Text style={styles.removeStaffBigBtnText}>Remove Staff</Text>
+                <Text style={styles.removeStaffBigBtnText}>{tr("Remove Staff", "Alih Keluar Kakitangan")}</Text>
               </TouchableOpacity>
             </>
           ) : detailsSubTab === 'permissions' ? (
@@ -2781,7 +2779,7 @@ export default function StaffManagementScreen() {
                         </View>
                         <View>
                           <Text style={styles.rolePresetTitle}>Role: {selectedStaffForDetails.role_title || 'Provider'}</Text>
-                          <Text style={styles.rolePresetSubtitle}>Store-level access capabilities</Text>
+                          <Text style={styles.rolePresetSubtitle}>{tr("Store-level access capabilities", "Keupayaan akses peringkat kedai")}</Text>
                         </View>
                       </View>
                       <TouchableOpacity 
@@ -2789,13 +2787,13 @@ export default function StaffManagementScreen() {
                         onPress={() => handleOpenEditStaff(selectedStaffForDetails)}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.changeRoleBtnText}>Change Role</Text>
+                        <Text style={styles.changeRoleBtnText}>{tr("Change Role", "Tukar Peranan")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
 
                   {/* Capability Toggles */}
-                  <Text style={styles.groupHeaderLabel}>STORE CAPABILITY TOGGLES</Text>
+                  <Text style={styles.groupHeaderLabel}>{tr("STORE CAPABILITY TOGGLES", "TOGOL KEUPAYAAN KEDAI")}</Text>
                   <View style={styles.groupedSettingsBox}>
                     {/* Core Duty Info */}
                     <View style={styles.permSwitchRow}>
@@ -2803,11 +2801,11 @@ export default function StaffManagementScreen() {
                         <Ionicons name="scan-outline" size={18} color="#B45309" />
                       </View>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.groupedRowTitle}>Loyalty Card QR Scanner</Text>
-                        <Text style={styles.groupedRowSubtitle}>Included by default for all verified active staff</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Loyalty Card QR Scanner", "Pengimbas QR Kad Kesetiaan")}</Text>
+                        <Text style={styles.groupedRowSubtitle}>{tr("Included by default for all verified active staff", "Disertakan secara lalai untuk semua kakitangan aktif yang disahkan")}</Text>
                       </View>
                       <View style={styles.paidBadgePill}>
-                        <Text style={styles.paidBadgePillText}>Enabled</Text>
+                        <Text style={styles.paidBadgePillText}>{tr("Enabled", "Dibenarkan")}</Text>
                       </View>
                     </View>
 
@@ -2819,8 +2817,8 @@ export default function StaffManagementScreen() {
                         <Ionicons name="gift-outline" size={18} color="#16A34A" />
                       </View>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.groupedRowTitle}>Loyalty Rewards & Passes</Text>
-                        <Text style={styles.groupedRowSubtitle}>Allow creating reward tiers and issuing custom vouchers</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Loyalty Rewards & Passes", "Ganjaran Kesetiaan & Pas")}</Text>
+                        <Text style={styles.groupedRowSubtitle}>{tr("Allow creating reward tiers and issuing custom vouchers", "Benarkan mencipta tahap ganjaran dan mengeluarkan baucar tersuai")}</Text>
                       </View>
                       <Switch
                         value={permissionsState.can_manage_rewards ?? false}
@@ -2838,8 +2836,8 @@ export default function StaffManagementScreen() {
                         <Ionicons name="people-outline" size={18} color="#2563EB" />
                       </View>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.groupedRowTitle}>CRM & Stamp Adjustments</Text>
-                        <Text style={styles.groupedRowSubtitle}>Allow viewing member contact list and manual stamp fixes</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("CRM & Stamp Adjustments", "CRM & Pelarasan Setem")}</Text>
+                        <Text style={styles.groupedRowSubtitle}>{tr("Allow viewing member contact list and manual stamp fixes", "Benarkan melihat senarai kontak ahli dan pembetulan setem manual")}</Text>
                       </View>
                       <Switch
                         value={permissionsState.can_manage_customers ?? false}
@@ -2857,8 +2855,8 @@ export default function StaffManagementScreen() {
                         <Ionicons name="bar-chart-outline" size={18} color="#475569" />
                       </View>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.groupedRowTitle}>Business Analytics & Reports</Text>
-                        <Text style={styles.groupedRowSubtitle}>Allow seeing store revenue summaries and turnover</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Business Analytics & Reports", "Analitik & Laporan Perniagaan")}</Text>
+                        <Text style={styles.groupedRowSubtitle}>{tr("Allow seeing store revenue summaries and turnover", "Benarkan melihat ringkasan hasil kedai dan pusingan")}</Text>
                       </View>
                       <Switch
                         value={permissionsState.can_view_analytics ?? false}
@@ -2876,8 +2874,8 @@ export default function StaffManagementScreen() {
                         <Ionicons name="storefront-outline" size={18} color="#475569" />
                       </View>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.groupedRowTitle}>Edit Store Profile & Outlets</Text>
-                        <Text style={styles.groupedRowSubtitle}>Allow modifying store details, logo, and branch links</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Edit Store Profile & Outlets", "Edit Profil Kedai & Cawangan")}</Text>
+                        <Text style={styles.groupedRowSubtitle}>{tr("Allow modifying store details, logo, and branch links", "Benarkan mengubah butiran kedai, logo, dan pautan cawangan")}</Text>
                       </View>
                       <Switch
                         value={permissionsState.can_edit_store_profile ?? false}
@@ -2889,13 +2887,13 @@ export default function StaffManagementScreen() {
                   </View>
 
                   {/* Security & Audit Status */}
-                  <Text style={styles.groupHeaderLabel}>SECURITY & AUDIT</Text>
+                  <Text style={styles.groupHeaderLabel}>{tr("SECURITY & AUDIT", "KESELAMATAN & AUDIT")}</Text>
                   {hasAnomaly ? (
                     <View style={styles.anomalyWarningCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                         <Ionicons name="warning" size={22} color="#DC2626" />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.anomalyWarningTitle}>Unusual Activity Flagged</Text>
+                          <Text style={styles.anomalyWarningTitle}>{tr("Unusual Activity Flagged", "Aktiviti Tidak Biasa Ditandakan")}</Text>
                           <Text style={styles.anomalyWarningSub}>
                             {staffAnomalies[0].stamp_count} stamps issued to member within threshold
                           </Text>
@@ -2908,7 +2906,7 @@ export default function StaffManagementScreen() {
                           }}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.investigateBtnText}>Review</Text>
+                          <Text style={styles.investigateBtnText}>{tr("Review", "Semak")}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -2916,8 +2914,8 @@ export default function StaffManagementScreen() {
                     <View style={styles.securityCleanCard}>
                       <Ionicons name="shield-checkmark" size={22} color="#16A34A" />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.securityCleanTitle}>No Suspicious Activity</Text>
-                        <Text style={styles.securityCleanSub}>All stamp issuances within safe threshold (≤ 5/customer)</Text>
+                        <Text style={styles.securityCleanTitle}>{tr("No Suspicious Activity", "Tiada Aktiviti Mencurigakan")}</Text>
+                        <Text style={styles.securityCleanSub}>{tr("All stamp issuances within safe threshold (≤ 5/customer)", "Semua pengeluaran setem dalam had selamat (≤ 5/pelanggan)")}</Text>
                       </View>
                     </View>
                   )}
@@ -2962,14 +2960,14 @@ export default function StaffManagementScreen() {
               ) : null}
 
               {/* Key Performance Breakdown Grid */}
-              <Text style={styles.groupHeaderLabel}>LOYALTY & SALES METRICS</Text>
+              <Text style={styles.groupHeaderLabel}>{tr("LOYALTY & SALES METRICS", "METRIK KESETIAAN & JUALAN")}</Text>
               <View style={styles.perfMetricGrid}>
                 <View style={styles.perfGridCard}>
                   <View style={styles.statMetricIconCircle}>
                     <Ionicons name="ribbon-outline" size={16} color="#0F172A" />
                   </View>
                   <Text style={styles.perfGridVal}>{selectedStaffForDetails.stamps_issued ?? 0}</Text>
-                  <Text style={styles.perfGridLabel}>Stamps issued</Text>
+                  <Text style={styles.perfGridLabel}>{tr("Stamps issued", "Setem diberikan")}</Text>
                 </View>
 
                 <View style={styles.perfGridCard}>
@@ -2977,7 +2975,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="gift-outline" size={16} color="#16A34A" />
                   </View>
                   <Text style={styles.perfGridVal}>{selectedStaffForDetails.vouchers_redeemed ?? 0}</Text>
-                  <Text style={styles.perfGridLabel}>Vouchers redeemed</Text>
+                  <Text style={styles.perfGridLabel}>{tr("Vouchers redeemed", "Baucar ditebus")}</Text>
                 </View>
 
                 <View style={styles.perfGridCard}>
@@ -2985,7 +2983,7 @@ export default function StaffManagementScreen() {
                     <Ionicons name="people-outline" size={16} color="#2563EB" />
                   </View>
                   <Text style={styles.perfGridVal}>{selectedStaffForDetails.customers_served ?? 0}</Text>
-                  <Text style={styles.perfGridLabel}>Customers served</Text>
+                  <Text style={styles.perfGridLabel}>{tr("Customers served", "Pelanggan dilayan")}</Text>
                 </View>
 
                 <View style={styles.perfGridCard}>
@@ -2995,7 +2993,7 @@ export default function StaffManagementScreen() {
                   <Text style={styles.perfGridVal}>
                     RM {(selectedStaffForDetails.sales_volume ?? 0).toLocaleString()}
                   </Text>
-                  <Text style={styles.perfGridLabel}>Total sales</Text>
+                  <Text style={styles.perfGridLabel}>{tr("Total sales", "Jumlah jualan")}</Text>
                 </View>
               </View>
             </View>
@@ -3040,7 +3038,7 @@ export default function StaffManagementScreen() {
                 <View style={{ gap: 16 }}>
                   {/* Month Selector Row */}
                   <View style={styles.quickStatsHeaderRow}>
-                    <Text style={styles.quickStatsTitle}>Commission Overview</Text>
+                    <Text style={styles.quickStatsTitle}>{tr("Commission Overview", "Gambaran Komisen")}</Text>
                     <View style={styles.timeFilterBtn}>
                       <Text style={styles.timeFilterText}>{commissionMonth}</Text>
                       <Ionicons name="calendar-outline" size={14} color="#64748B" />
@@ -3051,11 +3049,11 @@ export default function StaffManagementScreen() {
                   <View style={styles.commExecutiveCard}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                       <View>
-                        <Text style={styles.commCardMiniLabel}>UNPAID COMMISSION DUE</Text>
+                        <Text style={styles.commCardMiniLabel}>{tr("UNPAID COMMISSION DUE", "KOMISEN TERTUNGGAK")}</Text>
                         <Text style={styles.commCardBigAmount}>RM {unpaidDue.toFixed(2)}</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.commCardMiniLabel}>TOTAL EARNED</Text>
+                        <Text style={styles.commCardMiniLabel}>{tr("TOTAL EARNED", "JUMLAH DIPEROLEH")}</Text>
                         <Text style={styles.commCardTotalAmount}>RM {totalComm.toFixed(2)}</Text>
                       </View>
                     </View>
@@ -3081,18 +3079,18 @@ export default function StaffManagementScreen() {
                     ) : hasCommissionPlan ? (
                       <View style={styles.allPaidBadgeRow}>
                         <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-                        <Text style={styles.allPaidBadgeText}>All commissions settled for this cycle</Text>
+                        <Text style={styles.allPaidBadgeText}>{tr("All commissions settled for this cycle", "Semua komisen telah diselesaikan untuk kitaran ini")}</Text>
                       </View>
                     ) : (
                       <View style={styles.allPaidBadgeRow}>
                         <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
-                        <Text style={styles.allPaidBadgeText}>No commission plan configured</Text>
+                        <Text style={styles.allPaidBadgeText}>{tr("No commission plan configured", "Tiada pelan komisen dikonfigurasi")}</Text>
                       </View>
                     )}
                   </View>
 
                   {/* Compensation & Rate Structure Grouped Box */}
-                  <Text style={styles.groupHeaderLabel}>COMPENSATION STRUCTURE</Text>
+                  <Text style={styles.groupHeaderLabel}>{tr("COMPENSATION STRUCTURE", "STRUKTUR PAMPASAN")}</Text>
                   <View style={styles.groupedSettingsBox}>
                     {/* Employment Type */}
                     <TouchableOpacity 
@@ -3104,7 +3102,7 @@ export default function StaffManagementScreen() {
                         <Ionicons name="briefcase-outline" size={18} color="#0F172A" />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.groupedRowTitle}>Contract Type</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Contract Type", "Jenis Kontrak")}</Text>
                         <Text style={styles.groupedRowSubtitle}>
                           {selectedStaffForDetails.employment_type === 'part_time' ? 'Part-Time (Sambilan)' : 'Full-Time (Tetap)'}
                         </Text>
@@ -3148,7 +3146,7 @@ export default function StaffManagementScreen() {
                         <Ionicons name="trending-up-outline" size={18} color="#B45309" />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.groupedRowTitle}>Commission Plan</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Commission Plan", "Pelan Komisen")}</Text>
                         <Text style={styles.groupedRowSubtitle}>
                           {isPercent 
                             ? `${commRate}% per completed sale` 
@@ -3168,7 +3166,7 @@ export default function StaffManagementScreen() {
                         <Ionicons name="receipt-outline" size={18} color="#0F172A" />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.groupedRowTitle}>Volume Delivered</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Volume Delivered", "Jumlah Dihantar")}</Text>
                         <Text style={styles.groupedRowSubtitle}>
                           {jobsTotal} jobs completed • RM {salesTotal.toLocaleString()} handled
                         </Text>
@@ -3177,14 +3175,14 @@ export default function StaffManagementScreen() {
                   </View>
 
                   {/* Payout History Section */}
-                  <Text style={styles.groupHeaderLabel}>SETTLED PAYOUTS</Text>
+                  <Text style={styles.groupHeaderLabel}>{tr("SETTLED PAYOUTS", "BAYARAN DISELESAIKAN")}</Text>
                   <View style={styles.groupedSettingsBox}>
                     <View style={styles.groupedSettingsRow}>
                       <View style={[styles.groupedIconCircle, { backgroundColor: '#ECFDF5' }]}>
                         <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.groupedRowTitle}>Previous Month Payout</Text>
+                        <Text style={styles.groupedRowTitle}>{tr("Previous Month Payout", "Bayaran Bulan Lepas")}</Text>
                         <Text style={styles.groupedRowSubtitle}>
                           {paidTotal > 0
                             ? `RM ${paidTotal.toFixed(2)} • Settled via cash / transfer`
@@ -3193,7 +3191,7 @@ export default function StaffManagementScreen() {
                       </View>
                       {paidTotal > 0 && (
                         <View style={styles.paidBadgePill}>
-                          <Text style={styles.paidBadgePillText}>Paid</Text>
+                          <Text style={styles.paidBadgePillText}>{tr("Paid", "Dibayar")}</Text>
                         </View>
                       )}
                     </View>
@@ -3221,7 +3219,7 @@ export default function StaffManagementScreen() {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <Text style={styles.headerTitleModern} numberOfLines={1}>{t('manage_staff')}</Text>
-                <Text style={styles.headerSubtitleModern} numberOfLines={1}>Your team & access</Text>
+                <Text style={styles.headerSubtitleModern} numberOfLines={1}>{tr("Your team & access", "Pasukan & akses anda")}</Text>
               </View>
             </View>
 
@@ -3269,7 +3267,7 @@ export default function StaffManagementScreen() {
                 <Text style={styles.statCountNumber}>
                   {staff.filter(s => s.attendance_status !== 'on_leave').length}
                 </Text>
-                <Text style={styles.statCountLabel}>On duty</Text>
+                <Text style={styles.statCountLabel}>{tr("On duty", "Bertugas")}</Text>
               </View>
             </View>
           </View>
@@ -3291,9 +3289,7 @@ export default function StaffManagementScreen() {
               onPress={() => setActiveTab('performance')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, activeTab === 'performance' && styles.tabBtnTextActive]}>
-                Performance
-              </Text>
+              <Text style={[styles.tabBtnText, activeTab === 'performance' && styles.tabBtnTextActive]}>{tr("Performance", "Prestasi")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -3301,9 +3297,7 @@ export default function StaffManagementScreen() {
               onPress={() => setActiveTab('commission')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, activeTab === 'commission' && styles.tabBtnTextActive]}>
-                Commission
-              </Text>
+              <Text style={[styles.tabBtnText, activeTab === 'commission' && styles.tabBtnTextActive]}>{tr("Commission", "Komisen")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -3311,9 +3305,7 @@ export default function StaffManagementScreen() {
               onPress={() => setActiveTab('settings')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.tabBtnText, activeTab === 'settings' && styles.tabBtnTextActive]}>
-                Permissions
-              </Text>
+              <Text style={[styles.tabBtnText, activeTab === 'settings' && styles.tabBtnTextActive]}>{tr("Permissions", "Kebenaran")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -3321,7 +3313,7 @@ export default function StaffManagementScreen() {
             <>
               {/* Section Header */}
               <View style={styles.teamSectionHeaderRow}>
-                <Text style={styles.teamSectionTitle}>Your Team</Text>
+                <Text style={styles.teamSectionTitle}>{tr("Your Team", "Pasukan Anda")}</Text>
                 <Text style={styles.teamSectionCount}>{staff.length} member{staff.length === 1 ? '' : 's'}</Text>
               </View>
 
@@ -3344,7 +3336,7 @@ export default function StaffManagementScreen() {
                     activeOpacity={0.8}
                   >
                     <Ionicons name="add" size={18} color="#FFFFFF" />
-                    <Text style={styles.addStaffHeaderBtnText}>Invite Staff</Text>
+                    <Text style={styles.addStaffHeaderBtnText}>{tr("Invite Staff", "Jemput Kakitangan")}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -3497,7 +3489,7 @@ export default function StaffManagementScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.anomalyBannerBtnText}>Review</Text>
+                  <Text style={styles.anomalyBannerBtnText}>{tr("Review", "Semak")}</Text>
                   <Ionicons name="chevron-forward" size={14} color="#991B1B" />
                 </TouchableOpacity>
               </View>
@@ -4837,8 +4829,8 @@ export default function StaffManagementScreen() {
             {/* Header */}
             <View style={styles.sheetHeaderRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sheetTitle}>Invite Staff</Text>
-                <Text style={styles.sheetSubtitle}>Give a team member secure access to your store.</Text>
+                <Text style={styles.sheetTitle}>{tr("Invite Staff", "Jemput Kakitangan")}</Text>
+                <Text style={styles.sheetSubtitle}>{tr("Give a team member secure access to your store.", "Berikan akses selamat kepada ahli pasukan ke kedai anda.")}</Text>
               </View>
               <TouchableOpacity 
                 style={styles.sheetCloseBtn}
@@ -4850,7 +4842,7 @@ export default function StaffManagementScreen() {
             </View>
 
             {/* Phone Number Field */}
-            <Text style={styles.sheetInputLabel}>Phone Number</Text>
+            <Text style={styles.sheetInputLabel}>{tr("Phone Number", "Nombor Telefon")}</Text>
             <View style={styles.phoneInputRow}>
               <View style={styles.countryCodePill}>
                 <Text style={{ fontSize: 16 }}>🇲🇾</Text>
@@ -4870,7 +4862,7 @@ export default function StaffManagementScreen() {
             </View>
 
             {/* Assign Branch Field */}
-            <Text style={styles.sheetInputLabel}>Assign Branch</Text>
+            <Text style={styles.sheetInputLabel}>{tr("Assign Branch", "Tetapkan Cawangan")}</Text>
             <TouchableOpacity 
               style={styles.dropdownSelectorBox}
               onPress={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
@@ -4905,7 +4897,7 @@ export default function StaffManagementScreen() {
             )}
 
             {/* Staff Role Field */}
-            <Text style={styles.sheetInputLabel}>Staff Role</Text>
+            <Text style={styles.sheetInputLabel}>{tr("Staff Role", "Peranan Kakitangan")}</Text>
             <TouchableOpacity 
               style={styles.dropdownSelectorBox}
               onPress={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
@@ -4921,7 +4913,7 @@ export default function StaffManagementScreen() {
             {isRoleDropdownOpen && (
               <View style={styles.dropdownListContainer}>
                 <View style={styles.dropdownListSectionHeader}>
-                  <Text style={styles.dropdownListSectionHeaderText}>Pangkat Staf & Tahap Gaji / Komisen</Text>
+                  <Text style={styles.dropdownListSectionHeaderText}>{tr("Pangkat Staf & Tahap Gaji / Komisen", "Pangkat Staf & Tahap Gaji / Komisen")}</Text>
                 </View>
                 {customRoles.map((tier) => (
                   <TouchableOpacity
@@ -5027,7 +5019,7 @@ export default function StaffManagementScreen() {
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Text style={styles.sendInviteBtnText}>Send Invitation</Text>
+                  <Text style={styles.sendInviteBtnText}>{tr("Send Invitation", "Hantar Jemputan")}</Text>
                   <Ionicons name="arrow-forward" size={18} color="#FFC700" />
                 </>
               )}
@@ -5309,7 +5301,7 @@ export default function StaffManagementScreen() {
             <View style={styles.modalIconBg}>
               <Ionicons name="trash-outline" size={28} color="#EF4444" />
             </View>
-            <Text style={styles.modalTitle}>Delete Role Tier?</Text>
+            <Text style={styles.modalTitle}>{tr("Delete Role Tier?", "Padam Tahap Peranan?")}</Text>
             {roleToDelete && (
               <>
                 <Text style={styles.modalSubtitle}>
@@ -5341,7 +5333,7 @@ export default function StaffManagementScreen() {
                 disabled={isDeletingRole}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{tr("Cancel", "Batal")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
@@ -5352,7 +5344,7 @@ export default function StaffManagementScreen() {
                 {isDeletingRole ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Delete Role</Text>
+                  <Text style={styles.modalConfirmText}>{tr("Delete Role", "Padam Peranan")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -5372,7 +5364,7 @@ export default function StaffManagementScreen() {
             <View style={styles.modalIconBg}>
               <Ionicons name="trash-outline" size={28} color="#EF4444" />
             </View>
-            <Text style={styles.modalTitle}>Clear All Roles?</Text>
+            <Text style={styles.modalTitle}>{tr("Clear All Roles?", "Kosongkan Semua Peranan?")}</Text>
             <Text style={styles.modalSubtitle}>
               Are you sure you want to remove all {customRoles.length} configured role presets? Existing staff will retain their current compensation rates.
             </Text>
@@ -5383,7 +5375,7 @@ export default function StaffManagementScreen() {
                 disabled={isClearingAllRoles}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{tr("Cancel", "Batal")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmBtn}
@@ -5394,7 +5386,7 @@ export default function StaffManagementScreen() {
                 {isClearingAllRoles ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.modalConfirmText}>Clear All</Text>
+                  <Text style={styles.modalConfirmText}>{tr("Clear All", "Kosongkan Semua")}</Text>
                 )}
               </TouchableOpacity>
             </View>
