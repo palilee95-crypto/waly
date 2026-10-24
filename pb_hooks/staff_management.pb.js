@@ -1251,108 +1251,99 @@ routerAdd("POST", "/api/risev/merchant/staff/update", (e) => {
   }
 
   // ── Email ───────────────────────────────────────────────────────────────
-  if (body.email !== undefined && String(body.email || "").trim() !== "") {
-    if (!staffUser) {
-      return e.json(400, { message: "This staff member has no login account, so an email cannot be set." });
+  // Shadow staff (no real inbox) use shadow_staff_<phone>@risev.app as their
+  // login identity. That address is derived, never authored: if the record is a
+  // shadow account we always rebuild it from the (possibly new) phone, even when
+  // the client echoes the old value back.
+  if (staffUser) {
+    const submittedEmail = String(body.email || "").trim().toLowerCase();
+    const currentEmail = staffUser.getString("email");
+    const shadowAccount = isShadowEmail(currentEmail) || isShadowEmail(submittedEmail);
+
+    if (shadowAccount) {
+      const phoneForEmail = newPhone || normalizePhone(staffUser.getString("phone"));
+      const nextEmail = shadowEmail(phoneForEmail);
+      if (nextEmail && nextEmail !== currentEmail) {
+        let clash = null;
+        try { clash = $app.findFirstRecordByData("users", "email", nextEmail); } catch (err) {}
+        if (clash && clash.id !== staffUser.id) {
+          return e.json(400, { message: "Another account already uses this email." });
+        }
+        setIfPresent(staffUser, "email", nextEmail);
+      }
+    } else if (submittedEmail) {
+      let clash = null;
+      try { clash = $app.findFirstRecordByData("users", "email", submittedEmail); } catch (err) {}
+      if (clash && clash.id !== staffUser.id) {
+        return e.json(400, { message: "Another account already uses this email." });
+      }
+      setIfPresent(staffUser, "email", submittedEmail);
     }
-    const email = String(body.email).trim().toLowerCase();
-    let clash = null;
-    try { clash = $app.findFirstRecordByData("users", "email", email); } catch (err) {}
-    if (clash && clash.id !== staffUser.id) {
-      return e.json(400, { message: "Another account already uses this email." });
-    }
-    setIfPresent(staffUser, "email", email);
-  } else if (staffUser && newPhone && isShadowEmail(staffUser.getString("email"))) {
-    // Shadow staff log in with shadow_staff_<phone>@risev.app; keep it in step with a new phone.
-    setIfPresent(staffUser, "email", shadowEmail(newPhone));
+  } else if (body.email !== undefined && String(body.email || "").trim() !== "") {
+    return e.json(400, { message: "This staff member has no login account, so an email cannot be set." });
   }
 
-  // ── Role & branch ───────────────────────────────────────────────────────
-  if (body.role_title !== undefined) {
-    const roleTitle = String(body.role_title || "").trim() || "Provider";
-    setIfPresent(staffUser, "role_title", roleTitle);
-    setIfPresent(msRec, "role_title", roleTitle);
-  }
-
-  if (body.branch_name !== undefined) {
-    const branchName = String(body.branch_name || "").trim();
-    if (branchName) {
-      setIfPresent(staffUser, "branch_name", branchName);
-      if (msRec) {
-        try {
-          const branchList = $app.findRecordsByFilter("branches", `merchant = "${merchantId}"`, "-created", 500, 0);
-          for (let i = 0; i < branchList.length; i++) {
-            if ((branchList[i].getString("name") || "").trim().toLowerCase() === branchName.toLowerCase()) {
-              setIfPresent(msRec, "branch", branchList[i].id);
-              break;
+  // ── Branch, role, employment, pay, attendance (owner only) ──────────────
+  // A staff member may edit their own name / phone / email; role, branch,
+  // employment, pay and attendance belong to the owner.
+  if (isOwner) {
+    if (body.branch_name !== undefined) {
+      const branchName = String(body.branch_name || "").trim();
+      if (branchName) {
+        setIfPresent(staffUser, "branch_name", branchName);
+        if (msRec) {
+          try {
+            const branchList = $app.findRecordsByFilter("branches", `merchant = "${merchantId}"`, "-created", 500, 0);
+            for (let i = 0; i < branchList.length; i++) {
+              if ((branchList[i].getString("name") || "").trim().toLowerCase() === branchName.toLowerCase()) {
+                setIfPresent(msRec, "branch", branchList[i].id);
+                break;
+              }
             }
-          }
-        } catch (err) {}
+          } catch (err) {}
+        }
       }
     }
-  }
 
-  // ── Employment & compensation (metadata is the durable copy) ────────────
-  let uMeta = {};
-  if (staffUser) {
-    try {
-      const rawMeta = staffUser.get("metadata");
-      uMeta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
-    } catch (err) { uMeta = {}; }
-  }
+    if (body.role_title !== undefined) {
+      const roleTitle = String(body.role_title || "").trim() || "Provider";
+      setIfPresent(msRec, "role_title", roleTitle);
+    }
 
-  const employmentType = body.employment_type === "part_time"
-    ? "part_time"
-    : (body.employment_type === "full_time" ? "full_time" : "");
-  if (employmentType) {
-    uMeta.employment_type = employmentType;
-    setIfPresent(staffUser, "employment_type", employmentType);
-    setIfPresent(msRec, "employment_type", employmentType);
-  }
-
-  if (body.base_salary !== undefined) {
-    uMeta.base_salary = toNumber(body.base_salary);
-    setIfPresent(staffUser, "base_salary", uMeta.base_salary);
-    setIfPresent(msRec, "base_salary", uMeta.base_salary);
-  }
-  if (body.hourly_rate !== undefined) {
-    uMeta.hourly_rate = toNumber(body.hourly_rate);
-    setIfPresent(staffUser, "hourly_rate", uMeta.hourly_rate);
-    setIfPresent(msRec, "hourly_rate", uMeta.hourly_rate);
-  }
-  if (body.commission_type !== undefined) {
-    uMeta.commission_type = ["percentage", "fixed_per_job", "none"].indexOf(body.commission_type) !== -1
-      ? body.commission_type
-      : "none";
-    setIfPresent(staffUser, "commission_type", uMeta.commission_type);
-    setIfPresent(msRec, "commission_type", uMeta.commission_type);
-  }
-  if (body.commission_rate !== undefined) {
-    uMeta.commission_rate = toNumber(body.commission_rate);
-    setIfPresent(staffUser, "commission_rate", uMeta.commission_rate);
-    setIfPresent(msRec, "commission_rate", uMeta.commission_rate);
-  }
-
-  if (body.attendance_status !== undefined) {
-    const status = body.attendance_status === "on_leave" ? "on_leave" : "active";
-    uMeta.attendance_status = status;
-    setIfPresent(staffUser, "attendance_status", status);
-    if (msRec) setIfPresent(msRec, "is_active", status !== "on_leave");
+    if (body.employment_type !== undefined) {
+      const employmentType = body.employment_type === "part_time" ? "part_time" : "full_time";
+      setIfPresent(staffUser, "employment_type", employmentType);
+    }
+    if (body.base_salary !== undefined) setIfPresent(staffUser, "base_salary", toNumber(body.base_salary));
+    if (body.hourly_rate !== undefined) setIfPresent(staffUser, "hourly_rate", toNumber(body.hourly_rate));
+    if (body.commission_type !== undefined) {
+      const commissionType = ["percentage", "fixed_per_job", "none"].indexOf(body.commission_type) !== -1
+        ? body.commission_type
+        : "none";
+      setIfPresent(staffUser, "commission_type", commissionType);
+    }
+    if (body.commission_rate !== undefined) setIfPresent(staffUser, "commission_rate", toNumber(body.commission_rate));
+    if (body.attendance_status !== undefined) {
+      const status = body.attendance_status === "on_leave" ? "on_leave" : "active";
+      setIfPresent(staffUser, "attendance_status", status);
+      if (msRec) setIfPresent(msRec, "is_active", status !== "on_leave");
+    }
   }
 
   if (staffUser) {
-    try {
-      staffUser.set("metadata", JSON.stringify(uMeta));
-    } catch (err) {}
     try {
       $app.save(staffUser);
     } catch (err) {
-      return e.json(400, { message: "Could not update the staff account: " + String(err) });
+      console.log("[STAFF UPDATE] users save failed:", err.message || err);
+      return e.json(400, { message: "Could not update the staff account." });
     }
   }
 
   if (msRec) {
-    try { $app.save(msRec); } catch (err) {}
+    try { $app.save(msRec); } catch (err) {
+      console.log("[STAFF UPDATE] merchant_staff save failed:", err.message || err);
+      return e.json(400, { message: "Could not update the staff record." });
+    }
   }
 
   return e.json(200, {
@@ -1365,12 +1356,12 @@ routerAdd("POST", "/api/risev/merchant/staff/update", (e) => {
       phone: staffUser ? staffUser.getString("phone") : (msRec ? msRec.getString("phone") : ""),
       role_title: msRec ? msRec.getString("role_title") : (staffUser ? staffUser.getString("role_title") : ""),
       branch_name: staffUser ? staffUser.getString("branch_name") : "",
-      employment_type: uMeta.employment_type || "full_time",
-      base_salary: uMeta.base_salary || 0,
-      hourly_rate: uMeta.hourly_rate || 0,
-      commission_type: uMeta.commission_type || "none",
-      commission_rate: uMeta.commission_rate || 0,
-      attendance_status: uMeta.attendance_status || "active"
+      employment_type: staffUser ? (staffUser.getString("employment_type") || "full_time") : "full_time",
+      base_salary: staffUser ? (parseFloat(staffUser.get("base_salary")) || 0) : 0,
+      hourly_rate: staffUser ? (parseFloat(staffUser.get("hourly_rate")) || 0) : 0,
+      commission_type: staffUser ? (staffUser.getString("commission_type") || "none") : "none",
+      commission_rate: staffUser ? (parseFloat(staffUser.get("commission_rate")) || 0) : 0,
+      attendance_status: staffUser ? (staffUser.getString("attendance_status") || "active") : "active"
     }
   });
 }, $apis.requireAuth("users"));
