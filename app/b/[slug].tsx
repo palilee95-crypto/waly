@@ -23,7 +23,7 @@ import { BlurView } from 'expo-blur';
 import { pb } from '@/lib/pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildPassUrl, shortPassRef } from '@/lib/bookingPass';
-import { ALL_TIME_SLOTS, getPeriodForSlot, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
+import { ALL_TIME_SLOTS, fitsOpeningHours, formatMinutesLabel, getPeriodForSlot, hoursForDate, isSlotInPast, parseSlotToMinutes } from '@/lib/bookingSlots';
 import { AppointmentPassData, PASS_SHEET_SURFACE, saveAppointmentPass, shareAppointmentPass } from '@/lib/appointmentPass';
 import AppointmentTicket from '@/components/AppointmentTicket';
 import { useAuth } from '@/context/AuthContext';
@@ -360,26 +360,47 @@ export default function CustomerBookingPwaScreen() {
     return firstValid || '09:00 AM';
   });
 
+  // Opening hours for the selected day. `unset` (merchant never configured
+  // hours) blocks nothing; a configured week with no entry for that weekday is
+  // closed, which matches the server-side check on create/reschedule.
+  const hoursSource = storeLocation?.hours ?? merchant?.operating_hours ?? null;
+  const dayHours = useMemo(
+    () => hoursForDate(hoursSource, selectedIsoDate),
+    [hoursSource, selectedIsoDate]
+  );
+
+  // Pickers run before the cart is known, so they assume a 30-minute service;
+  // the grid itself uses the real cart duration.
+  const slotFitsHoursFor = (slot: string, durationMinutes: number) =>
+    fitsOpeningHours(dayHours, parseSlotToMinutes(slot), durationMinutes);
+  const slotFitsHours = (slot: string) => slotFitsHoursFor(slot, calculateTotalDuration() || 30);
+
   // Compute actual earliest available slot for the selected date
   const earliestAvailableSlot = useMemo(() => {
-    const firstValid = ALL_TIME_SLOTS.find(slot => !isSlotInPast(slot, selectedIsoDate));
-    return firstValid || 'Closed today';
-  }, [selectedIsoDate]);
+    const firstValid = ALL_TIME_SLOTS.find(
+      slot => !isSlotInPast(slot, selectedIsoDate) && slotFitsHoursFor(slot, 30)
+    );
+    if (firstValid) return firstValid;
+    return dayHours.closed ? 'Closed' : 'No slots left';
+  }, [selectedIsoDate, dayHours]);
 
   // Handle date selection with auto-alignment of valid time period and slot
   const handleDateSelect = (iso: string, full: string) => {
     setSelectedIsoDate(iso);
     setSelectedDate(full);
 
-    const firstValid = ALL_TIME_SLOTS.find(s => !isSlotInPast(s, iso));
+    const nextHours = hoursForDate(hoursSource, iso);
+    const fits = (slot: string) => fitsOpeningHours(nextHours, parseSlotToMinutes(slot), 30);
+    const isBookable = (slot: string) => !isSlotInPast(slot, iso) && fits(slot);
+    const firstValid = ALL_TIME_SLOTS.find(isBookable);
     if (firstValid) {
       const currentPeriodSlots = timeSlotsByPeriod[selectedTimePeriod] || [];
-      const hasValidSlotInCurrentPeriod = currentPeriodSlots.some(s => !isSlotInPast(s, iso));
+      const hasValidSlotInCurrentPeriod = currentPeriodSlots.some(isBookable);
       if (!hasValidSlotInCurrentPeriod) {
         setSelectedTimePeriod(getPeriodForSlot(firstValid));
         setSelectedTime(firstValid);
-      } else if (isSlotInPast(selectedTime, iso)) {
-        const nextInPeriod = currentPeriodSlots.find(s => !isSlotInPast(s, iso));
+      } else if (!isBookable(selectedTime)) {
+        const nextInPeriod = currentPeriodSlots.find(isBookable);
         if (nextInPeriod) {
           setSelectedTime(nextInPeriod);
         } else {
@@ -1731,6 +1752,23 @@ export default function CustomerBookingPwaScreen() {
     return busyWindows.some(w => start < w.end && w.start < end);
   };
 
+  // Everything the customer must not pick: in the past, outside the day's
+  // opening hours, or already taken by the chosen provider.
+  const slotBlocked = (slot: string) =>
+    isSlotInPast(slot, selectedIsoDate) || !slotFitsHours(slot) || slotIsTaken(slot);
+
+  // Hours arrive with the merchant, so a pre-selected slot can fall outside them.
+  // Move to the first bookable slot instead of letting Next fail.
+  useEffect(() => {
+    if (currentStep !== 2) return;
+    if (!slotBlocked(selectedTime)) return;
+    const firstOpen = ALL_TIME_SLOTS.find(s => !slotBlocked(s));
+    if (firstOpen) {
+      setSelectedTime(firstOpen);
+      setSelectedTimePeriod(getPeriodForSlot(firstOpen));
+    }
+  }, [currentStep, selectedIsoDate, dayHours, busyWindows, selectedServices.length, selectedTime]);
+
   const handleNextStep = async () => {
     if (currentStep === 0) {
       setCurrentStep(1);
@@ -1741,8 +1779,20 @@ export default function CustomerBookingPwaScreen() {
       }
       setCurrentStep(2);
     } else if (currentStep === 2) {
+      if (!dayHours.unset && dayHours.closed) {
+        Alert.alert('Closed', 'The store is closed on this day. Please choose another date.');
+        return;
+      }
       if (isSlotInPast(selectedTime, selectedIsoDate)) {
         Alert.alert('Slot Unavailable', 'The selected time slot has already passed. Please choose an upcoming time or another date.');
+        return;
+      }
+      if (!slotFitsHours(selectedTime)) {
+        Alert.alert(
+          'Outside opening hours',
+          'The store is open ' + formatMinutesLabel(dayHours.openMinutes) + ' – ' +
+          formatMinutesLabel(dayHours.closeMinutes % 1440) + ' on this day. Please choose another time.'
+        );
         return;
       }
       if (slotIsTaken(selectedTime)) {
@@ -3123,18 +3173,23 @@ export default function CustomerBookingPwaScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
               {upcomingDates.map(dt => {
                 const isSelected = selectedIsoDate === dt.iso;
+                const dtHours = hoursForDate(hoursSource, dt.iso);
+                const isClosed = !dtHours.unset && dtHours.closed;
                 return (
                   <TouchableOpacity
                     key={dt.iso}
+                    disabled={isClosed}
+                    accessibilityLabel={isClosed ? `${dt.day} ${dt.num} — store closed` : `${dt.day} ${dt.num}`}
                     style={[
                       styles.dayColumnCard,
-                      isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset
+                      isSelected ? themeStyles.neumorphicActiveBtn : themeStyles.neumorphicInset,
+                      isClosed && !isSelected ? { opacity: 0.35 } : null,
                     ]}
                     onPress={() => handleDateSelect(dt.iso, dt.full)}
-                    activeOpacity={0.85}
+                    activeOpacity={isClosed ? 1 : 0.85}
                   >
-                    <Text style={[styles.dayNameText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textSecondaryColor }]}>{dt.day}</Text>
-                    <Text style={[styles.dayNumText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor }]}>{dt.num}</Text>
+                    <Text style={[styles.dayNameText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textSecondaryColor, textDecorationLine: isClosed ? 'line-through' : 'none' }]}>{dt.day}</Text>
+                    <Text style={[styles.dayNumText, { color: isSelected ? themeStyles.contrastColor : themeStyles.textPrimaryColor, textDecorationLine: isClosed ? 'line-through' : 'none' }]}>{dt.num}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -3142,10 +3197,15 @@ export default function CustomerBookingPwaScreen() {
 
             {/* Time Period Filter Segment */}
             <Text style={[styles.dateGroupTitle, { color: themeStyles.textPrimaryColor }]}>Select Time</Text>
+            {!dayHours.unset && !dayHours.closed ? (
+              <Text style={{ fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: themeStyles.textSecondaryColor, marginTop: -2, marginBottom: 10 }}>
+                {locale === 'ms' ? 'Waktu operasi' : 'Open'} {formatMinutesLabel(dayHours.openMinutes)} – {formatMinutesLabel(dayHours.closeMinutes % 1440)}
+              </Text>
+            ) : null}
             <View style={[styles.periodSegmentTrack, themeStyles.neumorphicInset]}>
               {(['Morning', 'Afternoon', 'Evening'] as const).map(p => {
                 const pSlots = timeSlotsByPeriod[p] || [];
-                const isAllPast = pSlots.every(s => isSlotInPast(s, selectedIsoDate) || slotIsTaken(s));
+                const isAllPast = pSlots.every(s => slotBlocked(s));
                 const isSelectedPeriod = selectedTimePeriod === p;
                 return (
                   <TouchableOpacity
@@ -3157,7 +3217,7 @@ export default function CustomerBookingPwaScreen() {
                     ]}
                     onPress={() => {
                       setSelectedTimePeriod(p);
-                      const validInPeriod = pSlots.filter(s => !isSlotInPast(s, selectedIsoDate) && !slotIsTaken(s));
+                      const validInPeriod = pSlots.filter(s => !slotBlocked(s));
                       if (validInPeriod.length > 0 && !validInPeriod.includes(selectedTime)) {
                         setSelectedTime(validInPeriod[0]);
                       }
@@ -3181,9 +3241,7 @@ export default function CustomerBookingPwaScreen() {
             {/* 3-Column Time Slot Grid */}
             <View style={styles.timeSlotsGrid}>
               {(timeSlotsByPeriod[selectedTimePeriod] || []).map(tm => {
-                const isPast = isSlotInPast(tm, selectedIsoDate);
-                const isTaken = slotIsTaken(tm);
-                const isBlocked = isPast || isTaken;
+                const isBlocked = slotBlocked(tm);
                 const isSelected = selectedTime === tm && !isBlocked;
                 return (
                   <TouchableOpacity
@@ -3220,19 +3278,28 @@ export default function CustomerBookingPwaScreen() {
               })}
             </View>
 
-            {/* Informational notice if all slots in the current period or day have passed */}
-            {ALL_TIME_SLOTS.every(s => isSlotInPast(s, selectedIsoDate)) ? (
+            {/* Closed days and days with nothing bookable explain themselves. */}
+            {!dayHours.unset && dayHours.closed ? (
+              <View style={[styles.allDayPastBanner, themeStyles.neumorphicInset]}>
+                <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
+                <Text style={{ fontSize: 13, color: themeStyles.textPrimaryColor, marginLeft: 8, fontWeight: '600', flex: 1 }}>
+                  {locale === 'ms' ? 'Kedai tutup pada hari ini. Sila pilih tarikh lain di atas.' : 'The store is closed on this day. Please choose another date above.'}
+                </Text>
+              </View>
+            ) : ALL_TIME_SLOTS.every(s => slotBlocked(s)) ? (
               <View style={[styles.allDayPastBanner, themeStyles.neumorphicInset]}>
                 <Ionicons name="time-outline" size={18} color="#EF4444" />
                 <Text style={{ fontSize: 13, color: themeStyles.textPrimaryColor, marginLeft: 8, fontWeight: '600', flex: 1 }}>
-                  All appointment slots for today have ended. Please choose another date above.
+                  {locale === 'ms' ? 'Tiada slot tersedia untuk hari ini. Sila pilih tarikh lain di atas.' : 'No slots are available for this day. Please choose another date above.'}
                 </Text>
               </View>
-            ) : (timeSlotsByPeriod[selectedTimePeriod] || []).every(s => isSlotInPast(s, selectedIsoDate)) ? (
+            ) : (timeSlotsByPeriod[selectedTimePeriod] || []).every(s => slotBlocked(s)) ? (
               <View style={[styles.allDayPastBanner, themeStyles.neumorphicInset]}>
                 <Ionicons name="time-outline" size={16} color={themeStyles.textSecondaryColor} />
                 <Text style={{ fontSize: 13, color: themeStyles.textSecondaryColor, marginLeft: 8, fontWeight: '500' }}>
-                  All {selectedTimePeriod.toLowerCase()} slots have passed for today. Please select an upcoming period above.
+                  {locale === 'ms'
+                    ? `Tiada slot ${selectedTimePeriod.toLowerCase()} tersedia. Sila pilih sesi lain di atas.`
+                    : `No ${selectedTimePeriod.toLowerCase()} slots are available. Please select another period above.`}
                 </Text>
               </View>
             ) : null}
