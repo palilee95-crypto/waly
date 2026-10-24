@@ -91,7 +91,8 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
               label = t('profile');
             }
 
-            const isLockedMarketing = route.name === 'marketing' && !isOwner && !staffPermissions?.can_view_marketing;
+            // Marketing stays owner-only; there is no staff permission for it.
+            const isLockedMarketing = route.name === 'marketing' && !isOwner;
 
             return (
               <TouchableOpacity
@@ -238,7 +239,7 @@ function CustomMerchantTabBar({ state, descriptors, navigation, isSidebarExpande
             label = t('profile');
           }
 
-          const isLockedMarketing = route.name === 'marketing' && !isOwner && !staffPermissions?.can_view_marketing;
+          const isLockedMarketing = route.name === 'marketing' && !isOwner;
 
           return (
             <TouchableOpacity

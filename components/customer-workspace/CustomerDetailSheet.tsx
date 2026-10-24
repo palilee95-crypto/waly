@@ -5,12 +5,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Linking } from 'react-native';
 import { colors, radii } from '@/theme';
+import { pb } from '@/lib/pocketbase';
 import {
   CustomerDetail,
   fetchCustomerDetail,
@@ -19,6 +21,8 @@ import {
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
+import { cleanCustomerName } from '@/lib/customer-name';
+import { useTr } from '@/lib/i18n';
 import LoyaltyCardBack, { inkOn } from '@/components/LoyaltyCardBack';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -29,6 +33,23 @@ const TYPE_LABEL: Record<string, string> = {
   points: 'Points earned',
   adjust: 'Adjustment',
 };
+
+function typeLabel(tr: (en: string, ms: string) => string, type: string): string {
+  switch (type) {
+    case 'earn':
+    case 'stamp':
+      return tr('Stamp earned', 'Setem diperoleh');
+    case 'spend':
+    case 'redeem':
+      return tr('Reward redeemed', 'Ganjaran ditebus');
+    case 'points':
+      return tr('Points earned', 'Mata diperoleh');
+    case 'adjust':
+      return tr('Adjustment', 'Pelarasan');
+    default:
+      return TYPE_LABEL[type] || type || tr('Activity', 'Aktiviti');
+  }
+}
 
 type Props = {
   visible: boolean;
@@ -47,6 +68,7 @@ export default function CustomerDetailSheet({
   onClose,
   onDeleted,
 }: Props) {
+  const tr = useTr();
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +76,10 @@ export default function CustomerDetailSheet({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [editingTxn, setEditingTxn] = useState<{ id: string; bill: number } | null>(null);
+  const [billInput, setBillInput] = useState('');
+  const [savingBill, setSavingBill] = useState(false);
+  const [billError, setBillError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible || !customerId) return;
@@ -63,6 +89,9 @@ export default function CustomerDetailSheet({
     setDeleteError(null);
     setConfirming(false);
     setShowActions(false);
+    setEditingTxn(null);
+    setBillInput('');
+    setBillError(null);
     setLoading(true);
     fetchCustomerDetail(customerId, { name, phone })
       .then((res) => {
@@ -110,7 +139,43 @@ export default function CustomerDetailSheet({
     }
   };
 
-  const initials = (detail?.name || name || 'C')
+  const displayName = cleanCustomerName(detail?.name || name) || 'Customer';
+
+  const openBillEditor = (item: { id: string; bill: number }) => {
+    setEditingTxn({ id: item.id, bill: item.bill });
+    setBillInput(item.bill > 0 ? item.bill.toFixed(2) : '');
+    setBillError(null);
+  };
+
+  const saveBill = async () => {
+    if (!editingTxn || !customerId) return;
+    const value = Number(String(billInput).replace(',', '.'));
+    if (!isFinite(value) || value < 0) {
+      setBillError('Enter a valid amount (0 or more).');
+      return;
+    }
+    setSavingBill(true);
+    setBillError(null);
+    try {
+      await pb.send('/api/risev/merchant/transactions/bill', {
+        method: 'POST',
+        body: { transaction_id: editingTxn.id, bill_amount: value },
+        requestKey: null,
+      });
+      const refreshed = await fetchCustomerDetail(customerId, {
+        name: detail?.name,
+        phone: detail?.phone,
+      });
+      setDetail(refreshed);
+      setEditingTxn(null);
+    } catch (err: any) {
+      setBillError(err?.response?.data?.message || err?.message || 'Could not save the bill amount.');
+    } finally {
+      setSavingBill(false);
+    }
+  };
+
+  const initials = displayName
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -134,24 +199,24 @@ export default function CustomerDetailSheet({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>
-                {detail?.name || name || 'Customer'}
+                {displayName}
               </Text>
               <Text style={styles.subtitle} numberOfLines={1}>
-                {detail?.phone || phone || 'No phone on file'}
+                {detail?.phone || phone || tr('No phone on file', 'Tiada nombor telefon')}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setShowActions((value) => !value)} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Customer actions">
+            <TouchableOpacity onPress={() => setShowActions((value) => !value)} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={tr('Customer actions', 'Tindakan pelanggan')}>
               <Ionicons name="ellipsis-horizontal" size={18} color={colors.black} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Close customer details">
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={tr('Close customer details', 'Tutup butiran pelanggan')}>
               <Ionicons name="close" size={18} color={colors.black} />
             </TouchableOpacity>
           </View>
 
           {showActions ? (
-            <TouchableOpacity style={styles.actionMenuItem} onPress={remove} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Remove customer from this store">
+            <TouchableOpacity style={styles.actionMenuItem} onPress={remove} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={tr('Remove customer from this store', 'Alih keluar pelanggan dari kedai ini')}>
               <Ionicons name="trash-outline" size={17} color={colors.error.dark} />
-              <Text style={styles.actionMenuText}>Remove from this store</Text>
+              <Text style={styles.actionMenuText}>{tr('Remove from this store', 'Alih keluar dari kedai ini')}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -199,23 +264,23 @@ export default function CustomerDetailSheet({
               <View style={styles.statRow}>
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{detail.points.toLocaleString('en-MY')}</Text>
-                  <Text style={styles.statLabel}>Points</Text>
+                  <Text style={styles.statLabel}>{tr('Points', 'Mata')}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{detail.completions}</Text>
-                  <Text style={styles.statLabel}>Rewards</Text>
+                  <Text style={styles.statLabel}>{tr('Rewards', 'Ganjaran')}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{detail.vouchers}</Text>
-                  <Text style={styles.statLabel}>Vouchers</Text>
+                  <Text style={styles.statLabel}>{tr('Vouchers', 'Baucar')}</Text>
                 </View>
               </View>
 
-              <Text style={styles.sectionLabel}>Recent activity</Text>
+              <Text style={styles.sectionLabel}>{tr('Recent activity', 'Aktiviti terkini')}</Text>
               {detail.activity.length === 0 ? (
-                <Text style={styles.emptyText}>No visits recorded yet.</Text>
+                <Text style={styles.emptyText}>{tr('No visits recorded yet.', 'Belum ada lawatan direkodkan.')}</Text>
               ) : (
                 <View style={styles.activityList}>
                   {detail.activity.map((item, index) => {
@@ -237,15 +302,26 @@ export default function CustomerDetailSheet({
                         <View style={styles.activityCopy}>
                           <View style={styles.activityHeading}>
                             <Text style={styles.activityTitle} numberOfLines={1}>
-                              {TYPE_LABEL[item.type] || item.type || 'Activity'}
+                              {typeLabel(tr, item.type)}
                             </Text>
                             <Text style={styles.activityDate}>{formatShortDateFromIso(item.created)}</Text>
                           </View>
                           <Text style={styles.activityMeta} numberOfLines={2}>
-                            {impact || (isReward ? 'Reward claimed' : 'Loyalty activity')}
+                            {impact || (isReward ? tr('Reward claimed', 'Ganjaran ditebus') : tr('Loyalty activity', 'Aktiviti kesetiaan'))}
                             {' · '}{relativeDays(item.created)}
                           </Text>
                         </View>
+                        {item.type === 'earn' ? (
+                          <TouchableOpacity
+                            onPress={() => openBillEditor(item)}
+                            style={styles.editBillBtn}
+                            activeOpacity={0.75}
+                            accessibilityRole="button"
+                            accessibilityLabel={tr('Edit bill amount', 'Edit jumlah bil')}
+                          >
+                            <Ionicons name="pencil" size={14} color={colors.black} />
+                          </TouchableOpacity>
+                        ) : null}
                       </View>
                     );
                   })}
@@ -256,16 +332,57 @@ export default function CustomerDetailSheet({
 
           {deleteError ? <Text style={styles.deleteError}>{deleteError}</Text> : null}
 
+          {editingTxn ? (
+            <View style={styles.billPanel}>
+              <Text style={styles.confirmTitle}>{tr('Edit bill amount', 'Edit jumlah bil')}</Text>
+              <Text style={styles.confirmText}>
+                {tr('Correct the sale total. Stamps and points already credited stay unchanged.', 'Betulkan jumlah jualan. Setem dan mata yang telah dikreditkan kekal tidak berubah.')}
+              </Text>
+              <TextInput
+                style={styles.billInput}
+                value={billInput}
+                onChangeText={setBillInput}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#94A3B8"
+                autoFocus
+              />
+              {billError ? <Text style={styles.deleteError}>{billError}</Text> : null}
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => setEditingTxn(null)}
+                  disabled={savingBill}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryText}>{tr('Cancel', 'Batal')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dangerBtn}
+                  onPress={saveBill}
+                  disabled={savingBill}
+                  activeOpacity={0.85}
+                >
+                  {savingBill ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.dangerText}>{tr('Save bill', 'Simpan bil')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+
           {confirming ? (
             <View style={styles.confirmPanel}>
-              <Text style={styles.confirmTitle}>Remove this customer?</Text>
-              <Text style={styles.confirmText}>They will be removed from this store only. Their other stores stay unchanged.</Text>
+              <Text style={styles.confirmTitle}>{tr('Remove this customer?', 'Alih keluar pelanggan ini?')}</Text>
+              <Text style={styles.confirmText}>{tr('They will be removed from this store only. Their other stores stay unchanged.', 'Mereka hanya akan dialih keluar dari kedai ini. Kedai lain tidak berubah.')}</Text>
               <View style={styles.confirmActions}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setConfirming(false)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Cancel removal">
-                  <Text style={styles.secondaryText}>Cancel</Text>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setConfirming(false)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={tr('Cancel removal', 'Batal alih keluar')}>
+                  <Text style={styles.secondaryText}>{tr('Cancel', 'Batal')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.dangerBtn, styles.dangerBtnArmed]} onPress={remove} disabled={deleting} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Confirm remove customer">
-                  {deleting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.dangerText}>Remove customer</Text>}
+                <TouchableOpacity style={[styles.dangerBtn, styles.dangerBtnArmed]} onPress={remove} disabled={deleting} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={tr('Confirm remove customer', 'Sahkan alih keluar pelanggan')}>
+                  {deleting ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.dangerText}>{tr('Remove customer', 'Alih keluar pelanggan')}</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -275,10 +392,10 @@ export default function CustomerDetailSheet({
               onPress={openChat}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel={`Chat with ${detail?.name || name || 'customer'}`}
+              accessibilityLabel={tr(`Chat with ${displayName}`, `Sembang dengan ${displayName}`)}
             >
               <Ionicons name="logo-whatsapp" size={15} color={colors.black} />
-              <Text style={styles.secondaryText}>Chat with customer</Text>
+              <Text style={styles.secondaryText}>{tr('Chat with customer', 'Sembang dengan pelanggan')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -391,6 +508,34 @@ const styles = StyleSheet.create({
   activityTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: colors.black, flex: 1 },
   activityDate: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: '#64748B' },
   activityMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, lineHeight: 17, color: '#64748B', marginTop: 3 },
+  editBillBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billPanel: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: '#E9EDF3',
+    padding: 14,
+    marginTop: 12,
+  },
+  billInput: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 16,
+    color: colors.black,
+  },
   deleteError: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 11.5,

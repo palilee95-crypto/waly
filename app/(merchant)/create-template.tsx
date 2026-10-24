@@ -17,6 +17,7 @@ import { handleSmartBack } from '@/lib/navigation';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { pb } from '@/lib/pocketbase';
 import { useAuth } from '@/context/AuthContext';
+import { useTr } from '@/lib/i18n';
 
 export interface TemplateButton {
   id: string;
@@ -120,6 +121,7 @@ const WIZARD_STEPS = [
 export default function CreateTemplateScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const tr = useTr();
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
@@ -206,7 +208,7 @@ export default function CreateTemplateScreen() {
   // Button management
   const addButton = () => {
     if (buttons.length >= 3) {
-      Alert.alert('Maximum Reached', 'Meta WhatsApp allows up to 3 interactive buttons per template.');
+      Alert.alert(tr("Maximum Reached", "Had Maksimum Dicapai"), 'Meta WhatsApp allows up to 3 interactive buttons per template.');
       return;
     }
     const newId = String(Date.now());
@@ -398,7 +400,7 @@ export default function CreateTemplateScreen() {
             <Ionicons name="logo-whatsapp" size={20} color="#16A34A" />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Create WhatsApp Template</Text>
+            <Text style={styles.headerTitle}>{tr("Create WhatsApp Template", "Cipta Templat WhatsApp")}</Text>
             <Text style={styles.headerSub}>
               Step {currentStep} of 5 • {WIZARD_STEPS[currentStep - 1]?.label}
             </Text>
@@ -490,7 +492,7 @@ export default function CreateTemplateScreen() {
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={styles.inputLabel}>TEMPLATE NAME</Text>
+                      <Text style={styles.inputLabel}>{tr("TEMPLATE NAME", "NAMA TEMPLAT")}</Text>
                       <Text style={styles.requiredStar}>*</Text>
                     </View>
                     <View style={styles.formatTag}>
@@ -505,7 +507,7 @@ export default function CreateTemplateScreen() {
                     </View>
                     <TextInput
                       style={[styles.inputInnerField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                      placeholder="e.g. weekend_flash_sale"
+                      placeholder={tr("e.g. weekend_flash_sale", "cth. weekend_flash_sale")}
                       placeholderTextColor="#94A3B8"
                       value={formName}
                       onChangeText={(t) => {
@@ -531,7 +533,7 @@ export default function CreateTemplateScreen() {
 
                 {/* Category Selection Cards */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>CATEGORY</Text>
+                  <Text style={styles.inputLabel}>{tr("CATEGORY", "KATEGORI")}</Text>
                   <View style={styles.categoryCardGrid}>
                     <TouchableOpacity
                       style={[styles.categoryCard, formCategory === 'MARKETING' && styles.categoryCardActive]}
@@ -546,7 +548,7 @@ export default function CreateTemplateScreen() {
                           <Ionicons name="checkmark-circle" size={20} color="#FFC700" />
                         )}
                       </View>
-                      <Text style={styles.categoryCardTitle}>Marketing</Text>
+                      <Text style={styles.categoryCardTitle}>{tr("Marketing", "Pemasaran")}</Text>
                       <Text style={styles.categoryCardDesc}>
                         Promotions, seasonal discounts, birthday gifts, and announcements.
                       </Text>
@@ -565,7 +567,7 @@ export default function CreateTemplateScreen() {
                           <Ionicons name="checkmark-circle" size={20} color="#FFC700" />
                         )}
                       </View>
-                      <Text style={styles.categoryCardTitle}>Utility</Text>
+                      <Text style={styles.categoryCardTitle}>{tr("Utility", "Utiliti")}</Text>
                       <Text style={styles.categoryCardDesc}>
                         Stamp balances, milestone alerts, and transaction receipts.
                       </Text>
@@ -575,7 +577,7 @@ export default function CreateTemplateScreen() {
 
                 {/* Language Selector */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>LANGUAGE</Text>
+                  <Text style={styles.inputLabel}>{tr("LANGUAGE", "BAHASA")}</Text>
                   <View style={styles.languageToggleContainer}>
                     <TouchableOpacity
                       style={[styles.langBtn, formLanguage === 'en_US' && styles.langBtnActive]}
@@ -608,14 +610,14 @@ export default function CreateTemplateScreen() {
                     onPress={() => router.back()}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.secondaryBtnText}>Cancel</Text>
+                    <Text style={styles.secondaryBtnText}>{tr("Cancel", "Batal")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.primaryBtn}
                     onPress={handleNextStep}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.primaryBtnText}>Next: Header</Text>
+                    <Text style={styles.primaryBtnText}>{tr("Next: Header", "Seterusnya: Pengepala")}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#050505" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 </View>
@@ -628,7 +630,7 @@ export default function CreateTemplateScreen() {
                 <View style={styles.stepIntroBanner}>
                   <Ionicons name="image" size={18} color="#D97706" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.stepIntroTitle}>Header Media & Title</Text>
+                    <Text style={styles.stepIntroTitle}>{tr("Header Media & Title", "Media & Tajuk Pengepala")}</Text>
                     <Text style={styles.stepIntroDesc}>
                       Attach an eye-catching promo image banner or text headline to top your message.
                     </Text>
@@ -637,7 +639,7 @@ export default function CreateTemplateScreen() {
 
                 {/* ── HEADER TYPE SELECTOR ── */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>HEADER FORMAT</Text>
+                  <Text style={styles.inputLabel}>{tr("HEADER FORMAT", "FORMAT PENGEPALA")}</Text>
                   <View style={styles.headerTypePills}>
                     <TouchableOpacity
                       style={[styles.headerTypePill, headerType === 'IMAGE' && styles.headerTypePillActive]}
@@ -678,7 +680,7 @@ export default function CreateTemplateScreen() {
                 {headerType === 'IMAGE' && (
                   <View style={styles.imageConfigBox}>
                     <View style={styles.labelRow}>
-                      <Text style={styles.inputLabel}>SAMPLE IMAGE (FOR META REVIEW)</Text>
+                      <Text style={styles.inputLabel}>{tr("SAMPLE IMAGE (FOR META REVIEW)", "IMEJ SAMPEL (UNTUK SEMAKAN META)")}</Text>
                       <Text style={styles.charCountBadge}>16:9 • HD</Text>
                     </View>
 
@@ -704,7 +706,7 @@ export default function CreateTemplateScreen() {
 
                     {/* Custom URL input */}
                     <View style={{ marginTop: 8 }}>
-                      <Text style={styles.fieldMicroLabel}>CUSTOM IMAGE URL</Text>
+                      <Text style={styles.fieldMicroLabel}>{tr("CUSTOM IMAGE URL", "URL IMEJ TERSUAI")}</Text>
                       <View style={styles.inputBoxWithIcon}>
                         <View style={styles.inputLeftIcon}>
                           <Ionicons name="link-outline" size={16} color="#94A3B8" />
@@ -734,7 +736,7 @@ export default function CreateTemplateScreen() {
                         <Image source={{ uri: headerImageUrl }} style={styles.imagePreviewThumb} resizeMode="cover" />
                         <View style={styles.imageOverlayBadge}>
                           <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-                          <Text style={styles.imageOverlayText}>Meta Media Attached</Text>
+                          <Text style={styles.imageOverlayText}>{tr("Meta Media Attached", "Media Meta Dilampirkan")}</Text>
                         </View>
                       </View>
                     ) : null}
@@ -745,7 +747,7 @@ export default function CreateTemplateScreen() {
                 {headerType === 'TEXT' && (
                   <View style={styles.inputGroup}>
                     <View style={styles.labelRow}>
-                      <Text style={styles.inputLabel}>HEADER TEXT</Text>
+                      <Text style={styles.inputLabel}>{tr("HEADER TEXT", "TEKS PENGEPALA")}</Text>
                       <Text style={styles.charCountBadge}>{formHeader.length}/60</Text>
                     </View>
                     <View style={styles.inputBoxWithIcon}>
@@ -754,7 +756,7 @@ export default function CreateTemplateScreen() {
                       </View>
                       <TextInput
                         style={[styles.inputInnerField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                        placeholder="e.g. Special Weekend Announcement 📣"
+                        placeholder={tr("e.g. Special Weekend Announcement 📣", "cth. Pengumuman Hujung Minggu Istimewa 📣")}
                         placeholderTextColor="#94A3B8"
                         value={formHeader}
                         onChangeText={setFormHeader}
@@ -772,14 +774,14 @@ export default function CreateTemplateScreen() {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="arrow-back" size={16} color="#475569" />
-                    <Text style={styles.secondaryBtnText} numberOfLines={1}>Back</Text>
+                    <Text style={styles.secondaryBtnText} numberOfLines={1}>{tr("Back", "Kembali")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.primaryBtn}
                     onPress={handleNextStep}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.primaryBtnText} numberOfLines={1}>Next: Message Body</Text>
+                    <Text style={styles.primaryBtnText} numberOfLines={1}>{tr("Next: Message Body", "Seterusnya: Kandungan Mesej")}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -792,7 +794,7 @@ export default function CreateTemplateScreen() {
                 <View style={styles.stepIntroBanner}>
                   <Ionicons name="chatbubble-ellipses" size={18} color="#D97706" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.stepIntroTitle}>Message Body & Variables</Text>
+                    <Text style={styles.stepIntroTitle}>{tr("Message Body & Variables", "Kandungan Mesej & Pemboleh Ubah")}</Text>
                     <Text style={styles.stepIntroDesc}>
                       Write your broadcast message and tap dynamic tags to personalize per customer.
                     </Text>
@@ -803,7 +805,7 @@ export default function CreateTemplateScreen() {
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={styles.inputLabel}>MESSAGE BODY</Text>
+                      <Text style={styles.inputLabel}>{tr("MESSAGE BODY", "KANDUNGAN MESEJ")}</Text>
                       <Text style={styles.requiredStar}>*</Text>
                     </View>
                     <Text style={styles.charCountBadge}>{formBody.length}/1024</Text>
@@ -813,7 +815,7 @@ export default function CreateTemplateScreen() {
                   <View style={styles.variableBox}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       <Ionicons name="sparkles" size={14} color="#D97706" />
-                      <Text style={styles.variableBoxTitle}>Tap to insert dynamic customer data:</Text>
+                      <Text style={styles.variableBoxTitle}>{tr("Tap to insert dynamic customer data:", "Ketik untuk memasukkan data pelanggan dinamik:")}</Text>
                     </View>
                     <View style={styles.variableChipsRow}>
                       {Object.keys(sampleData).map((k) => (
@@ -832,7 +834,7 @@ export default function CreateTemplateScreen() {
 
                   <TextInput
                     style={[styles.textAreaField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                    placeholder="Enter your message text here..."
+                    placeholder={tr("Enter your message text here...", "Masukkan teks mesej anda di sini...")}
                     placeholderTextColor="#94A3B8"
                     value={formBody}
                     onChangeText={(t) => {
@@ -848,7 +850,7 @@ export default function CreateTemplateScreen() {
                 {/* Footer Text (Optional) */}
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
-                    <Text style={styles.inputLabel}>FOOTER TEXT (OPTIONAL)</Text>
+                    <Text style={styles.inputLabel}>{tr("FOOTER TEXT (OPTIONAL)", "TEKS PENGAKHIR (PILIHAN)")}</Text>
                     <Text style={styles.charCountBadge}>{formFooter.length}/60</Text>
                   </View>
                   <View style={styles.inputBoxWithIcon}>
@@ -857,7 +859,7 @@ export default function CreateTemplateScreen() {
                     </View>
                     <TextInput
                       style={[styles.inputInnerField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                      placeholder="e.g. Show this message at counter"
+                      placeholder={tr("e.g. Show this message at counter", "cth. Tunjukkan mesej ini di kaunter")}
                       placeholderTextColor="#94A3B8"
                       value={formFooter}
                       onChangeText={setFormFooter}
@@ -874,14 +876,14 @@ export default function CreateTemplateScreen() {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="arrow-back" size={16} color="#475569" />
-                    <Text style={styles.secondaryBtnText} numberOfLines={1}>Back</Text>
+                    <Text style={styles.secondaryBtnText} numberOfLines={1}>{tr("Back", "Kembali")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.primaryBtn}
                     onPress={handleNextStep}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.primaryBtnText} numberOfLines={1}>Next: Buttons</Text>
+                    <Text style={styles.primaryBtnText} numberOfLines={1}>{tr("Next: Buttons", "Seterusnya: Butang")}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -894,7 +896,7 @@ export default function CreateTemplateScreen() {
                 <View style={styles.stepIntroBanner}>
                   <Ionicons name="radio-button-on" size={18} color="#D97706" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.stepIntroTitle}>Interactive Action Buttons</Text>
+                    <Text style={styles.stepIntroTitle}>{tr("Interactive Action Buttons", "Butang Tindakan Interaktif")}</Text>
                     <Text style={styles.stepIntroDesc}>
                       Add up to 3 interactive buttons (Website link, Call phone, or Quick reply) to drive conversions.
                     </Text>
@@ -906,7 +908,7 @@ export default function CreateTemplateScreen() {
                   <View style={styles.buttonsBuilderHeaderRow}>
                     <View style={{ flex: 1, marginRight: 8 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.inputLabel}>ATTACHED BUTTONS</Text>
+                        <Text style={styles.inputLabel}>{tr("ATTACHED BUTTONS", "BUTANG DILAMPIRKAN")}</Text>
                         <View style={styles.buttonCounterBadge}>
                           <Text style={styles.buttonCounterText}>{buttons.length}/3</Text>
                         </View>
@@ -918,7 +920,7 @@ export default function CreateTemplateScreen() {
                     {buttons.length < 3 && (
                       <TouchableOpacity style={styles.addBtnTrigger} onPress={addButton} activeOpacity={0.8}>
                         <Ionicons name="add" size={15} color="#050505" />
-                        <Text style={styles.addBtnTriggerText}>Add Button</Text>
+                        <Text style={styles.addBtnTriggerText}>{tr("Add Button", "Tambah Butang")}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -926,8 +928,8 @@ export default function CreateTemplateScreen() {
                   {buttons.length === 0 ? (
                     <View style={styles.noButtonsBox}>
                       <Ionicons name="finger-print-outline" size={28} color="#CBD5E1" style={{ marginBottom: 6 }} />
-                      <Text style={styles.noButtonsText}>No interactive buttons added yet.</Text>
-                      <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Tap "+ Add Button" above to attach a link or quick action.</Text>
+                      <Text style={styles.noButtonsText}>{tr("No interactive buttons added yet.", "Belum ada butang interaktif ditambah.")}</Text>
+                      <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{tr("Tap \"+ Add Button\" above to attach a link or quick action.", "Ketik \"+ Tambah Butang\" di atas untuk melampirkan pautan atau tindakan pantas.")}</Text>
                     </View>
                   ) : (
                     <View style={{ gap: 12 }}>
@@ -984,12 +986,12 @@ export default function CreateTemplateScreen() {
                           {/* Button Label Input */}
                           <View style={{ marginTop: 10 }}>
                             <View style={styles.labelRow}>
-                              <Text style={styles.fieldMicroLabel}>BUTTON LABEL TEXT</Text>
+                              <Text style={styles.fieldMicroLabel}>{tr("BUTTON LABEL TEXT", "TEKS LABEL BUTANG")}</Text>
                               <Text style={styles.charCountBadge}>{btn.text.length}/25</Text>
                             </View>
                             <TextInput
                               style={[styles.buttonInputField, Platform.OS === 'web' ? ({ outlineWidth: 0 } as any) : null]}
-                              placeholder="e.g. Claim 20% Discount"
+                              placeholder={tr("e.g. Claim 20% Discount", "cth. Tebus Diskaun 20%")}
                               placeholderTextColor="#94A3B8"
                               value={btn.text}
                               onChangeText={(t) => updateButton(btn.id, { text: t })}
@@ -1000,7 +1002,7 @@ export default function CreateTemplateScreen() {
                           {/* URL target */}
                           {btn.type === 'URL' && (
                             <View style={{ marginTop: 8 }}>
-                              <Text style={styles.fieldMicroLabel}>DESTINATION URL (HTTPS)</Text>
+                              <Text style={styles.fieldMicroLabel}>{tr("DESTINATION URL (HTTPS)", "URL DESTINASI (HTTPS)")}</Text>
                               <View style={styles.inputBoxWithIcon}>
                                 <View style={styles.inputLeftIcon}>
                                   <Ionicons name="link-outline" size={15} color="#94A3B8" />
@@ -1019,7 +1021,7 @@ export default function CreateTemplateScreen() {
                           {/* Phone target */}
                           {btn.type === 'PHONE_NUMBER' && (
                             <View style={{ marginTop: 8 }}>
-                              <Text style={styles.fieldMicroLabel}>PHONE NUMBER (WITH COUNTRY CODE)</Text>
+                              <Text style={styles.fieldMicroLabel}>{tr("PHONE NUMBER (WITH COUNTRY CODE)", "NOMBOR TELEFON (DENGAN KOD NEGARA)")}</Text>
                               <View style={styles.inputBoxWithIcon}>
                                 <View style={styles.inputLeftIcon}>
                                   <Ionicons name="call-outline" size={15} color="#94A3B8" />
@@ -1049,14 +1051,14 @@ export default function CreateTemplateScreen() {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="arrow-back" size={16} color="#475569" />
-                    <Text style={styles.secondaryBtnText} numberOfLines={1}>Back</Text>
+                    <Text style={styles.secondaryBtnText} numberOfLines={1}>{tr("Back", "Kembali")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.primaryBtn}
                     onPress={handleNextStep}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.primaryBtnText} numberOfLines={1}>Next: Review</Text>
+                    <Text style={styles.primaryBtnText} numberOfLines={1}>{tr("Next: Review", "Seterusnya: Semak")}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#050505" />
                   </TouchableOpacity>
                 </View>
@@ -1073,11 +1075,11 @@ export default function CreateTemplateScreen() {
                       <Ionicons name="shield-checkmark" size={18} color="#16A34A" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.complianceTitle}>Meta AI Compliance Pre-Check</Text>
-                      <Text style={styles.complianceSub}>Automated instant review (~1 to 2 minutes)</Text>
+                      <Text style={styles.complianceTitle}>{tr("Meta AI Compliance Pre-Check", "Pra-Semak Pematuhan Meta AI")}</Text>
+                      <Text style={styles.complianceSub}>{tr("Automated instant review (~1 to 2 minutes)", "Semakan automatik segera (~1 hingga 2 minit)")}</Text>
                     </View>
                     <View style={styles.readyBadge}>
-                      <Text style={styles.readyBadgeText}>READY</Text>
+                      <Text style={styles.readyBadgeText}>{tr("READY", "SEDIA")}</Text>
                     </View>
                   </View>
 
@@ -1113,10 +1115,10 @@ export default function CreateTemplateScreen() {
                 {!isDesktop && (
                   <View style={{ marginVertical: 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <Text style={styles.inputLabel}>WHATSAPP MESSAGE PREVIEW</Text>
+                      <Text style={styles.inputLabel}>{tr("WHATSAPP MESSAGE PREVIEW", "PRATONTON MESEJ WHATSAPP")}</Text>
                       <View style={styles.liveIndicatorBadge}>
                         <View style={styles.liveDot} />
-                        <Text style={styles.liveIndicatorText}>Live Preview</Text>
+                        <Text style={styles.liveIndicatorText}>{tr("Live Preview", "Pratonton Langsung")}</Text>
                       </View>
                     </View>
 
@@ -1172,7 +1174,7 @@ export default function CreateTemplateScreen() {
                         </View>
 
                         <View style={styles.datePill}>
-                          <Text style={styles.datePillText}>TODAY</Text>
+                          <Text style={styles.datePillText}>{tr("TODAY", "HARI INI")}</Text>
                         </View>
 
                         {/* WhatsApp Message Bubble with Media & Buttons */}
@@ -1223,7 +1225,7 @@ export default function CreateTemplateScreen() {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="create-outline" size={16} color="#475569" />
-                    <Text style={styles.secondaryBtnText} numberOfLines={1}>Edit Buttons</Text>
+                    <Text style={styles.secondaryBtnText} numberOfLines={1}>{tr("Edit Buttons", "Edit Butang")}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1237,7 +1239,7 @@ export default function CreateTemplateScreen() {
                     ) : (
                       <>
                         <Ionicons name="rocket" size={16} color="#050505" />
-                        <Text style={styles.submitBtnText} numberOfLines={1}>Submit to Meta AI</Text>
+                        <Text style={styles.submitBtnText} numberOfLines={1}>{tr("Submit to Meta AI", "Hantar ke Meta AI")}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -1251,10 +1253,10 @@ export default function CreateTemplateScreen() {
             <View style={[styles.previewColumn, { flex: 0.75 }]}>
               <View style={styles.previewStickyWrapper}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <Text style={styles.inputLabel}>LIVE WHATSAPP PREVIEW</Text>
+                  <Text style={styles.inputLabel}>{tr("LIVE WHATSAPP PREVIEW", "PRATONTON WHATSAPP LANGSUNG")}</Text>
                   <View style={styles.liveIndicatorBadge}>
                     <View style={styles.liveDot} />
-                    <Text style={styles.liveIndicatorText}>Interactive</Text>
+                    <Text style={styles.liveIndicatorText}>{tr("Interactive", "Interaktif")}</Text>
                   </View>
                 </View>
 
@@ -1311,7 +1313,7 @@ export default function CreateTemplateScreen() {
                     </View>
 
                     <View style={styles.datePill}>
-                      <Text style={styles.datePillText}>TODAY</Text>
+                      <Text style={styles.datePillText}>{tr("TODAY", "HARI INI")}</Text>
                     </View>
 
                     {/* WhatsApp Message Bubble Wrapper with Media & Action Buttons */}

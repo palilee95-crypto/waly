@@ -14,6 +14,7 @@
  *   missing     null, rendered as "No data" — never coerced to 0
  */
 import { pb } from './pocketbase';
+import { cleanCustomerName } from './customer-name';
 
 export type AttentionItem = {
   id: 'return' | 'rewards' | 'rebook';
@@ -579,7 +580,7 @@ export async function fetchCustomerDetail(
 
   return {
     id: customerId,
-    name: fallback.name || expanded?.name || 'Customer',
+    name: cleanCustomerName(fallback.name || expanded?.name) || 'Customer',
     phone: fallback.phone || expanded?.phone || '',
     stamps: Number(card?.stamps_collected) || 0,
     goal: Number(card?.expand?.program?.stamp_goal) || 10,

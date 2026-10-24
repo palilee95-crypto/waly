@@ -25,6 +25,7 @@ import { useAuth } from '@/context/AuthContext';
 import { pb } from '@/lib/pocketbase';
 import FlippableLoyaltyCard from './_components/FlippableLoyaltyCard';
 import PointsCashModal from '@/components/PointsCashModal';
+import { useTr } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -56,6 +57,7 @@ type LoyaltyCardItem = {
 
 // --- Sub-component for Hoverable Wallet Card ---
 const StackedWalletCard = ({ item, index, isPulledOut, isExiting, onTap, user, styles }: any) => {
+  const tr = useTr();
   const pullAnim = React.useRef(new Animated.Value(isPulledOut ? 1 : 0)).current;
   const enterAnim = React.useRef(new Animated.Value(0)).current;
   const exitAnim = React.useRef(new Animated.Value(0)).current;
@@ -153,14 +155,14 @@ const StackedWalletCard = ({ item, index, isPulledOut, isExiting, onTap, user, s
               <Text style={[{ fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFC700' }, item.fontColor && { color: item.fontColor }]}>
                 {item.points.toLocaleString()}
               </Text>
-              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>POINTS</Text>
+              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_700Bold', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>{tr('POINTS', 'MATA')}</Text>
             </View>
           ) : (
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={[{ fontSize: 15, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' }, item.fontColor && { color: item.fontColor }]}>
                 {item.collectedStamps}/{item.totalStamps}
               </Text>
-              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>STAMPS</Text>
+              <Text style={[{ fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.75)' }, item.fontColor && { color: item.fontColor, opacity: 0.75 }]}>{tr('STAMPS', 'SETEM')}</Text>
             </View>
           )}
         </View>
@@ -221,7 +223,7 @@ const StackedWalletCard = ({ item, index, isPulledOut, isExiting, onTap, user, s
         {isPulledOut && (
           <Animated.View style={{ position: 'absolute', bottom: 70, left: 0, right: 0, alignItems: 'center' }}>
             <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-              <Text style={{ color: '#FFF', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold' }}>Tap again to view details</Text>
+              <Text style={{ color: '#FFF', fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold' }}>{tr('Tap again to view details', 'Ketik lagi untuk lihat butiran')}</Text>
             </View>
           </Animated.View>
         )}
@@ -233,6 +235,7 @@ const StackedWalletCard = ({ item, index, isPulledOut, isExiting, onTap, user, s
 export default function MyCardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const tr = useTr();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [displayPage, setDisplayPage] = useState(1);
@@ -284,7 +287,7 @@ export default function MyCardsScreen() {
         newPinned = newPinned.filter(id => id !== cardId);
       } else {
         if (newPinned.length >= 3) {
-          Alert.alert("Limit Reached", "You can only pin up to 3 cards to your home dashboard. Please unpin another card first.");
+          Alert.alert(tr('Limit Reached', 'Had Dicapai'), tr('You can only pin up to 3 cards to your home dashboard. Please unpin another card first.', 'Anda hanya boleh menyemat sehingga 3 kad pada papan pemuka utama. Sila nyahsemak kad lain terlebih dahulu.'));
           return;
         }
         newPinned.push(cardId);
@@ -684,7 +687,7 @@ export default function MyCardsScreen() {
                   fontFamily: 'PlusJakartaSans_500Medium',
                   color: '#000000',
                 }}
-                placeholder="Search merchant or reward..."
+                placeholder={tr('Search merchant or reward...', 'Cari peniaga atau ganjaran...')}
                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -842,15 +845,15 @@ export default function MyCardsScreen() {
             ) : loyaltyCards.length === 0 ? (
               <View style={styles.emptyStateCard}>
                 <Ionicons name="card-outline" size={48} color="#94A3B8" />
-                <Text style={styles.emptyStateTitle}>No Stamp Cards Yet</Text>
+                <Text style={styles.emptyStateTitle}>{tr('No Stamp Cards Yet', 'Belum Ada Kad Setem')}</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  You haven't collected any stamps from merchants yet. Start exploring shops!
+                  {tr("You haven't collected any stamps from merchants yet. Start exploring shops!", 'Anda belum mengumpul setem daripada peniaga lagi. Mulakan terokai kedai!')}
                 </Text>
                 <TouchableOpacity 
                   style={styles.emptyStateBtn} 
                   onPress={() => router.push('/(customer)/explore')}
                 >
-                  <Text style={styles.emptyStateBtnText}>Explore Partners</Text>
+                  <Text style={styles.emptyStateBtnText}>{tr('Explore Partners', 'Teroka Rakan Kongsi')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -964,7 +967,7 @@ export default function MyCardsScreen() {
                   />
                   <View style={styles.flipHintRow}>
                     <Ionicons name="swap-horizontal" size={13} color="rgba(0, 0, 0, 0.45)" />
-                    <Text style={styles.flipHintText}>Tap card to flip for details & barcode</Text>
+                    <Text style={styles.flipHintText}>{tr('Tap card to flip for details & barcode', 'Ketik kad untuk lihat butiran & kod bar')}</Text>
                   </View>
                 </View>
 
@@ -979,11 +982,11 @@ export default function MyCardsScreen() {
                       <View style={styles.progressTrackerHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="ribbon-outline" size={15} color="#000000" />
-                          <Text style={styles.progressTrackerTitle}>STAMP PROGRESS</Text>
+                          <Text style={styles.progressTrackerTitle}>{tr('STAMP PROGRESS', 'PROGRES SETEM')}</Text>
                         </View>
                         <View style={styles.progressBadge}>
                           <Text style={styles.progressBadgeText}>
-                            {selectedCard.collectedStamps} / {selectedCard.totalStamps} STAMPS
+                            {selectedCard.collectedStamps} / {selectedCard.totalStamps} {tr('STAMPS', 'SETEM')}
                           </Text>
                         </View>
                       </View>
@@ -1000,7 +1003,7 @@ export default function MyCardsScreen() {
                             <Ionicons name="gift" size={16} color="#000000" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.rewardUnlockedTitle}>Reward Ready to Redeem! 🎉</Text>
+                            <Text style={styles.rewardUnlockedTitle}>{tr('Reward Ready to Redeem! 🎉', 'Ganjaran Sedia Ditebus! 🎉')}</Text>
                             <Text style={styles.rewardUnlockedSub} numberOfLines={2}>
                               {selectedCard.rewardName}
                             </Text>
@@ -1010,7 +1013,7 @@ export default function MyCardsScreen() {
                         <View style={styles.rewardPendingRow}>
                           <Ionicons name="gift-outline" size={15} color="rgba(0, 0, 0, 0.7)" />
                           <Text style={styles.rewardPendingText}>
-                            Collect <Text style={{ fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#000000' }}>{remainingStamps} more stamps</Text> to unlock <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', color: '#000000' }}>{selectedCard.rewardName}</Text>
+                            {tr(`Collect ${remainingStamps} more stamps to unlock ${selectedCard.rewardName}`, `Kumpul ${remainingStamps} setem lagi untuk membuka ${selectedCard.rewardName}`)}
                           </Text>
                         </View>
                       )}
@@ -1023,10 +1026,10 @@ export default function MyCardsScreen() {
                   <View style={styles.statsGridRow}>
                     {/* Points Balance Column */}
                     <View style={styles.statsCard}>
-                      <Text style={styles.statsLabel}>POINTS BALANCE</Text>
+                      <Text style={styles.statsLabel}>{tr('POINTS BALANCE', 'BAKI MATA')}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
                         <Text style={styles.statsValue}>{selectedCard.points}</Text>
-                        <Text style={styles.statsUnit}>PTS</Text>
+                        <Text style={styles.statsUnit}>{tr('PTS', 'MATA')}</Text>
                       </View>
                       {(selectedCard.enable_points as boolean | undefined) !== false ? (
                         <TouchableOpacity
@@ -1034,7 +1037,7 @@ export default function MyCardsScreen() {
                           activeOpacity={0.85}
                           onPress={() => setPointsCashOpen(true)}
                         >
-                          <Text style={styles.usePointsBtnText}>Use points</Text>
+                          <Text style={styles.usePointsBtnText}>{tr('Use points', 'Guna mata')}</Text>
                           <Ionicons name="chevron-forward" size={11} color="#B45309" />
                         </TouchableOpacity>
                       ) : null}
@@ -1042,11 +1045,11 @@ export default function MyCardsScreen() {
 
                     {/* Membership Tier Column */}
                     <View style={styles.statsCard}>
-                      <Text style={styles.statsLabel}>MEMBERSHIP</Text>
+                      <Text style={styles.statsLabel}>{tr('MEMBERSHIP', 'KEAHLIAN')}</Text>
                       <View style={styles.tierValueRow}>
                         <View style={styles.tierDot} />
                         <Text style={styles.tierValueText}>
-                          {(selectedCard.tier || 'VIP').toUpperCase()} MEMBER
+                          {(selectedCard.tier || 'VIP').toUpperCase()} {tr('MEMBER', 'AHLI')}
                         </Text>
                       </View>
                     </View>
@@ -1064,12 +1067,12 @@ export default function MyCardsScreen() {
                       if (targetSlug) {
                         router.push(`/b/${targetSlug}` as any);
                       } else {
-                        Alert.alert('Store Unavailable', 'Merchant booking page is not available.');
+                        Alert.alert(tr('Store Unavailable', 'Kedai Tidak Tersedia'), tr('Merchant booking page is not available.', 'Halaman tempahan peniaga tidak tersedia.'));
                       }
                     }}
                   >
                     <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
-                    <Text style={styles.bookAppointmentBtnText}>Book Appointment</Text>
+                    <Text style={styles.bookAppointmentBtnText}>{tr('Book Appointment', 'Tempah Temujanji')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1089,7 +1092,7 @@ export default function MyCardsScreen() {
                       styles.pinToggleBtnText,
                       pinnedCards.includes(selectedCard.id) && styles.pinToggleBtnTextActive
                     ]}>
-                      {pinnedCards.includes(selectedCard.id) ? "Pinned" : "Pin to Home"}
+                      {pinnedCards.includes(selectedCard.id) ? tr('Pinned', 'Disemat') : tr('Pin to Home', 'Semat ke Utama')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1097,14 +1100,14 @@ export default function MyCardsScreen() {
                 {/* Points Catalog Section (Hidden in Stamps-Only Mode) */}
                 {selectedCard.enable_points !== false && (
                   <View style={styles.catalogSection}>
-                    <Text style={styles.catalogTitle}>Points Catalog</Text>
-                    <Text style={styles.catalogSubtitle}>Spend points earned at this merchant to redeem rewards:</Text>
+                    <Text style={styles.catalogTitle}>{tr('Points Catalog', 'Katalog Mata')}</Text>
+                    <Text style={styles.catalogSubtitle}>{tr('Spend points earned at this merchant to redeem rewards:', 'Gunakan mata yang diperoleh di peniaga ini untuk menebus ganjaran:')}</Text>
                     
                     {loadingRewards ? (
                       <ActivityIndicator color="#000000" style={{ marginVertical: 20 }} />
                     ) : merchantRewards.length === 0 ? (
                       <View style={styles.emptyCatalogCard}>
-                        <Text style={styles.emptyCatalogText}>No catalog rewards available at this shop.</Text>
+                        <Text style={styles.emptyCatalogText}>{tr('No catalog rewards available at this shop.', 'Tiada ganjaran katalog tersedia di kedai ini.')}</Text>
                       </View>
                     ) : (
                       <View style={styles.catalogList}>
@@ -1112,7 +1115,7 @@ export default function MyCardsScreen() {
                           <View key={reward.id} style={styles.catalogItem}>
                             <View style={{ flex: 1, marginRight: 12 }}>
                               <Text style={styles.catalogItemName}>{reward.name}</Text>
-                              <Text style={styles.catalogItemCost}>{reward.points_cost} Points</Text>
+                              <Text style={styles.catalogItemCost}>{reward.points_cost} {tr('Points', 'Mata')}</Text>
                               {reward.description ? (
                                 <Text style={styles.catalogItemDesc}>{reward.description}</Text>
                               ) : null}
@@ -1125,7 +1128,7 @@ export default function MyCardsScreen() {
                               disabled={selectedCard.points < reward.points_cost}
                               onPress={() => handleRedeemReward(reward)}
                             >
-                              <Text style={styles.redeemBtnText}>Redeem</Text>
+                              <Text style={styles.redeemBtnText}>{tr('Redeem', 'Tebus')}</Text>
                             </TouchableOpacity>
                           </View>
                         ))}
@@ -1148,7 +1151,7 @@ export default function MyCardsScreen() {
                   <View style={styles.scanIconPill}>
                     <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
                   </View>
-                  <Text style={styles.stickyScanBtnText}>SHOW QR TO SCAN</Text>
+                  <Text style={styles.stickyScanBtnText}>{tr('SHOW QR TO SCAN', 'TUNJUKKAN QR UNTUK IMBAS')}</Text>
                   <Ionicons name="arrow-forward" size={18} color="rgba(255, 255, 255, 0.7)" />
                 </TouchableOpacity>
               </View>
@@ -1174,7 +1177,7 @@ export default function MyCardsScreen() {
                 <View style={[styles.confirmIconBg, { backgroundColor: '#EF4444' }]}>
                   <Ionicons name="warning" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.confirmTitle}>Redemption Failed</Text>
+                <Text style={styles.confirmTitle}>{tr('Redemption Failed', 'Penebusan Gagal')}</Text>
                 <Text style={styles.confirmText}>{redemptionError}</Text>
                 
                 <TouchableOpacity
@@ -1184,7 +1187,7 @@ export default function MyCardsScreen() {
                     setRedemptionConfirmVisible(false);
                   }}
                 >
-                  <Text style={styles.errorCloseText}>Close</Text>
+                  <Text style={styles.errorCloseText}>{tr('Close', 'Tutup')}</Text>
                 </TouchableOpacity>
               </View>
             ) : !redemptionSuccessVisible ? (
@@ -1193,9 +1196,9 @@ export default function MyCardsScreen() {
                 <View style={styles.confirmIconBg}>
                   <Ionicons name="gift" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.confirmTitle}>Confirm Redemption</Text>
+                <Text style={styles.confirmTitle}>{tr('Confirm Redemption', 'Sahkan Penebusan')}</Text>
                 <Text style={styles.confirmText}>
-                  Are you sure you want to redeem "{selectedRewardToRedeem?.name}" for {selectedRewardToRedeem?.points_cost} points?
+                  {tr(`Are you sure you want to redeem "${selectedRewardToRedeem?.name}" for ${selectedRewardToRedeem?.points_cost} points?`, `Adakah anda pasti mahu menebus "${selectedRewardToRedeem?.name}" dengan ${selectedRewardToRedeem?.points_cost} mata?`)}
                 </Text>
                 
                 <View style={styles.confirmActions}>
@@ -1204,7 +1207,7 @@ export default function MyCardsScreen() {
                     disabled={redeemingInProgress}
                     onPress={() => setRedemptionConfirmVisible(false)}
                   >
-                    <Text style={styles.cancelActionText}>Cancel</Text>
+                    <Text style={styles.cancelActionText}>{tr('Cancel', 'Batal')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.confirmActionBtn}
@@ -1214,7 +1217,7 @@ export default function MyCardsScreen() {
                     {redeemingInProgress ? (
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
-                      <Text style={styles.confirmActionText}>Redeem</Text>
+                      <Text style={styles.confirmActionText}>{tr('Redeem', 'Tebus')}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -1225,9 +1228,9 @@ export default function MyCardsScreen() {
                 <View style={[styles.confirmIconBg, { backgroundColor: '#10B981' }]}>
                   <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
                 </View>
-                <Text style={styles.confirmTitle}>Redemption Successful!</Text>
+                <Text style={styles.confirmTitle}>{tr('Redemption Successful!', 'Penebusan Berjaya!')}</Text>
                 <Text style={styles.confirmText}>
-                  Your voucher has been generated successfully. You can find it under the Vouchers tab!
+                  {tr('Your voucher has been generated successfully. You can find it under the Vouchers tab!', 'Baucar anda telah berjaya dijana. Anda boleh menemuinya di tab Baucar!')}
                 </Text>
                 
                 <View style={styles.successActions}>
@@ -1235,13 +1238,13 @@ export default function MyCardsScreen() {
                     style={styles.successDoneBtn}
                     onPress={handleRedemptionSuccessDone}
                   >
-                    <Text style={styles.successDoneText}>Done</Text>
+                    <Text style={styles.successDoneText}>{tr('Done', 'Selesai')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.successViewVouchersBtn}
                     onPress={handleRedemptionSuccessViewVouchers}
                   >
-                    <Text style={styles.successViewVouchersText}>View Vouchers</Text>
+                    <Text style={styles.successViewVouchersText}>{tr('View Vouchers', 'Lihat Baucar')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1260,7 +1263,7 @@ export default function MyCardsScreen() {
         <View style={styles.qrOverlay}>
           <View style={styles.qrContent}>
             <View style={styles.qrHeader}>
-              <Text style={styles.qrTitle}>My Member QR</Text>
+              <Text style={styles.qrTitle}>{tr('My Member QR', 'QR Ahli Saya')}</Text>
               <TouchableOpacity onPress={() => setQrModalVisible(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color="#000000" />
               </TouchableOpacity>
@@ -1275,10 +1278,10 @@ export default function MyCardsScreen() {
               />
             </View>
 
-            <Text style={styles.phoneLabel}>PHONE NUMBER</Text>
+            <Text style={styles.phoneLabel}>{tr('PHONE NUMBER', 'NOMBOR TELEFON')}</Text>
             <Text style={styles.phoneValue}>{user?.phone || '+60 11-2345678'}</Text>
             <Text style={styles.scanNotice}>
-              Present this code to the store staff to collect stamps or redeem reward vouchers.
+              {tr('Present this code to the store staff to collect stamps or redeem reward vouchers.', 'Tunjukkan kod ini kepada kakitangan kedai untuk mengumpul setem atau menebus baucar ganjaran.')}
             </Text>
           </View>
         </View>
