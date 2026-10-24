@@ -1,36 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "headers": [
-    {
-      "source": "/",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
-      ]
-    },
-    {
-      "source": "/index.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
-      ]
-    },
-    {
-      "source": "/_expo/static/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    }
-  ],
   "routes": [
+    {
+      "src": "/_expo/(.*)",
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    {
+      "src": "/assets/(.*)",
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    {
+      "src": "/.*\\.html$",
+      "headers": { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      "continue": true
+    },
     { "handle": "filesystem" },
     { "src": "/_expo/.*", "status": 404 },
     { "src": "/assets/.*", "status": 404 },
     { "src": "/.*\\.(js|mjs|css|map|json|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf)$", "status": 404 },
-    { "src": "/.*", "dest": "/index.html" }
+    {
+      "src": "/.*",
+      "dest": "/index.html",
+      "headers": { "Cache-Control": "no-store, no-cache, must-revalidate" }
+    }
   ]
 }
