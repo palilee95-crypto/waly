@@ -179,13 +179,8 @@ onRecordCreate((e) => {
     rec.set("customer_phone", cleanPhone);
   }
 
-  // 2. Ensure customer account in users collection
-  const customer = ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId);
-  if (customer) {
-    rec.set("customer", customer.id);
-  }
-
-  // 3. Calculate slot duration and end time with 10-minute turnaround buffer
+  // 2. Calculate slot duration and opening-hours fit before anything is written:
+  //    a rejected slot must not mint a customer or a loyalty card.
   let totalDurationMinutes = 30; // default
   let itemsSummary = [];
   try {
@@ -220,9 +215,9 @@ onRecordCreate((e) => {
   const slotEndMins = startMins + totalDurationMinutes + bufferMinutes;
   const actualServiceEndMins = startMins + totalDurationMinutes;
 
-  // 3b. Opening hours: a booking cannot land on a closed day, start before the
-  // shop opens, or run past closing time. Merchants with no configured hours are
-  // left alone (hoursForDate reports `unset`).
+  // Opening hours: a booking cannot land on a closed day, start before the shop
+  // opens, or run past closing time. Merchants with no configured hours are left
+  // alone (hoursForDate reports `unset`).
   try {
     const availability = require(`${__hooks}/booking_availability.js`);
     let hours = null;
@@ -251,6 +246,12 @@ onRecordCreate((e) => {
   } catch (hoursErr) {
     if (hoursErr instanceof BadRequestError) throw hoursErr;
     console.log("[BOOKING HOURS CHECK NOTE]", hoursErr.message || hoursErr);
+  }
+
+  // 3. Ensure customer account in users collection (only once the slot is valid)
+  const customer = ensureCustomerAndLoyaltyCard(cleanPhone, customerName, merchantId);
+  if (customer) {
+    rec.set("customer", customer.id);
   }
 
   if (!rec.getString("end_time")) {
