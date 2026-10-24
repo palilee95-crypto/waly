@@ -48,11 +48,11 @@ export type DayHours = {
   closeMinutes: number;
 };
 
-/** "08:00", "8:00 AM", "22:00" → minutes since midnight. -1 when unparseable. */
+/** "08:00", "8:00 AM", "22:00", "11.00" → minutes since midnight. -1 when unparseable. */
 export function parseClockMinutes(value?: string | null): number {
   const text = String(value ?? '').trim();
   if (!text) return -1;
-  const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(text);
+  const ampm = /^(\d{1,2})[.:](\d{2})\s*(AM|PM)$/i.exec(text);
   if (ampm) {
     let hours = parseInt(ampm[1], 10);
     const minutes = parseInt(ampm[2], 10);
@@ -61,7 +61,7 @@ export function parseClockMinutes(value?: string | null): number {
     if (ampm[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
     return hours * 60 + minutes;
   }
-  const plain = /^(\d{1,2}):(\d{2})$/.exec(text);
+  const plain = /^(\d{1,2})[.:](\d{2})$/.exec(text);
   if (plain) {
     const hours = parseInt(plain[1], 10);
     const minutes = parseInt(plain[2], 10);
@@ -122,10 +122,17 @@ export function hoursForDate(hours: unknown, dateIso: string): DayHours {
   if (explicitlyClosed) return { unset: false, closed: true, openMinutes: 0, closeMinutes: 0 };
 
   const openMinutes = parseClockMinutes(openText);
-  const closeMinutes = parseClockMinutes(closeText);
+  let closeMinutes = parseClockMinutes(closeText);
   // Malformed hours are closed: a typo must never open the shop.
   if (openMinutes < 0 || closeMinutes < 0) return { unset: false, closed: true, openMinutes: 0, closeMinutes: 0 };
 
+  // Some merchants type "11.00-9.00" with no AM/PM. When both ends sit inside
+  // 1–12 and the close reads earlier than the open, the close is the evening
+  // (11:00–21:00). Explicit 24-hour values (22:00-02:00) skip this and fall
+  // through to the overnight rule below.
+  if (closeMinutes <= openMinutes && openMinutes <= 12 * 60 && closeMinutes <= 12 * 60) {
+    closeMinutes += 12 * 60;
+  }
   return {
     unset: false,
     closed: false,
