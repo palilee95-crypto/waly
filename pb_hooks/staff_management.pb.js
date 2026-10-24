@@ -34,8 +34,15 @@ routerAdd("GET", "/api/risev/merchant/staff", (e) => {
   // Read merchant metadata for anomaly detection settings and dismissals
   let merchantMeta = {};
   try {
-    const rawM = merchant.get("metadata");
-    merchantMeta = typeof rawM === "string" ? JSON.parse(rawM) : (rawM || {});
+    // JSON fields come back from get() as a Go []byte; getString() returns the
+    // JSON text, which is what we can parse and mutate.
+    const rawText = merchant.getString("metadata");
+    const parsedMeta = rawText ? JSON.parse(rawText) : null;
+    if (parsedMeta && typeof parsedMeta === "object" && !Array.isArray(parsedMeta)) {
+      merchantMeta = parsedMeta;
+    } else {
+      merchantMeta = {};
+    }
   } catch (mErr) {
     merchantMeta = {};
   }
@@ -1387,8 +1394,15 @@ routerAdd("GET", "/api/risev/merchant/staff/roles", (e) => {
 
   let merchantMeta = {};
   try {
-    const rawM = merchant.get("metadata");
-    merchantMeta = typeof rawM === "string" ? JSON.parse(rawM) : (rawM || {});
+    // JSON fields come back from get() as a Go []byte; getString() returns the
+    // JSON text, which is what we can parse and mutate.
+    const rawText = merchant.getString("metadata");
+    const parsedMeta = rawText ? JSON.parse(rawText) : null;
+    if (parsedMeta && typeof parsedMeta === "object" && !Array.isArray(parsedMeta)) {
+      merchantMeta = parsedMeta;
+    } else {
+      merchantMeta = {};
+    }
   } catch (mErr) {
     merchantMeta = {};
   }
@@ -1526,8 +1540,15 @@ routerAdd("POST", "/api/risev/merchant/staff/roles", (e) => {
 
   let merchantMeta = {};
   try {
-    const rawM = merchant.get("metadata");
-    merchantMeta = typeof rawM === "string" ? JSON.parse(rawM) : (rawM || {});
+    // JSON fields come back from get() as a Go []byte; getString() returns the
+    // JSON text, which is what we can parse and mutate.
+    const rawText = merchant.getString("metadata");
+    const parsedMeta = rawText ? JSON.parse(rawText) : null;
+    if (parsedMeta && typeof parsedMeta === "object" && !Array.isArray(parsedMeta)) {
+      merchantMeta = parsedMeta;
+    } else {
+      merchantMeta = {};
+    }
   } catch (mErr) {
     merchantMeta = {};
   }
@@ -1543,7 +1564,18 @@ routerAdd("POST", "/api/risev/merchant/staff/roles", (e) => {
     description: r.description ? String(r.description).trim() : ''
   })).filter(r => r.title.length > 0);
 
-  merchantMeta.staff_role_tiers = sanitized;
+  // One tier per title. Older clients could append the same role twice (double
+  // submit); keep the first so the list cannot drift into duplicates.
+  const seenTitles = {};
+  const uniqueRoles = [];
+  sanitized.forEach((role) => {
+    const key = role.title.toLowerCase();
+    if (seenTitles[key]) return;
+    seenTitles[key] = true;
+    uniqueRoles.push(role);
+  });
+
+  merchantMeta.staff_role_tiers = uniqueRoles;
   merchant.set("metadata", JSON.stringify(merchantMeta));
 
   try {
@@ -1555,7 +1587,7 @@ routerAdd("POST", "/api/risev/merchant/staff/roles", (e) => {
   return e.json(200, {
     success: true,
     message: "Staff roles successfully updated.",
-    roles: sanitized
+    roles: uniqueRoles
   });
 }, $apis.requireAuth("users"));
 

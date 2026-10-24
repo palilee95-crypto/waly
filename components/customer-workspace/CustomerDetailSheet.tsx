@@ -5,12 +5,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Linking } from 'react-native';
 import { colors, radii } from '@/theme';
+import { pb } from '@/lib/pocketbase';
 import {
   CustomerDetail,
   fetchCustomerDetail,
@@ -19,6 +21,7 @@ import {
   formatShortDateFromIso,
 } from '@/lib/customer-workspace';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
+import { cleanCustomerName } from '@/lib/customer-name';
 import LoyaltyCardBack, { inkOn } from '@/components/LoyaltyCardBack';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -54,6 +57,10 @@ export default function CustomerDetailSheet({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [editingTxn, setEditingTxn] = useState<{ id: string; bill: number } | null>(null);
+  const [billInput, setBillInput] = useState('');
+  const [savingBill, setSavingBill] = useState(false);
+  const [billError, setBillError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible || !customerId) return;
@@ -63,6 +70,9 @@ export default function CustomerDetailSheet({
     setDeleteError(null);
     setConfirming(false);
     setShowActions(false);
+    setEditingTxn(null);
+    setBillInput('');
+    setBillError(null);
     setLoading(true);
     fetchCustomerDetail(customerId, { name, phone })
       .then((res) => {
@@ -110,7 +120,43 @@ export default function CustomerDetailSheet({
     }
   };
 
-  const initials = (detail?.name || name || 'C')
+  const displayName = cleanCustomerName(detail?.name || name) || 'Customer';
+
+  const openBillEditor = (item: { id: string; bill: number }) => {
+    setEditingTxn({ id: item.id, bill: item.bill });
+    setBillInput(item.bill > 0 ? item.bill.toFixed(2) : '');
+    setBillError(null);
+  };
+
+  const saveBill = async () => {
+    if (!editingTxn || !customerId) return;
+    const value = Number(String(billInput).replace(',', '.'));
+    if (!isFinite(value) || value < 0) {
+      setBillError('Enter a valid amount (0 or more).');
+      return;
+    }
+    setSavingBill(true);
+    setBillError(null);
+    try {
+      await pb.send('/api/risev/merchant/transactions/bill', {
+        method: 'POST',
+        body: { transaction_id: editingTxn.id, bill_amount: value },
+        requestKey: null,
+      });
+      const refreshed = await fetchCustomerDetail(customerId, {
+        name: detail?.name,
+        phone: detail?.phone,
+      });
+      setDetail(refreshed);
+      setEditingTxn(null);
+    } catch (err: any) {
+      setBillError(err?.response?.data?.message || err?.message || 'Could not save the bill amount.');
+    } finally {
+      setSavingBill(false);
+    }
+  };
+
+  const initials = displayName
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -134,7 +180,7 @@ export default function CustomerDetailSheet({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>
-                {detail?.name || name || 'Customer'}
+                {displayName}
               </Text>
               <Text style={styles.subtitle} numberOfLines={1}>
                 {detail?.phone || phone || 'No phone on file'}
@@ -246,6 +292,17 @@ export default function CustomerDetailSheet({
                             {' · '}{relativeDays(item.created)}
                           </Text>
                         </View>
+                        {item.type === 'earn' ? (
+                          <TouchableOpacity
+                            onPress={() => openBillEditor(item)}
+                            style={styles.editBillBtn}
+                            activeOpacity={0.75}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit bill amount"
+                          >
+                            <Ionicons name="pencil" size={14} color={colors.black} />
+                          </TouchableOpacity>
+                        ) : null}
                       </View>
                     );
                   })}
@@ -255,6 +312,47 @@ export default function CustomerDetailSheet({
           ) : null}
 
           {deleteError ? <Text style={styles.deleteError}>{deleteError}</Text> : null}
+
+          {editingTxn ? (
+            <View style={styles.billPanel}>
+              <Text style={styles.confirmTitle}>Edit bill amount</Text>
+              <Text style={styles.confirmText}>
+                Correct the sale total. Stamps and points already credited stay unchanged.
+              </Text>
+              <TextInput
+                style={styles.billInput}
+                value={billInput}
+                onChangeText={setBillInput}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#94A3B8"
+                autoFocus
+              />
+              {billError ? <Text style={styles.deleteError}>{billError}</Text> : null}
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => setEditingTxn(null)}
+                  disabled={savingBill}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dangerBtn}
+                  onPress={saveBill}
+                  disabled={savingBill}
+                  activeOpacity={0.85}
+                >
+                  {savingBill ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.dangerText}>Save bill</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
 
           {confirming ? (
             <View style={styles.confirmPanel}>
@@ -275,7 +373,7 @@ export default function CustomerDetailSheet({
               onPress={openChat}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel={`Chat with ${detail?.name || name || 'customer'}`}
+              accessibilityLabel={`Chat with ${displayName}`}
             >
               <Ionicons name="logo-whatsapp" size={15} color={colors.black} />
               <Text style={styles.secondaryText}>Chat with customer</Text>
@@ -391,6 +489,34 @@ const styles = StyleSheet.create({
   activityTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: colors.black, flex: 1 },
   activityDate: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: '#64748B' },
   activityMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, lineHeight: 17, color: '#64748B', marginTop: 3 },
+  editBillBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billPanel: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: '#E9EDF3',
+    padding: 14,
+    marginTop: 12,
+  },
+  billInput: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 16,
+    color: colors.black,
+  },
   deleteError: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 11.5,

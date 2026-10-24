@@ -2167,8 +2167,9 @@ export default function NfcLandingScreen() {
     let claimSessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     let createdClaimId = '';
     try {
-      const voucherTag = voucherToApply ? ` [VOUCHER:${voucherToApply.id}#${voucherToApply.title || voucherToApply.code || ''}]` : '';
-      const encodedName = `${displayName}${voucherTag}`;
+      // The claim carries voucher_id/voucher_name explicitly; never encode it
+      // into the customer name (it used to leak into the customer record).
+      const encodedName = displayName;
 
       const reqRes = await pb.send<{ success: boolean; claim_id: string; session_code: string; current_stamps?: number }>('/api/risev/nfc/request', {
         method: 'POST',

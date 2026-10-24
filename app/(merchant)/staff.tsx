@@ -195,6 +195,17 @@ export const DEFAULT_STAFF_ROLES: StaffRoleTier[] = [
   },
 ];
 
+/** Role tiers are identified by title; repeated saves must not create twins. */
+function dedupeRoleTiers(roles: StaffRoleTier[]): StaffRoleTier[] {
+  const seen = new Map<string, StaffRoleTier>();
+  (roles || []).forEach((role) => {
+    const key = String(role?.title || '').trim().toLowerCase();
+    if (!key) return;
+    if (!seen.has(key)) seen.set(key, role);
+  });
+  return Array.from(seen.values());
+}
+
 export default function StaffManagementScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; anomaly_staff_id?: string }>();
@@ -248,6 +259,7 @@ export default function StaffManagementScreen() {
   // Staff Role & Compensation Tiers State (Full Page Flow - Connected to Real Backend Data)
   const [customRoles, setCustomRoles] = useState<StaffRoleTier[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
+  const [savingRoleTier, setSavingRoleTier] = useState(false);
   const [isRolesPage, setIsRolesPage] = useState(false);
   const [returnToEditStaff, setReturnToEditStaff] = useState(false);
   const [roleEditorMode, setRoleEditorMode] = useState<'list' | 'create' | 'edit'>('list');
@@ -281,8 +293,17 @@ export default function StaffManagementScreen() {
         }
       });
       if (res && Array.isArray(res.roles) && res.roles.length > 0) {
-        setCustomRoles(res.roles);
-        await AsyncStorage.setItem(`@risev_staff_role_tiers_${user.merchant_id}`, JSON.stringify(res.roles));
+        const cleaned = dedupeRoleTiers(res.roles);
+        setCustomRoles(cleaned);
+        await AsyncStorage.setItem(`@risev_staff_role_tiers_${user.merchant_id}`, JSON.stringify(cleaned));
+        // Heal lists that already contain duplicates (older double-submits).
+        if (cleaned.length !== res.roles.length) {
+          pb.send('/api/risev/merchant/staff/roles', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + pb.authStore.token },
+            body: { role_tiers: cleaned },
+          }).catch(() => {});
+        }
         return;
       }
     } catch (apiErr) {
@@ -343,7 +364,8 @@ export default function StaffManagementScreen() {
   }, [user?.merchant_id]);
 
   const saveRoles = async (updated: StaffRoleTier[]) => {
-    setCustomRoles(updated);
+    const cleaned = dedupeRoleTiers(updated);
+    setCustomRoles(cleaned);
     try {
       if (user?.merchant_id) {
         await pb.send('/api/risev/merchant/staff/roles', {
@@ -351,14 +373,14 @@ export default function StaffManagementScreen() {
           headers: {
             'Authorization': 'Bearer ' + pb.authStore.token
           },
-          body: { role_tiers: updated }
+          body: { role_tiers: cleaned }
         });
       }
     } catch (pbErr) {
       console.warn('Failed to save role tiers to PocketBase:', pbErr);
     }
     try {
-      await AsyncStorage.setItem(`@risev_staff_role_tiers_${user?.merchant_id || 'default'}`, JSON.stringify(updated));
+      await AsyncStorage.setItem(`@risev_staff_role_tiers_${user?.merchant_id || 'default'}`, JSON.stringify(cleaned));
     } catch (e) {
       console.warn('Failed to save role tiers to storage:', e);
     }
@@ -462,14 +484,21 @@ export default function StaffManagementScreen() {
   };
 
   const handleSaveRoleTier = async () => {
+    if (savingRoleTier) return;
     const titleTrimmed = roleFormTitle.trim();
     if (!titleTrimmed) {
       Alert.alert('Role Title Required', 'Please enter a name for this role/tier.');
       return;
     }
 
+    // Same title means the same tier: update it instead of appending a twin.
+    const duplicate = customRoles.find(
+      (r) => r.id !== editingRoleId && r.title.trim().toLowerCase() === titleTrimmed.toLowerCase()
+    );
+    const targetId = editingRoleId || (duplicate ? duplicate.id : `role_${Date.now()}`);
+
     const newTier: StaffRoleTier = {
-      id: editingRoleId || `role_${Date.now()}`,
+      id: targetId,
       title: titleTrimmed,
       employment_type: roleFormType,
       base_salary: parseFloat(roleFormBaseSalary) || 0,
@@ -479,21 +508,28 @@ export default function StaffManagementScreen() {
       description: roleFormDesc.trim() || undefined,
     };
 
-    let updated: StaffRoleTier[];
-    if (editingRoleId) {
-      updated = customRoles.map(r => r.id === editingRoleId ? newTier : r);
-    } else {
-      updated = [...customRoles, newTier];
-    }
+    setSavingRoleTier(true);
+    try {
+      let updated: StaffRoleTier[];
+      if (editingRoleId) {
+        updated = customRoles.map(r => r.id === editingRoleId ? newTier : r);
+      } else if (duplicate) {
+        updated = customRoles.map(r => r.id === duplicate.id ? newTier : r);
+      } else {
+        updated = [...customRoles, newTier];
+      }
 
-    await saveRoles(updated);
-    Alert.alert('Saved', `Role tier "${titleTrimmed}" successfully saved!`);
-    if (returnToEditStaff) {
-      setIsRolesPage(false);
-      setIsEditingStaffPage(true);
-      setReturnToEditStaff(false);
-    } else {
-      setRoleEditorMode('list');
+      await saveRoles(updated);
+      Alert.alert('Saved', `Role tier "${titleTrimmed}" successfully saved!`);
+      if (returnToEditStaff) {
+        setIsRolesPage(false);
+        setIsEditingStaffPage(true);
+        setReturnToEditStaff(false);
+      } else {
+        setRoleEditorMode('list');
+      }
+    } finally {
+      setSavingRoleTier(false);
     }
   };
 
@@ -2382,11 +2418,16 @@ export default function StaffManagementScreen() {
               {/* Sticky Bottom Save Button */}
               <View style={styles.fullPageStickyFooter}>
                 <TouchableOpacity
-                  style={styles.fullPageSaveBtn}
+                  style={[styles.fullPageSaveBtn, savingRoleTier && { opacity: 0.6 }]}
                   onPress={handleSaveRoleTier}
+                  disabled={savingRoleTier}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.fullPageSaveBtnText}>Save Role Tier</Text>
+                  {savingRoleTier ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.fullPageSaveBtnText}>Save Role Tier</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
