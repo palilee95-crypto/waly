@@ -63,11 +63,11 @@ function durationMinutes(booking) {
 // plus this buffer, and callers pass the requested slot's buffered end.
 var TURNAROUND_MINUTES = 10;
 
-// "08:00", "8:00 AM", "22:00" -> minutes since midnight. -1 when unparseable.
+// "08:00", "8:00 AM", "22:00", "11.00" -> minutes since midnight. -1 when unparseable.
 function parseClockMinutes(value) {
   var text = String(value === undefined || value === null ? "" : value).trim();
   if (!text) return -1;
-  var ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(text);
+  var ampm = /^(\d{1,2})[.:](\d{2})\s*(AM|PM)$/i.exec(text);
   if (ampm) {
     var h12 = parseInt(ampm[1], 10);
     var m12 = parseInt(ampm[2], 10);
@@ -76,7 +76,7 @@ function parseClockMinutes(value) {
     if (ampm[3].toUpperCase() === "AM" && h12 === 12) h12 = 0;
     return h12 * 60 + m12;
   }
-  var plain = /^(\d{1,2}):(\d{2})$/.exec(text);
+  var plain = /^(\d{1,2})[.:](\d{2})$/.exec(text);
   if (plain) {
     var h24 = parseInt(plain[1], 10);
     var m24 = parseInt(plain[2], 10);
@@ -161,6 +161,13 @@ function hoursForDate(hours, dateIso) {
   if (openMinutes < 0 || closeMinutes < 0) {
     result.closed = true;
     return result;
+  }
+  // Some merchants type "11.00-9.00" with no AM/PM. When both ends sit inside
+  // 1-12 and the close reads earlier than the open, the close is the evening
+  // (11:00-21:00). Explicit 24-hour windows (22:00-02:00) skip this and fall
+  // through to the overnight rule below.
+  if (closeMinutes <= openMinutes && openMinutes <= 12 * 60 && closeMinutes <= 12 * 60) {
+    closeMinutes += 12 * 60;
   }
   if (closeMinutes <= openMinutes) closeMinutes += 1440;
 
