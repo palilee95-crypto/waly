@@ -1120,6 +1120,261 @@ routerAdd("POST", "/api/risev/merchant/staff/compensation", (e) => {
   });
 }, $apis.requireAuth("users"));
 
+// Update a staff member's profile (name, email, phone, role, branch, employment, status).
+// The client cannot write another user's `users` record — updateRule is "id = @request.auth.id" —
+// so every profile edit has to come through here.
+routerAdd("POST", "/api/risev/merchant/staff/update", (e) => {
+  const authRecord = e.auth;
+  if (!authRecord) {
+    return e.json(401, { message: "Unauthorized. Please log in first." });
+  }
+
+  const merchantId = authRecord.getString("merchant_id");
+  if (!merchantId) {
+    return e.json(400, { message: "Account is not associated with any merchant." });
+  }
+
+  const body = e.requestInfo().body || {};
+  const staffId = String(body.staff_id || "").trim();
+  const merchantStaffId = String(body.merchant_staff_id || "").trim();
+  if (!staffId && !merchantStaffId) {
+    return e.json(400, { message: "staff_id is required" });
+  }
+
+  function normalizePhone(raw) {
+    const digits = String(raw || "").replace(/[^\d]/g, "");
+    if (!digits) return "";
+    if (digits.indexOf("60") === 0) return "+" + digits;
+    if (digits.charAt(0) === "0") return "+60" + digits.slice(1);
+    if (digits.length >= 9) return "+60" + digits;
+    return "+" + digits;
+  }
+
+  function isShadowEmail(value) {
+    return /^shadow_staff_\d+@risev\.app$/i.test(String(value || ""));
+  }
+
+  function shadowEmail(phone) {
+    return "shadow_staff_" + String(phone || "").replace(/[^\d]/g, "") + "@risev.app";
+  }
+
+  function toNumber(value) {
+    const n = parseFloat(value);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function setIfPresent(record, field, value) {
+    if (!record) return;
+    try { record.set(field, value); } catch (err) {}
+  }
+
+  let merchant = null;
+  try { merchant = $app.findRecordById("merchants", merchantId); } catch (err) {}
+  if (!merchant) {
+    return e.json(404, { message: "Associated merchant not found." });
+  }
+  const isOwner = merchant.getString("owner") === authRecord.id;
+
+  let staffUser = null;
+  let msRec = null;
+
+  if (merchantStaffId) {
+    try { msRec = $app.findRecordById("merchant_staff", merchantStaffId); } catch (err) {}
+  }
+  if (staffId && staffId.indexOf("ms_") !== 0) {
+    try { staffUser = $app.findRecordById("users", staffId); } catch (err) {}
+  }
+  if (!staffUser && !msRec && staffId) {
+    try { msRec = $app.findRecordById("merchant_staff", staffId); } catch (err) {}
+  }
+  if (!staffUser && msRec) {
+    const linkedUserId = msRec.getString("user");
+    if (linkedUserId) {
+      try { staffUser = $app.findRecordById("users", linkedUserId); } catch (err) {}
+    }
+  }
+  if (staffUser && !msRec) {
+    try {
+      const hits = $app.findRecordsByFilter(
+        "merchant_staff",
+        `merchant = "${merchantId}" && user = "${staffUser.id}"`,
+        "-created",
+        1,
+        0
+      );
+      if (hits.length > 0) msRec = hits[0];
+    } catch (err) {}
+  }
+
+  if (!staffUser && !msRec) {
+    return e.json(404, { message: "Staff record not found." });
+  }
+
+  // Scope the target to this merchant, and only the owner may edit somebody else.
+  if (staffUser) {
+    const userMerchant = staffUser.getString("merchant_id");
+    if (userMerchant && userMerchant !== merchantId) {
+      return e.json(403, { message: "This staff member belongs to another store." });
+    }
+  } else if (msRec && msRec.getString("merchant") !== merchantId) {
+    return e.json(403, { message: "This staff member belongs to another store." });
+  }
+  if (staffUser && staffUser.id !== authRecord.id && !isOwner) {
+    return e.json(403, { message: "Only the store owner can edit another staff member." });
+  }
+  if (!staffUser && !isOwner) {
+    return e.json(403, { message: "Only the store owner can edit another staff member." });
+  }
+
+  // ── Name ────────────────────────────────────────────────────────────────
+  if (body.name !== undefined) {
+    const name = String(body.name || "").trim();
+    if (!name) return e.json(400, { message: "Name cannot be empty." });
+    setIfPresent(staffUser, "name", name);
+    setIfPresent(msRec, "name", name);
+  }
+
+  // ── Phone (login identity for shadow staff) ─────────────────────────────
+  let newPhone = "";
+  if (body.phone !== undefined) {
+    newPhone = normalizePhone(body.phone);
+    if (!newPhone) return e.json(400, { message: "Phone number cannot be empty." });
+    if (staffUser) {
+      let clash = null;
+      try { clash = $app.findFirstRecordByData("users", "phone", newPhone); } catch (err) {}
+      if (clash && clash.id !== staffUser.id) {
+        return e.json(400, { message: "Another account already uses this phone number." });
+      }
+      setIfPresent(staffUser, "phone", newPhone);
+    }
+    setIfPresent(msRec, "phone", newPhone);
+  }
+
+  // ── Email ───────────────────────────────────────────────────────────────
+  if (body.email !== undefined && String(body.email || "").trim() !== "") {
+    if (!staffUser) {
+      return e.json(400, { message: "This staff member has no login account, so an email cannot be set." });
+    }
+    const email = String(body.email).trim().toLowerCase();
+    let clash = null;
+    try { clash = $app.findFirstRecordByData("users", "email", email); } catch (err) {}
+    if (clash && clash.id !== staffUser.id) {
+      return e.json(400, { message: "Another account already uses this email." });
+    }
+    setIfPresent(staffUser, "email", email);
+  } else if (staffUser && newPhone && isShadowEmail(staffUser.getString("email"))) {
+    // Shadow staff log in with shadow_staff_<phone>@risev.app; keep it in step with a new phone.
+    setIfPresent(staffUser, "email", shadowEmail(newPhone));
+  }
+
+  // ── Role & branch ───────────────────────────────────────────────────────
+  if (body.role_title !== undefined) {
+    const roleTitle = String(body.role_title || "").trim() || "Provider";
+    setIfPresent(staffUser, "role_title", roleTitle);
+    setIfPresent(msRec, "role_title", roleTitle);
+  }
+
+  if (body.branch_name !== undefined) {
+    const branchName = String(body.branch_name || "").trim();
+    if (branchName) {
+      setIfPresent(staffUser, "branch_name", branchName);
+      if (msRec) {
+        try {
+          const branchList = $app.findRecordsByFilter("branches", `merchant = "${merchantId}"`, "-created", 500, 0);
+          for (let i = 0; i < branchList.length; i++) {
+            if ((branchList[i].getString("name") || "").trim().toLowerCase() === branchName.toLowerCase()) {
+              setIfPresent(msRec, "branch", branchList[i].id);
+              break;
+            }
+          }
+        } catch (err) {}
+      }
+    }
+  }
+
+  // ── Employment & compensation (metadata is the durable copy) ────────────
+  let uMeta = {};
+  if (staffUser) {
+    try {
+      const rawMeta = staffUser.get("metadata");
+      uMeta = typeof rawMeta === "string" ? JSON.parse(rawMeta) : (rawMeta || {});
+    } catch (err) { uMeta = {}; }
+  }
+
+  const employmentType = body.employment_type === "part_time"
+    ? "part_time"
+    : (body.employment_type === "full_time" ? "full_time" : "");
+  if (employmentType) {
+    uMeta.employment_type = employmentType;
+    setIfPresent(staffUser, "employment_type", employmentType);
+    setIfPresent(msRec, "employment_type", employmentType);
+  }
+
+  if (body.base_salary !== undefined) {
+    uMeta.base_salary = toNumber(body.base_salary);
+    setIfPresent(staffUser, "base_salary", uMeta.base_salary);
+    setIfPresent(msRec, "base_salary", uMeta.base_salary);
+  }
+  if (body.hourly_rate !== undefined) {
+    uMeta.hourly_rate = toNumber(body.hourly_rate);
+    setIfPresent(staffUser, "hourly_rate", uMeta.hourly_rate);
+    setIfPresent(msRec, "hourly_rate", uMeta.hourly_rate);
+  }
+  if (body.commission_type !== undefined) {
+    uMeta.commission_type = ["percentage", "fixed_per_job", "none"].indexOf(body.commission_type) !== -1
+      ? body.commission_type
+      : "none";
+    setIfPresent(staffUser, "commission_type", uMeta.commission_type);
+    setIfPresent(msRec, "commission_type", uMeta.commission_type);
+  }
+  if (body.commission_rate !== undefined) {
+    uMeta.commission_rate = toNumber(body.commission_rate);
+    setIfPresent(staffUser, "commission_rate", uMeta.commission_rate);
+    setIfPresent(msRec, "commission_rate", uMeta.commission_rate);
+  }
+
+  if (body.attendance_status !== undefined) {
+    const status = body.attendance_status === "on_leave" ? "on_leave" : "active";
+    uMeta.attendance_status = status;
+    setIfPresent(staffUser, "attendance_status", status);
+    if (msRec) setIfPresent(msRec, "is_active", status !== "on_leave");
+  }
+
+  if (staffUser) {
+    try {
+      staffUser.set("metadata", JSON.stringify(uMeta));
+    } catch (err) {}
+    try {
+      $app.save(staffUser);
+    } catch (err) {
+      return e.json(400, { message: "Could not update the staff account: " + String(err) });
+    }
+  }
+
+  if (msRec) {
+    try { $app.save(msRec); } catch (err) {}
+  }
+
+  return e.json(200, {
+    success: true,
+    staff: {
+      id: staffUser ? staffUser.id : "",
+      merchant_staff_id: msRec ? msRec.id : "",
+      name: staffUser ? staffUser.getString("name") : (msRec ? msRec.getString("name") : ""),
+      email: staffUser ? staffUser.getString("email") : "",
+      phone: staffUser ? staffUser.getString("phone") : (msRec ? msRec.getString("phone") : ""),
+      role_title: msRec ? msRec.getString("role_title") : (staffUser ? staffUser.getString("role_title") : ""),
+      branch_name: staffUser ? staffUser.getString("branch_name") : "",
+      employment_type: uMeta.employment_type || "full_time",
+      base_salary: uMeta.base_salary || 0,
+      hourly_rate: uMeta.hourly_rate || 0,
+      commission_type: uMeta.commission_type || "none",
+      commission_rate: uMeta.commission_rate || 0,
+      attendance_status: uMeta.attendance_status || "active"
+    }
+  });
+}, $apis.requireAuth("users"));
+
 // Staff Role & Compensation Tiers Management
 routerAdd("GET", "/api/risev/merchant/staff/roles", (e) => {
   const authRecord = e.auth;

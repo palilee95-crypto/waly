@@ -229,6 +229,8 @@ export default function StaffManagementScreen() {
   const [isEditingStaffPage, setIsEditingStaffPage] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editRoleTitle, setEditRoleTitle] = useState('');
   const [editAvatarUri, setEditAvatarUri] = useState<string | null>(null);
   const [editAvatarFile, setEditAvatarFile] = useState<any>(null);
@@ -1190,6 +1192,8 @@ export default function StaffManagementScreen() {
   const handleOpenEditStaff = (member: StaffMember) => {
     setEditingMember(member);
     setEditName(member.name);
+    setEditPhone(member.phone || '');
+    setEditEmail(member.email || '');
     setEditRoleTitle(member.role_title || 'Provider');
     setEditAvatarUri(getAvatarUrl(member));
     setEditAvatarFile(null);
@@ -1254,69 +1258,61 @@ export default function StaffManagementScreen() {
 
   const handleSaveStaffEdit = async () => {
     if (!editingMember || !user?.merchant_id) return;
+    if (!editName.trim()) {
+      Alert.alert(locale === 'en' ? 'Name required' : 'Nama diperlukan', locale === 'en' ? 'Please enter the staff name.' : 'Sila masukkan nama staf.');
+      return;
+    }
     setIsSavingStaff(true);
     try {
-      const formData = new FormData();
-      formData.append('merchant', user.merchant_id);
-      formData.append('name', editName.trim() || editingMember.name);
-      formData.append('role_title', editRoleTitle.trim() || 'Provider');
-      if (editingMember.phone) {
-        formData.append('phone', editingMember.phone);
-      }
-      formData.append('is_active', 'true');
-      if (editingMember.id && !editingMember.id.startsWith('ms_')) {
-        formData.append('user', editingMember.id);
-      }
+      // The avatar is a merchant-owned file on merchant_staff, so it can be uploaded directly.
+      let msId = editingMember.merchant_staff_id || '';
       if (editAvatarFile) {
-        formData.append('avatar', editAvatarFile as any);
-      }
-
-      let targetMsId = editingMember.merchant_staff_id;
-      if (!targetMsId && !editingMember.id.startsWith('ms_')) {
         try {
-          const existing = await pb.collection('merchant_staff').getFirstListItem(
-            `merchant = "${user.merchant_id}" && (user = "${editingMember.id}" || phone = "${editingMember.phone}" || name = "${editingMember.name}")`,
-            { requestKey: null }
-          );
-          targetMsId = existing.id;
-        } catch (e) {}
-      }
-
-      if (targetMsId) {
-        await pb.collection('merchant_staff').update(targetMsId, formData, { requestKey: null });
-      } else {
-        await pb.collection('merchant_staff').create(formData, { requestKey: null });
-      }
-
-      // Also update user record name & avatar if possible
-      if (editingMember.id && !editingMember.id.startsWith('ms_')) {
-        try {
-          const uForm = new FormData();
-          if (editName.trim()) uForm.append('name', editName.trim());
-          if (editAvatarFile) uForm.append('avatar', editAvatarFile as any);
-          await pb.collection('users').update(editingMember.id, uForm, { requestKey: null });
-        } catch (uErr) {}
-      }
-
-      // Save compensation & employment tier package
-      try {
-        await pb.send('/api/risev/merchant/staff/compensation', {
-          method: 'POST',
-          body: {
-            staff_id: editingMember.id,
-            employment_type: editEmploymentType,
-            base_salary: parseFloat(editBaseSalary) || 0,
-            hourly_rate: parseFloat(editHourlyRate) || 0,
-            commission_type: editCommissionType,
-            commission_rate: parseFloat(editCommissionRate) || 0
-          },
-          headers: {
-            'Authorization': 'Bearer ' + pb.authStore.token
+          if (msId) {
+            const avatarForm = new FormData();
+            avatarForm.append('avatar', editAvatarFile as any);
+            await pb.collection('merchant_staff').update(msId, avatarForm, { requestKey: null });
+          } else {
+            const avatarForm = new FormData();
+            avatarForm.append('merchant', user.merchant_id);
+            avatarForm.append('name', editName.trim());
+            avatarForm.append('role_title', editRoleTitle.trim() || 'Provider');
+            if (editPhone.trim()) avatarForm.append('phone', editPhone.trim());
+            if (editingMember.id && !editingMember.id.startsWith('ms_')) {
+              avatarForm.append('user', editingMember.id);
+            }
+            avatarForm.append('avatar', editAvatarFile as any);
+            const created = await pb.collection('merchant_staff').create(avatarForm, { requestKey: null });
+            msId = created.id;
           }
-        });
-      } catch (cErr) {
-        console.warn("Compensation update note:", cErr);
+        } catch (avatErr) {
+          console.warn('Avatar upload failed:', avatErr);
+        }
       }
+
+      // Everything else (name, email, phone, role, branch, employment, status) goes through the
+      // server route: users.updateRule is "id = @request.auth.id", so the client cannot write it.
+      const res = await pb.send<{ staff: any }>('/api/risev/merchant/staff/update', {
+        method: 'POST',
+        body: {
+          staff_id: editingMember.id,
+          merchant_staff_id: msId,
+          name: editName.trim(),
+          email: editEmail.trim(),
+          phone: editPhone.trim(),
+          role_title: editRoleTitle.trim() || 'Provider',
+          branch_name: editingMember.branch_name || '',
+          employment_type: editEmploymentType,
+          base_salary: parseFloat(editBaseSalary) || 0,
+          hourly_rate: parseFloat(editHourlyRate) || 0,
+          commission_type: editCommissionType,
+          commission_rate: parseFloat(editCommissionRate) || 0,
+          attendance_status: editingMember.attendance_status || 'active',
+        },
+        headers: {
+          'Authorization': 'Bearer ' + pb.authStore.token
+        }
+      });
 
       Alert.alert(
         locale === 'en' ? 'Success' : 'Berjaya',
@@ -1324,22 +1320,28 @@ export default function StaffManagementScreen() {
       );
       setIsEditingStaffPage(false);
       if (selectedStaffForDetails && selectedStaffForDetails.id === editingMember.id) {
+        const saved = res?.staff || {};
         setSelectedStaffForDetails(prev => prev ? ({
           ...prev,
-          name: editName.trim(),
-          role_title: editRoleTitle.trim(),
+          name: saved.name || editName.trim(),
+          email: saved.email || editEmail.trim(),
+          phone: saved.phone || editPhone.trim(),
+          role_title: saved.role_title || editRoleTitle.trim(),
           avatar_url: editAvatarUri || prev.avatar_url,
+          merchant_staff_id: saved.merchant_staff_id || prev.merchant_staff_id,
           employment_type: editEmploymentType,
           base_salary: editBaseSalary ? parseFloat(editBaseSalary) : undefined,
           hourly_rate: editHourlyRate ? parseFloat(editHourlyRate) : undefined,
           commission_type: editCommissionType,
           commission_rate: editCommissionRate ? parseFloat(editCommissionRate) : undefined,
+          attendance_status: editingMember.attendance_status || prev.attendance_status,
         }) : null);
       }
       fetchStaff();
     } catch (err: any) {
       console.warn('Failed to save staff edit:', err);
-      Alert.alert('Error', err?.message || 'Failed to update staff profile.');
+      const msg = err?.data?.message || err?.response?.message || err?.message || 'Failed to update staff profile.';
+      Alert.alert('Error', msg);
     } finally {
       setIsSavingStaff(false);
     }
@@ -1426,6 +1428,35 @@ export default function StaffManagementScreen() {
                     onChangeText={setEditName}
                     placeholder="e.g. Hashiff"
                     placeholderTextColor="#94A3B8"
+                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                  />
+                </View>
+
+                {/* Phone Number */}
+                <View style={[styles.editInputWrapper, { marginTop: 14 }]}>
+                  <Text style={styles.editMiniLabel}>Phone Number</Text>
+                  <TextInput
+                    style={styles.editTextInput}
+                    value={editPhone}
+                    onChangeText={setEditPhone}
+                    placeholder="+60123456789"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                    {...Platform.select({ web: { outlineStyle: 'none' } as any })}
+                  />
+                </View>
+
+                {/* Email Address */}
+                <View style={[styles.editInputWrapper, { marginTop: 14 }]}>
+                  <Text style={styles.editMiniLabel}>Email Address</Text>
+                  <TextInput
+                    style={styles.editTextInput}
+                    value={editEmail}
+                    onChangeText={setEditEmail}
+                    placeholder="name@store.com"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     {...Platform.select({ web: { outlineStyle: 'none' } as any })}
                   />
                 </View>
@@ -1608,6 +1639,38 @@ export default function StaffManagementScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
+
+                <View style={styles.editItemDivider} />
+
+                {/* Employment Type */}
+                <View style={styles.editItemRow}>
+                  <View style={[styles.groupedIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                    <Ionicons name="briefcase-outline" size={18} color="#2563EB" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.editItemRowLabel}>Employment Type</Text>
+                    <View style={[styles.compSegmentBox, { marginTop: 8 }]}>
+                      <TouchableOpacity
+                        style={[styles.compSegmentBtn, editEmploymentType === 'full_time' && styles.compSegmentBtnActive]}
+                        onPress={() => setEditEmploymentType('full_time')}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.compSegmentText, editEmploymentType === 'full_time' && styles.compSegmentTextActive]}>
+                          Full-Time
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.compSegmentBtn, editEmploymentType === 'part_time' && styles.compSegmentBtnActive]}
+                        onPress={() => setEditEmploymentType('part_time')}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.compSegmentText, editEmploymentType === 'part_time' && styles.compSegmentTextActive]}>
+                          Part-Time
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
               </View>
 
               {/* Navigation Rows (Access & Compensation) */}
@@ -2531,9 +2594,7 @@ export default function StaffManagementScreen() {
                     <Text style={styles.groupedRowSubtitle}>{selectedStaffForDetails.phone}</Text>
                   </View>
                   <TouchableOpacity 
-                    onPress={() => {
-                      if (selectedStaffForDetails.phone) Linking.openURL(`tel:${selectedStaffForDetails.phone}`);
-                    }}
+                    onPress={() => handleOpenEditStaff(selectedStaffForDetails)}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -2542,7 +2603,11 @@ export default function StaffManagementScreen() {
 
                 <View style={styles.groupedDivider} />
 
-                <View style={styles.groupedSettingsRow}>
+                <TouchableOpacity
+                  style={styles.groupedSettingsRow}
+                  onPress={() => handleOpenEditStaff(selectedStaffForDetails)}
+                  activeOpacity={0.7}
+                >
                   <View style={[styles.groupedIconCircle, { backgroundColor: '#F1F5F9' }]}>
                     <Ionicons name="mail-outline" size={18} color="#0F172A" />
                   </View>
@@ -2551,7 +2616,7 @@ export default function StaffManagementScreen() {
                     <Text style={styles.groupedRowSubtitle}>{selectedStaffForDetails.email || '—'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.groupedDivider} />
 
@@ -2609,6 +2674,26 @@ export default function StaffManagementScreen() {
 
                 <View style={styles.groupedDivider} />
 
+                {/* Employment Type */}
+                <TouchableOpacity 
+                  style={styles.groupedSettingsRow}
+                  onPress={() => handleOpenEditStaff(selectedStaffForDetails)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.groupedIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                    <Ionicons name="briefcase-outline" size={18} color="#2563EB" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.groupedRowTitle}>Employment Type</Text>
+                    <Text style={styles.groupedRowSubtitle}>
+                      {selectedStaffForDetails.employment_type === 'part_time' ? 'Part-Time' : 'Full-Time'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <View style={styles.groupedDivider} />
+
                 {/* Account Status */}
                 <TouchableOpacity 
                   style={styles.groupedSettingsRow}
@@ -2627,19 +2712,6 @@ export default function StaffManagementScreen() {
                   <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                 </TouchableOpacity>
 
-                <View style={styles.groupedDivider} />
-
-                {/* Last Active */}
-                <View style={styles.groupedSettingsRow}>
-                  <View style={[styles.groupedIconCircle, { backgroundColor: '#F1F5F9' }]}>
-                    <Ionicons name="time-outline" size={18} color="#0F172A" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.groupedRowTitle}>Last Active</Text>
-                    <Text style={styles.groupedRowSubtitle}>2 hours ago</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                </View>
               </View>
 
               {/* Remove Staff Button */}
