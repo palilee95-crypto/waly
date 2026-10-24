@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Stack, useSegments } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
+import { Stack, useSegments, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
@@ -40,7 +41,7 @@ if (Platform.OS === 'web') {
   };
 }
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /** Routes that never wait on app data, so the splash can lift as soon as auth settles. */
 const PUBLIC_ROUTE_PREFIXES = [
@@ -118,7 +119,7 @@ function AppContent() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
@@ -131,13 +132,15 @@ export default function RootLayout() {
     Outfit_800ExtraBold,
   });
 
+  // A font that fails to load must not strand the app on a blank splash: fall
+  // back to system fonts and let the rest of the app render.
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>
@@ -148,5 +151,28 @@ export default function RootLayout() {
         </AuthProvider>
       </LanguageProvider>
     </SafeAreaProvider>
+  );
+}
+
+/**
+ * Root error boundary: without one, a render-time throw on Android leaves a
+ * blank white screen that only a force-quit clears.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F172A', textAlign: 'center' }}>
+        Something went wrong
+      </Text>
+      <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 8, lineHeight: 20 }} numberOfLines={4}>
+        {error.message || 'The app hit an unexpected error.'}
+      </Text>
+      <Pressable
+        onPress={retry}
+        style={{ marginTop: 20, height: 44, paddingHorizontal: 24, borderRadius: 12, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>Try again</Text>
+      </Pressable>
+    </View>
   );
 }

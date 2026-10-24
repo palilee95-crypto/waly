@@ -1,6 +1,77 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import React from 'react';
 
+/**
+ * Never leave a blank white page behind. A stale cached shell can reference a
+ * bundle that the latest deploy deleted; Vercel/Netlify then answer that
+ * request with index.html and a 200, so the browser parses HTML as JS and the
+ * app never mounts. Detect that (and a silent no-boot) and retry once with a
+ * cache-busting URL, then fall back to a real reload button.
+ */
+const bootGuardScript = `
+(function () {
+  var BOOT = 'risev-boot';
+  var KEY = 'risev-boot-retry';
+
+  function booted() {
+    return document.documentElement.getAttribute('data-risev-boot') === 'done';
+  }
+
+  function fail(reason) {
+    var el = document.getElementById(BOOT);
+    if (!el || el.__risevGone || booted()) return;
+    var retried = false;
+    try { retried = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+    if (!retried) {
+      try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+      var url = location.pathname + location.search;
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'risev_bust=' + Date.now();
+      location.replace(url);
+      return;
+    }
+    el.style.backgroundColor = '#FFFFFF';
+    el.innerHTML =
+      '<div class="risev-recover">' +
+        '<img class="risev-recover-logo" src="/risev-boot.png" alt="" />' +
+        '<div class="risev-recover-title">The app could not load</div>' +
+        '<div class="risev-recover-body">You may be on an older cached version. Check your connection, then reload.</div>' +
+        '<button class="risev-recover-btn" type="button" onclick="location.replace(\\'/?risev_bust=\\' + Date.now())">Reload</button>' +
+      '</div>';
+  }
+
+  // A script element that fails to load or parse. Only ours is fatal — an
+  // ad-blocked Turnstile/Facebook SDK must not trigger a reload loop.
+  window.addEventListener('error', function (e) {
+    var t = e && e.target;
+    if (t && t.tagName === 'SCRIPT') {
+      var src = t.src || '';
+      if (src && src.indexOf('/_expo/') === -1) return;
+      fail('script');
+      return;
+    }
+    var msg = String((e && e.message) || '');
+    if (/Unexpected token\\s*'<'|Loading chunk|Importing a module script failed|error loading dynamically imported module/i.test(msg)) {
+      fail('chunk');
+    }
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    var msg = String((r && r.message) || r || '');
+    if (/Loading chunk|Importing a module script failed|Unexpected token\\s*'<'|error loading dynamically imported module/i.test(msg)) {
+      fail('chunk');
+    }
+  });
+
+  // Last resort: the page finished loading but the bundle never mounted. If the
+  // document is still fetching (slow Android connection), give it more time.
+  window.setTimeout(function () {
+    if (document.readyState !== 'complete') return;
+    if (document.getElementById(BOOT)) fail('timeout');
+  }, 12000);
+})();
+`;
+
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -64,7 +135,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         </div>
         <script
           dangerouslySetInnerHTML={{
-            __html: `setTimeout(function(){var el=document.getElementById('risev-boot');if(el&&!el.__removed){el.__removed=true;el.remove();}},12000);`,
+            __html: bootGuardScript,
           }}
         />
         {children}
@@ -172,5 +243,49 @@ const bootSplashStyles = `
     .risev-boot-arc circle {
       animation: none;
     }
+  }
+
+  .risev-recover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 340px;
+    padding: 32px;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .risev-recover-logo {
+    width: 72px;
+    height: auto;
+    margin-bottom: 4px;
+  }
+
+  .risev-recover-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0F172A;
+  }
+
+  .risev-recover-body {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: #64748B;
+  }
+
+  .risev-recover-btn {
+    margin-top: 8px;
+    height: 44px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: 12px;
+    background-color: #0F172A;
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
   }
 `;
